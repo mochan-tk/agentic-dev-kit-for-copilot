@@ -50,8 +50,8 @@ LICENSE                            MIT
 .gitattributes                     Line-ending pin: scaffold paths stay LF so the bash
                                    scripts survive Windows checkouts (core.autocrlf)
 docs/                              This repository's own development records: context
-                                   collections and ADRs about the scaffold itself (copied by
-                                   "Use this template"; the installer never ships it)
+                                   collections and ADRs about the scaffold itself
+                                   (the installer never ships it)
 .github/
   CODEOWNERS                       Human review gate on agreements/, workflows/, connectors/
   copilot-instructions.md          Repo practicalities: layout, validated commands, PR mechanics
@@ -97,8 +97,8 @@ docs/                              This repository's own development records: co
     tests/                         Offline regression tests for the CI guards (run-tests.sh)
     tuning-status.sh               Tuned or not? (report / --ci / --quiet)
 .vscode/mcp.json                   MCP servers for interactive surfaces
-.devcontainer/                     Codespaces / Dev Containers env for template contributors
-                                   (copied by "Use this template"; the installer never ships it)
+.devcontainer/                     Codespaces / Dev Containers env for kit contributors
+                                   (the installer never ships it)
 ```
 
 Everything the scaffold owns lives in `.github/` (plus root `AGENTS.md`,
@@ -182,6 +182,8 @@ bash ≥ 3.2).
      download.
    - `SCAFFOLD_REPO=owner/repo` and `SCAFFOLD_REF=<tag|branch|sha>`
      select a different source or version.
+   - Until onboarding completes, CI shows `scaffold not onboarded`
+     warnings and agents are told not to trust the command sections.
 
    **Already adopted?** Re-run with `--upgrade` to pull a newer scaffold
    (append `--dry-run` to preview first):
@@ -201,16 +203,6 @@ bash ≥ 3.2).
    ```powershell
    & ([scriptblock]::Create((irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1))) --upgrade
    ```
-
-   **Alternative for a brand-new repo:** click **Use this template** on
-   GitHub and clone.
-
-   - Copies the whole tree — including this template's `LICENSE`,
-     `.vscode/`, and `.devcontainer/`, none of which the installer ships.
-   - Replace the license with your own; keep the dev container for a
-     ready gh/jq/shellcheck environment, or delete it.
-   - Until onboarding completes, CI shows `scaffold not onboarded`
-     warnings and agents are told not to trust the command sections.
 
    *Done when:* `.github/scripts/tuning-status.sh` lists the pristine `CUSTOMIZE`
    markers and exits non-zero — the untuned state is machine-visible.

@@ -118,8 +118,8 @@ jobs:
         # scaffold's. The pathspec matches recursively.
         run: git ls-files -z '.github/*.sh' | xargs -0 shellcheck -S style
 
-      # Validates the scaffold-shipped dev container (template repository
-      # and "Use this template" copies). Gated on the sync-header sentinel
+      # Validates the scaffold-shipped dev container (this repository's
+      # own). Gated on the sync-header sentinel
       # in post-create.sh: adopting repos without it — installer adopters,
       # or apps with their own dev container (where JSONC is legitimate) —
       # are never linted, per the ownership rule above.
