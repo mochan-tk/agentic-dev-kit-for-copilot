@@ -41,6 +41,14 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The "Use this template" adoption path is dropped; the installer is the
+  single way in and the repository stays non-template. The template path
+  copied the whole tree with no filter — this kit's own development
+  records (`docs/`, 15 files), its `LICENSE`, `.vscode/`, `.devcontainer/`
+  and the full changelog — none of which the installer ships. A brand-new
+  repository is still fully served: `git init`, then run the installer
+  (refs #1 in mochan-tk/agentic-dev-kit-for-copilot).
+
 - The top-of-README adoption banner is deleted: readers scan for Getting
   started directly, and the banner dual-maintained both the install
   commands and the onboarding journey. Install commands now appear exactly
