@@ -60,8 +60,8 @@ plain `git push`; on any other branch put the scaffold commit on a branch
 cut from `origin/<default>` and push or PR-merge it to the default branch
 immediately — never sweep unrelated commits along, and never defer it to
 the P5 evidence PR. If the adopter declines, stop onboarding and note how
-to resume (land the scaffold on the default branch, re-run
-`/onboard-project`). If the push fails (no remote or no permission), record
+to resume (land the scaffold on the default branch, re-run the
+`project-onboarding` skill). If the push fails (no remote or no permission), record
 the blocker; you may continue same-checkout onboarding only after saying
 plainly that GitHub Actions, app/cloud sessions, and post-Epic task
 execution stay broken until the scaffold reaches the default branch.
@@ -94,7 +94,7 @@ discovered by P1/P3 or when work first needs it — path restrictions are
 declared per task in File ownership at decomposition time, secrets
 specifics surface when work first touches them (baseline guardrails
 already ship in the instructions), and the Projects roadmap board is
-offered by the first `/breakdown-epic` run (consent-gated), not
+offered by the first decomposition run (consent-gated), not
 interviewed up front. Every
 question must be answerable by a project owner without digging through
 the repository.
@@ -161,7 +161,8 @@ give the adopter something to review during it:
    handed-over documents by name. Open each body with a draft marker:
    *"Draft from onboarding — review and edit freely; nothing is decomposed
    until you approve."* End the **first phase's** body with the next-move
-   pointer: *"When this Epic looks right, run `/breakdown-epic` on it."* —
+   pointer: *"When this Epic looks right, decompose it with the
+   `plan-management` skill (in VS Code: `/breakdown-epic`)."* —
    the pointer rides in the body because the closing chat handoff may never
    reach whoever picks the Epic up. Later phases stay coarse until their
    turn and say so instead.
@@ -193,7 +194,8 @@ unrun command.
   user or team on every rule (clearing its `CUSTOMIZE:` sentinel) — a
   copied file that still names the template author cannot gate reviews.
 - Run `.github/scripts/setup-sources.sh` to activate the connector chosen
-  in P2 step 1 (records it in the SOURCES.md registry); `/kickoff-context` is
+  in P2 step 1 (records it in the SOURCES.md registry); the
+  `context-collection` skill (VS Code: `/kickoff-context`) is
   the follow-on that lands future context through it. Skip only when the
   adopter kept the default and no spec-kit workspace exists — then note
   the wizard can be run later.
@@ -243,13 +245,15 @@ report them *above* the block, never instead of it.
 1. Review and merge the evidence PR (the license merge).
 2. Review and edit the P2-close draft Epics — link them here, first phase
    first (or say they were skipped and point at the Epic form).
-3. When the first phase's Epic looks right, run `/breakdown-epic` on it —
-   decomposition into Task issues starts only on your approval, one phase
-   at a time; each ready Task then runs via `/start-task`.
+3. When the first phase's Epic looks right, decompose it with the
+   `plan-management` skill (VS Code: `/breakdown-epic`) — decomposition
+   into Task issues starts only on your approval, one phase
+   at a time; each ready Task then runs with the `session-orchestration`
+   skill (VS Code: `/start-task`).
 
 The same three moves ride durable carriers: the evidence PR description
 **ends with a `## Next steps` section**, and the first phase Epic's body
-already carries its `/breakdown-epic` pointer (P2-close). Durable copies exist
+already carries its decomposition pointer (P2-close). Durable copies exist
 because chat can die; the chat block exists because adopters read chat,
 not PR descriptions — neither substitutes for the other, and a PR
 announcement without the block is an unfinished P6. This checklist lives

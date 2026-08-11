@@ -278,7 +278,8 @@ bash ≥ 3.2).
    *Done when:* the board is visible in the repository's Projects tab.
 6. **First run:**
    - Collect sources into `.github/docs/context/<topic>/` (`context-collection`).
-   - When decisions must outlive their tasks, run `/distill-context` →
+   - When decisions must outlive their tasks, distill them
+     (`context-distillation`; VS Code: `/distill-context`) →
      agreements PR → human merges (= agreement). Skip when there is nothing
      above the promotion bar yet — most knowledge rides in Task issues.
    - Review the Epics drafted during onboarding — edit or replace them (form
@@ -287,10 +288,12 @@ bash ≥ 3.2).
      exist, wired and routed.
    - Dispatch the frontier: `exec:cloud` → assign the issue to Copilot;
      `exec:app` → open a parent session with the **orchestrator** agent and
-     let it spawn one child session per task (`/start-task` inside each);
+     let it spawn one child session per task (`session-orchestration`;
+     VS Code: `/start-task` inside each);
      `exec:ide` → a human pairs in the IDE (hardware work lands here).
-   - PRs flow through the gates; on deviations run `/replan`; periodically
-     run `/retro` so the system learns. Monthly, `retro-hygiene.yml` files
+   - PRs flow through the gates; on deviations replan (`plan-management`;
+     VS Code: `/replan`); periodically
+     run the `retro` skill (VS Code: `/retro`) so the system learns. Monthly, `retro-hygiene.yml` files
      a `Retro hygiene review <YYYY-MM>` issue surfacing promotion-overdue
      retro candidates and always-on budget drift.
    *Done when:* the first task PR merges with its evidence table — you have

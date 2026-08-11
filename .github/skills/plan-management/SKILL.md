@@ -106,7 +106,7 @@ gh issue list --label "ai:ready" --state open --json number,title,labels
 Optional: visualize Epics and Tasks as spans on a Projects v2 roadmap. The
 board stays a *view* of the issue graph — fields are derived from issues,
 never the reverse (see the Portfolio view row in the Data model). Creation
-has an owner: the first decomposition (`/breakdown-epic`) checks for the
+has an owner: the first decomposition checks for the
 board and, when absent, offers `init` with one consent question — declining
 never blocks decomposition, and the board can still be attached manually
 any time.
