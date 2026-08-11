@@ -135,24 +135,30 @@ else
   sed 's/^/    # /' "$OUT_DRYP"
 fi
 
-# --- banner: step 1 names the push, not just the commit --------------------
+# --- banner: step 1 lands the scaffold on the default branch ---------------
 # Reaching the remote default branch is a functional prerequisite: Actions
 # run workflows only from there, so a committed-but-unpushed scaffold breaks
-# onboarding mid-flight. The banner must say so, or adopters who follow it
-# literally land in exactly that state.
+# onboarding mid-flight. A bare `git push` is not enough guidance either --
+# on the app-session path the adopter sits on a generated branch with no
+# upstream, where it fails outright and would miss the default branch anyway.
 OUT_PUSH="$WORK/banner-push-out.txt"
 new_target
 run_init "$TARGET" > "$OUT_PUSH" 2>&1 || true
-if grep -q 'git push' "$OUT_PUSH"; then
-  t_ok "install banner tells the adopter to push"
+if grep -q 'git push origin HEAD:' "$OUT_PUSH"; then
+  t_ok "install banner pushes to the default branch explicitly"
 else
-  t_fail "install banner tells the adopter to push"
+  t_fail "install banner pushes to the default branch explicitly"
   sed 's/^/    # /' "$OUT_PUSH"
 fi
 if grep -q 'Actions only run from the default branch' "$OUT_PUSH"; then
   t_ok "install banner explains why the push matters"
 else
   t_fail "install banner explains why the push matters"
+fi
+if grep -q 'protected' "$OUT_PUSH"; then
+  t_ok "install banner names the protected-branch alternative"
+else
+  t_fail "install banner names the protected-branch alternative"
 fi
 
 # --- banner: Windows note is MSYS-shell-gated (#169) ------------------------

@@ -41,6 +41,17 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The install banner now shows a push command that works on the app-session
+  path. It previously printed a bare `git push`, which assumes the adopter
+  is on the default branch with an upstream configured — neither holds in a
+  Copilot app worktree session, where the command fails outright ("no
+  upstream branch") and, even when it succeeds elsewhere, pushes to a branch
+  Actions never read. Step 1 now states the goal (land the scaffold on the
+  remote default branch), prints `git push origin HEAD:<default>` with the
+  branch name resolved locally from `origin/HEAD` (placeholder when it
+  cannot be resolved), and names the protected-branch alternative in one
+  clause (refs #10 in mochan-tk/agentic-dev-kit-for-copilot).
+
 - The install banner now tells adopters to **push**, not just commit. Step
   1 named only `git commit`, so an adopter who followed it literally left
   the scaffold off the remote default branch — where Actions never run,

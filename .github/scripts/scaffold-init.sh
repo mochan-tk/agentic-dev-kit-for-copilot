@@ -552,12 +552,22 @@ else
   done
   [ -e LICENSE ] || echo " no LICENSE installed — the license choice is yours to make."
   echo
+  # Name the default branch in the push command so it works from the app
+  # session path: a worktree on its own generated branch, with no upstream.
+  # Resolved locally only — `origin/HEAD` exists in clones but not after a
+  # plain `git init` + `git remote add`, so fall back to a placeholder the
+  # adopter substitutes rather than guessing a name.
+  DEFAULT_BRANCH="$( { git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true; } | sed 's#^[^/]*/##' )"
+  [ -n "$DEFAULT_BRANCH" ] || DEFAULT_BRANCH="<default-branch>"
   echo " Next steps:"
-  echo "   1. Commit and push:          git commit -m 'Adopt agentic-dev scaffold'"
-  echo "                                git push"
+  echo "   1. Land it on the default branch:"
+  echo "        git commit -m 'Adopt agentic-dev scaffold'"
+  echo "        git push origin HEAD:$DEFAULT_BRANCH"
   echo "      Actions only run from the default branch, so the scaffold has"
-  echo "      to land there before onboarding. Skip both and"
-  echo "      /onboard-project offers to commit and push for you."
+  echo "      to reach it before onboarding — a push to any other branch"
+  echo "      does not count. If that branch is protected, push your own"
+  echo "      branch and open a PR instead. Skip all of this and"
+  echo "      /onboard-project offers to do it for you."
   echo "   2. Onboard interactively:    open GitHub Copilot (VS Code Chat, CLI,"
   echo "      or an app session) and run /onboard-project — it interviews you,"
   echo "      bootstraps the canonical labels, offers to enable branch"
