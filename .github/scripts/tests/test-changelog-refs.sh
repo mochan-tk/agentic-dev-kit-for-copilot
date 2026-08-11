@@ -44,6 +44,7 @@ expect_rc_grep 0 "check-changelog-refs: OK" \
   bash "$GUARD" "$WORK/qualified.md"
 
 # --- code spans are documentation, not links ------------------------------
+# shellcheck disable=SC2016  # the backticks are literal Markdown in the fixture
 write_changelog codespan.md '- The guard rejects a bare `#9999` in prose.'
 expect_rc_grep 0 "check-changelog-refs: OK" \
   "number inside a code span is ignored" \

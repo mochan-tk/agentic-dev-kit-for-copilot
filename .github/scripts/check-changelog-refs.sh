@@ -34,6 +34,7 @@ MAX_KNOWN=200
 # Drop code spans first: `#123` inside backticks is documentation, not a link.
 # Then drop qualified cross-repository references (owner/repo#n) so only bare
 # numbers remain.
+# shellcheck disable=SC2016  # the backticks are literal Markdown, not a subshell
 stripped="$(sed -e 's/`[^`]*`//g' -e 's|[A-Za-z0-9._-]\{1,\}/[A-Za-z0-9._-]\{1,\}#[0-9]\{1,\}||g' "$FILE")"
 
 bad=0
