@@ -45,6 +45,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Decomposition now corrects the Epic's state line. Onboarding opens a draft
+  Epic with "nothing is decomposed until you approve", but nothing ever
+  removed that marker, so an Epic that had been reviewed, approved and split
+  into Task sub-issues still told every later reader — human or agent — the
+  opposite of the truth. The decomposition procedure now replaces it with one
+  line naming the phase just decomposed and the date, rewritten each round so
+  it stays true under rolling-wave; Epics that never carried the marker
+  simply gain the line. The skill states why this edit does not breach the
+  single-writer rule: AGENTS.md §5 binds an agent to its own Task issue, and
+  an Epic is the plan it works from, not the work order it executes
+  (refs #20).
+
 - `setup-project.sh init` now creates the board's working views —
   `Roadmap` (roadmap layout), `Kanban` (board layout), `Backlog` (table
   layout). It previously created none and told the adopter to build them in

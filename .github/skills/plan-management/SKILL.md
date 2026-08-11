@@ -49,6 +49,15 @@ this.
    disjoint **File ownership** path sets. If two tasks need the same paths,
    add a `blocked-by` edge between them — serialization by dependency beats
    merge-conflict roulette.
+5. Once the round's Task issues exist, correct the Epic body's state line:
+   replace the onboarding draft marker (*"Draft from onboarding — … nothing
+   is decomposed until you approve."*) with one line naming the phase just
+   decomposed and the date. Epics without that marker simply gain the line.
+   Rewrite the same line on every later round — an Epic is decomposed many
+   times, so a one-shot "approved" claim would go stale immediately. This
+   is the one issue body an executing session may edit: AGENTS.md §5 binds
+   an agent to its own **Task** issue, and the Epic is the plan it works
+   from, not the work order it executes.
 
 ## The frontier
 

@@ -32,5 +32,10 @@ Epic issue number: ${input:epicNumber}
    schedule spans with `setup-project.sh dates` where dates are known.
    Never block decomposition on this: a decline is simply noted, and a
    missing `project` scope is reported with `gh auth refresh -s project`.
-7. Post one summary comment on the Epic listing what was created and why,
+7. Update the Epic body's state line: replace the onboarding draft marker
+   ("Draft from onboarding — … nothing is decomposed until you approve.")
+   with one line naming the phase just decomposed and today's date. An Epic
+   that never carried the marker simply gains the line. Rewriting it each
+   round keeps it true — rolling-wave decomposes the same Epic repeatedly.
+8. Post one summary comment on the Epic listing what was created and why,
    including the board outcome (URL, declined, or blocked).
