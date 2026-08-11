@@ -41,6 +41,15 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The install banner now tells adopters to **push**, not just commit. Step
+  1 named only `git commit`, so an adopter who followed it literally left
+  the scaffold off the remote default branch — where Actions never run,
+  breaking label bootstrapping and onboarding mid-flight. The banner now
+  names both commands, says why the push matters, and makes clear that
+  `/onboard-project` can do both if you skip them; a regression test keeps
+  the wording from drifting back (refs #8 in
+  mochan-tk/agentic-dev-kit-for-copilot).
+
 - The README Conventions label list is complete again: it named nine of the
   twelve labels `setup-labels.sh` creates. The three that were missing are
   now covered in the same bullet — `risk:high` (described by its effect:
