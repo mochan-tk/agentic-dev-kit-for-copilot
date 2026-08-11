@@ -153,6 +153,9 @@ jobs:
       - name: Check Markdown path references resolve
         run: bash .github/scripts/check-md-links.sh
 
+      - name: Check changelog issue references resolve to this repository
+        run: bash .github/scripts/check-changelog-refs.sh
+
       - name: Check connector definitions conform
         run: bash .github/scripts/check-connectors.sh
 
