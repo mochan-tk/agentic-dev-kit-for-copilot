@@ -54,11 +54,19 @@
 # Usage:
 #   check-task-ritual.sh [<pr-number>]     # or set PR_NUMBER
 #
-# Exemption: only allowlisted dependency bots skip the ritual (default:
-# dependabot[bot] renovate[bot] github-actions[bot]; override with
-# RITUAL_EXEMPT_BOTS, space-separated logins). Any other bot author —
-# cloud coding agents included — holds a session and is held to the
-# full ritual.
+# Exemptions — two, both narrow:
+#   1. Allowlisted dependency bots skip the ritual (default: dependabot[bot]
+#      renovate[bot] github-actions[bot]; override with RITUAL_EXEMPT_BOTS,
+#      space-separated logins). Any other bot author — cloud coding agents
+#      included — holds a session and is held to the full ritual.
+#   2. The onboarding evidence PR, which has no upstream Task because it *is*
+#      the deliverable. It must carry the skill-mandated title
+#      `scaffold: onboard <project>`, target an adopted scaffold (the base
+#      branch's scaffold-version marker names a real commit, not the
+#      template's own `sha=unknown`), and target a base that still carries
+#      CUSTOMIZE markers. Those last two make the exemption self-limiting: it
+#      holds at most once per adopting repository and lapses the moment
+#      onboarding merges.
 #
 # Requires: GitHub CLI (gh), authenticated. Repo context comes from the
 # checkout ({owner}/{repo} placeholders); set GH_REPO to override.
@@ -109,9 +117,59 @@ fi
 
 body=$(api "repos/{owner}/{repo}/pulls/${PR}" --jq '.body // ""')
 
-# The first task link names the primary Task under review.
+# The onboarding evidence PR is the one legitimate PR with no upstream Task:
+# it *is* the deliverable, and no Task issue exists when it opens. Exempt it,
+# but only when every signal agrees, so an ordinary PR cannot claim the
+# exemption by choosing a title:
+#
+#   1. the title the onboarding skill mandates, `scaffold: onboard <project>`;
+#   2. an adopting repository, not this template itself — the base branch's
+#      scaffold-version marker names a real commit, where the template's own
+#      copy reads `sha=unknown`;
+#   3. a base branch that has not been onboarded yet — CUSTOMIZE markers still
+#      present there.
+#
+# Signals 2 and 3 make the exemption self-limiting: it holds at most once per
+# adopting repository and lapses the moment the onboarding PR merges, because
+# the base tree is tuned from then on. Signal 3 must be measured against the
+# *base*, never the PR tree — the onboarding PR is precisely the change that
+# removes those markers, so its own tree is already tuned.
+base_ref=$(api "repos/{owner}/{repo}/pulls/${PR}" --jq '.base.ref')
+title=$(api "repos/{owner}/{repo}/pulls/${PR}" --jq '.title // ""')
+if printf '%s\n' "$title" | grep -qE '^scaffold: onboard '; then
+  # Read the base tree through the API so the check behaves identically
+  # wherever it runs — the workflow's checkout may not carry the base ref.
+  base_file() {
+    api "repos/{owner}/{repo}/contents/$1?ref=${base_ref}" --jq '.content' 2>/dev/null \
+      | base64 -d 2>/dev/null || true
+  }
+  adopted=0
+  base_file 'SCAFFOLD-CHANGELOG.md' \
+    | grep -qE '^<!-- scaffold-version: repo=[^ ]+ sha=[0-9a-f]{7,40} ' && adopted=1
+  base_untuned=0
+  base_file '.github/copilot-instructions.md' | grep -q 'CUSTOMIZE' && base_untuned=1
+
+  if [[ "$adopted" -eq 1 && "$base_untuned" -eq 1 ]]; then
+    echo "PASS: PR #${PR} is the onboarding evidence PR (title '${title}'). Its base"
+    echo "      '${base_ref}' is an adopted scaffold that still carries CUSTOMIZE"
+    echo "      markers, so no Task issue exists yet — this PR is the deliverable."
+    echo "      The exemption lapses once onboarding merges."
+    exit 0
+  fi
+  echo "note: PR #${PR} is titled like an onboarding PR, but base '${base_ref}' is"
+  if [[ "$adopted" -eq 0 ]]; then
+    echo "      not an adopted scaffold (no pinned scaffold-version marker);"
+  else
+    echo "      already onboarded;"
+  fi
+  echo "      the full start ritual applies."
+fi
+
+# The first task link names the primary Task under review. A qualifier may sit
+# between the keyword and the number ("Refs Epic #2") — the phrasing is
+# accurate and rejecting it buys no safety.
 link=$(printf '%s\n' "$body" \
-  | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?|refs?)[[:space:]]+#[0-9]+' \
+  | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?|refs?)[[:space:]]+([A-Za-z]+[[:space:]]+)?#[0-9]+' \
   | head -n1 || true)
 if [[ -z "$link" ]]; then
   echo "FAIL: PR #${PR} body has no task link (e.g. 'Closes #N', or 'Refs #N' for post-merge acceptance)."

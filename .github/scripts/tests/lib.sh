@@ -73,11 +73,12 @@ stage_all() {
 # `gh api <path> [--paginate] --jq <expr>` from JSON fixtures in
 # $GH_FIXTURES: pull.json (PR endpoint), commits.json (PR commits),
 # comments.json (issue comments list), comment.json (single comment by
-# id), issue.json (issue metadata), repo.json (bare repository
-# endpoint), user.json (authenticated user), org.json (organization
-# endpoint). jq runs with -r to mirror gh's raw --jq output. No network,
-# no auth, no repository state. A missing fixture file exits non-zero,
-# which models a 404 to the caller.
+# id), issue.json (issue metadata), contents.json (repository contents
+# endpoint; contents-changelog.json for SCAFFOLD-CHANGELOG.md), repo.json
+# (bare repository endpoint), user.json (authenticated user), org.json
+# (organization endpoint). jq runs with -r to mirror gh's raw --jq output.
+# No network, no auth, no repository state. A missing fixture file exits
+# non-zero, which models a 404 to the caller.
 install_gh_shim() {
   mkdir -p "$1/bin"
   cat > "$1/bin/gh" <<'SHIM'
@@ -101,6 +102,8 @@ case "$path" in
   orgs/*) fixture="$GH_FIXTURES/org.json" ;;
   repos/*/pulls/*/commits) fixture="$GH_FIXTURES/commits.json" ;;
   repos/*/pulls/*) fixture="$GH_FIXTURES/pull.json" ;;
+  repos/*/contents/SCAFFOLD-CHANGELOG.md*) fixture="$GH_FIXTURES/contents-changelog.json" ;;
+  repos/*/contents/*) fixture="$GH_FIXTURES/contents.json" ;;
   repos/*/issues/comments/*) fixture="$GH_FIXTURES/comment.json" ;;
   repos/*/issues/*/comments) fixture="$GH_FIXTURES/comments.json" ;;
   repos/*/issues/*) fixture="$GH_FIXTURES/issue.json" ;;
