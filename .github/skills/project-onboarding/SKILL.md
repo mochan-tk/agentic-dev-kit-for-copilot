@@ -20,7 +20,7 @@ Three invariants govern everything below:
   it has been executed in a clean environment during this onboarding, with
   its output (or failure + workaround) captured for the PR.
 - **Onboarding tunes; it does not build.** The deliverables are the tuned
-  scaffold, the evidence PR, and the draft Epic — never application code or
+  scaffold, the evidence PR, and the draft Epics — never application code or
   infrastructure changes. Application goals in the adopter's material are
   Epic content; work that cannot run here (missing tools, external systems,
   credentials) becomes a *Deferred from onboarding* entry (P6), not work to
@@ -151,18 +151,24 @@ give the adopter something to review during it:
    Record the choice and the script output in the evidence log. An API
    refusal (Free-plan private repo) is recorded the same way and never
    blocks onboarding.
-3. Draft the **outline Epic** on GitHub from the stated goal and the
+3. Draft the **phase Epics** on GitHub from the stated goal and the
    handed-over material, using the Epic form fields (outcome, success
-   criteria, scope, coarse phase outline). Keep it coarse — no Task
-   decomposition, no invented REQ-### IDs; cite handed-over documents by
-   name. Open the body with a draft marker: *"Draft from onboarding —
-   review and edit freely; nothing is decomposed until you approve."* End
-   the body with the next-move pointer: *"When this Epic looks right, run
-   `/breakdown-epic` on it."* — the pointer rides in the body because the
-   closing chat handoff may never reach whoever picks the Epic up.
-4. Hand the Epic URL to the adopter with: review this while I verify.
+   criteria, scope, coarse phase outline) — one Epic per phase of the
+   outline, as siblings; an Epic is never a sub-issue of another Epic. A
+   one-phase outline yields exactly one. Wire them `blocked-by` in phase
+   order, since ordering lives in dependencies, not prose. Keep every Epic
+   coarse — no Task decomposition, no invented REQ-### IDs; cite
+   handed-over documents by name. Open each body with a draft marker:
+   *"Draft from onboarding — review and edit freely; nothing is decomposed
+   until you approve."* End the **first phase's** body with the next-move
+   pointer: *"When this Epic looks right, run `/breakdown-epic` on it."* —
+   the pointer rides in the body because the closing chat handoff may never
+   reach whoever picks the Epic up. Later phases stay coarse until their
+   turn and say so instead.
+4. Hand the adopter every Epic URL, first phase first, with: review these
+   while I verify.
 
-Skip the draft (labels and the consent question still run) only when the
+Skip the drafts (labels and the consent question still run) only when the
 adopter stated no goal and handed over nothing — then note the Epic form
 for later.
 
@@ -217,9 +223,11 @@ Then write the **Deferred from onboarding ledger**: collect every item
 left undone or unverified across P0–P5 — commands that could not run
 (missing tools), external operations (pushes, deploys, credentials,
 resource provisioning), skipped or declined consent steps — and append
-them to the draft Epic body as a `## Deferred from onboarding` section,
-one checklist line each with the blocking reason. When the Epic was
-skipped, carry the same section in the evidence PR description instead.
+them to the **first phase Epic's** body as a `## Deferred from onboarding`
+section, one checklist line each with the blocking reason — the ledger is
+about onboarding, so it rides the Epic that is ready to move, not every
+phase. When the Epics were skipped, carry the same section in the evidence
+PR description instead.
 Chat is not a carrier: a deferred item that exists only in the final
 message evaporates with the session.
 
@@ -233,15 +241,15 @@ filled in. Queued checks, CI failures, or other problems do not waive it:
 report them *above* the block, never instead of it.
 
 1. Review and merge the evidence PR (the license merge).
-2. Review and edit the P2-close draft Epic — link it here (or say it was
-   skipped and point at the Epic form).
-3. When the Epic looks right, run `/breakdown-epic` on it — decomposition
-   into Task issues starts only on your approval; each ready Task then
-   runs via `/start-task`.
+2. Review and edit the P2-close draft Epics — link them here, first phase
+   first (or say they were skipped and point at the Epic form).
+3. When the first phase's Epic looks right, run `/breakdown-epic` on it —
+   decomposition into Task issues starts only on your approval, one phase
+   at a time; each ready Task then runs via `/start-task`.
 
 The same three moves ride durable carriers: the evidence PR description
-**ends with a `## Next steps` section**, and the draft Epic body already
-carries its `/breakdown-epic` pointer (P2-close). Durable copies exist
+**ends with a `## Next steps` section**, and the first phase Epic's body
+already carries its `/breakdown-epic` pointer (P2-close). Durable copies exist
 because chat can die; the chat block exists because adopters read chat,
 not PR descriptions — neither substitutes for the other, and a PR
 announcement without the block is an unfinished P6. This checklist lives

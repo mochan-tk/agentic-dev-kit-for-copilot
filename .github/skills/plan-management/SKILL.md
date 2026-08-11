@@ -36,7 +36,9 @@ this.
 ## Rolling-wave decomposition
 
 1. Create Epics for the whole outline up front — cheap, low detail, gives the
-   "what comes next" visibility agents need for preparation.
+   "what comes next" visibility agents need for preparation. One Epic per
+   phase, all siblings: the graph is two levels, so an Epic is never a
+   sub-issue of another Epic. Order them with `blocked-by`.
 2. Decompose an Epic into Task sub-issues only when its phase is about to
    start (or when the frontier is nearly empty). Detail decays; write it late.
 3. Every Task must clear the planner quality bar

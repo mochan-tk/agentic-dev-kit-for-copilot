@@ -28,9 +28,10 @@ Optional context from me: ${input:notes}
    canonical labels (`.github/scripts/setup-labels.sh`), ask my consent
    to enable branch protection now (state the admin PR-only bypass and
    Free-plan caveats) and run `.github/scripts/setup-ruleset.sh` per my
-   answer, draft the outline Epic from my goal and material (coarse,
-   draft-marked, no decomposition, `/breakdown-epic` pointer at the end of
-   the body), and give me its URL to review while you verify.
+   answer, draft the phase Epics from my goal and material (one per phase,
+   siblings never nested, `blocked-by` in order, coarse, draft-marked, no
+   decomposition, `/breakdown-epic` pointer at the end of the first
+   phase's body), and give me their URLs to review while you verify.
 3. **P3:** verify candidate commands by actually running them; keep an
    evidence log (command, prerequisites, result, workarounds). Show me the
    log before applying anything.
@@ -44,13 +45,14 @@ Optional context from me: ${input:notes}
 5. **P5/P6:** prove (`tuning-status.sh` exits 0; gates run once) and open
    one PR titled `scaffold: onboard <project>` with the evidence log in the
    description, plus the retro-log row and any upstream candidates. Append
-   everything left undone in P0–P5 to the draft Epic body as a
+   everything left undone in P0–P5 to the first phase Epic's body as a
    `## Deferred from onboarding` checklist (to the PR description when the
-   Epic was skipped), and end the PR description with a `## Next steps`
-   section (merge this PR → review the Epic → `/breakdown-epic`). You are
+   Epics were skipped), and end the PR description with a `## Next steps`
+   section (merge this PR → review the Epics → `/breakdown-epic` on the
+   first phase). You are
    not done at push: the PR must exist (if its creation is blocked, tell me
    and print the exact `gh pr create` command), and the chat message where
    you hand me the PR link must end with the numbered handoff — 1. merge
-   the evidence PR, 2. review the draft Epic (link it), 3. run
-   `/breakdown-epic` on it when it looks right. Queued or failing checks
+   the evidence PR, 2. review the draft Epics (link them), 3. run
+   `/breakdown-epic` on the first phase when it looks right. Queued or failing checks
    don't waive the handoff: report problems above it, never instead of it.
