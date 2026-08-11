@@ -160,14 +160,14 @@ bash ≥ 3.2).
    from a fork.
 
    ```sh
-   curl -fsSL https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash
    ```
 
    On Windows, use the PowerShell bootstrap (it locates Git for Windows
    and runs the same bash installer through Git Bash):
 
    ```powershell
-   irm https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.ps1 | iex
+   irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1 | iex
    ```
 
    - Installs only what the scaffold owns — `.github/**`, `AGENTS.md`,
@@ -192,14 +192,14 @@ bash ≥ 3.2).
    - Review the staged diff and land it as one PR.
 
    ```sh
-   curl -fsSL https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.sh | bash -s -- --upgrade
+   curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash -s -- --upgrade
    ```
 
    On Windows, plain `irm … | iex` cannot forward flags, so invoke it as
    a script block:
 
    ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.ps1))) --upgrade
+   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1))) --upgrade
    ```
 
    **Alternative for a brand-new repo:** click **Use this template** on

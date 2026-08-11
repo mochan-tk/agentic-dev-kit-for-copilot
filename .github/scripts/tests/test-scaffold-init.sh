@@ -295,7 +295,7 @@ if [ "$(grep -Ec "$MARKER_RE" "$TARGET/SCAFFOLD-CHANGELOG.md")" = "1" ]; then
 else
   t_fail "fresh install writes exactly one schema-valid version marker"
 fi
-if grep -Eq '^<!-- scaffold-version: repo=mochan-tk/ttt1-copilot sha=unknown date=[0-9]{4}-[0-9]{2}-[0-9]{2} -->$' "$TARGET/SCAFFOLD-CHANGELOG.md"; then
+if grep -Eq '^<!-- scaffold-version: repo=mochan-tk/agentic-dev-kit-for-copilot sha=unknown date=[0-9]{4}-[0-9]{2}-[0-9]{2} -->$' "$TARGET/SCAFFOLD-CHANGELOG.md"; then
   t_ok "non-git source tree degrades to sha=unknown (never invented)"
 else
   t_fail "non-git source tree degrades to sha=unknown (never invented)"
@@ -340,7 +340,7 @@ fi
 # --- dirty source tree: HEAD sha must not be claimed -----------------------
 echo "uncommitted" >> "$GITFIX/AGENTS.md"
 (cd "$TARGET" && SCAFFOLD_SOURCE_DIR="$GITFIX" bash "$INIT" --force) >/dev/null 2>&1
-if grep -Eq '^<!-- scaffold-version: repo=mochan-tk/ttt1-copilot sha=unknown date=[0-9]{4}-[0-9]{2}-[0-9]{2} -->$' "$TARGET/SCAFFOLD-CHANGELOG.md"; then
+if grep -Eq '^<!-- scaffold-version: repo=mochan-tk/agentic-dev-kit-for-copilot sha=unknown date=[0-9]{4}-[0-9]{2}-[0-9]{2} -->$' "$TARGET/SCAFFOLD-CHANGELOG.md"; then
   t_ok "dirty source tree degrades the marker to sha=unknown"
 else
   t_fail "dirty source tree degrades the marker to sha=unknown"

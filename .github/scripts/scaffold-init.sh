@@ -2,7 +2,7 @@
 # scaffold-init.sh — install the agentic-dev scaffold into a repository.
 #
 # One-liner (run at the root of a new or existing git repository):
-#   curl -fsSL https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash
 # Windows (PowerShell): use the companion bootstrap scaffold-init.ps1 in this
 # directory — it runs this script through Git Bash; logic lives here only.
 #
@@ -38,7 +38,7 @@
 #   - installed files are staged with `git add`, never committed.
 #
 # Environment:
-#   SCAFFOLD_REPO        source template repository (default: mochan-tk/ttt1-copilot)
+#   SCAFFOLD_REPO        source template repository (default: mochan-tk/agentic-dev-kit-for-copilot)
 #   SCAFFOLD_REF         branch / tag / SHA to fetch (default: main)
 #   SCAFFOLD_SOURCE_DIR  local template tree to copy from — no network at all
 #
@@ -49,7 +49,7 @@
 
 set -euo pipefail
 
-REPO="${SCAFFOLD_REPO:-mochan-tk/ttt1-copilot}"
+REPO="${SCAFFOLD_REPO:-mochan-tk/agentic-dev-kit-for-copilot}"
 REF="${SCAFFOLD_REF:-main}"
 SRC_OVERRIDE="${SCAFFOLD_SOURCE_DIR:-}"
 
@@ -78,7 +78,7 @@ Flags:
   --help      this text
 
 Environment:
-  SCAFFOLD_REPO        source repo, owner/name   (default mochan-tk/ttt1-copilot)
+  SCAFFOLD_REPO        source repo, owner/name   (default mochan-tk/agentic-dev-kit-for-copilot)
   SCAFFOLD_REF         branch / tag / SHA        (default main)
   SCAFFOLD_SOURCE_DIR  local template tree — skips all network fetch
 
@@ -86,7 +86,7 @@ The network fetch is pinned: SCAFFOLD_REF is resolved to a commit SHA
 before download, and that SHA is recorded in the provenance line.
 
 Examples:
-  curl -fsSL https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash
   SCAFFOLD_REPO=acme/dev-scaffold SCAFFOLD_REF=v1.0.0 bash scaffold-init.sh
   bash /path/to/template/.github/scripts/scaffold-init.sh my-new-repo
 EOF

@@ -6,11 +6,11 @@
 # this file must never duplicate any of it.
 #
 # One-liner (PowerShell, at the root of a new or existing git repository):
-#   irm https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.ps1 | iex
+#   irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1 | iex
 #
 # One-liner with arguments (iex cannot forward flags - $args is empty in
 # evaluated text; a script block invocation populates it):
-#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.ps1))) --upgrade
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1))) --upgrade
 #
 # Saved-file form forwards the installer's arguments:
 #   .\scaffold-init.ps1 [--force|--upgrade] [--dry-run] [--help] [target-dir]
@@ -26,7 +26,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$installerUrl = 'https://raw.githubusercontent.com/mochan-tk/ttt1-copilot/main/.github/scripts/scaffold-init.sh'
+$installerUrl = 'https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh'
 
 function Find-GitBash {
     # Standard Git for Windows locations first, then PATH.

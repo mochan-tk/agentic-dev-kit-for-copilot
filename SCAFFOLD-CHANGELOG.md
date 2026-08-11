@@ -7,7 +7,7 @@ an instance, this same file records which template version the instance
 adopted. The project's own changelog, if any, lives elsewhere — this file is
 about the scaffolding only.
 
-<!-- scaffold-version: repo=mochan-tk/ttt1-copilot sha=unknown date=unknown -->
+<!-- scaffold-version: repo=mochan-tk/agentic-dev-kit-for-copilot sha=unknown date=unknown -->
 **Scaffold version adopted by this instance:** v1.0.0 *(this is the template
 itself; in a copied instance, update this line when upgrading — the
 onboarding PR should confirm it)*
