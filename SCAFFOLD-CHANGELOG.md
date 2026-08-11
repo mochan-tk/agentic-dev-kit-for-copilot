@@ -45,6 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The `task-ritual` CI job can check out private repositories again. It
+  declared its own `permissions:` block, and a job-level block *replaces* the
+  workflow-level grant rather than merging with it — so `contents: read` was
+  lost and `actions/checkout` failed with "Repository not found" before the
+  guard ever ran. Public repositories clone without a token, so this
+  scaffold's own CI stayed green while every adopter on a private repository
+  saw a red check on every pull request. A new guard,
+  `check-workflow-permissions.sh`, fails CI when any job declares
+  `permissions:`, checks out, and omits `contents` — a static check, because
+  a public repository structurally cannot catch this class of defect by
+  running its own CI. Adopters already on private repositories pick the fix
+  up by re-running the installer with `--upgrade` (refs #24).
+
 - Onboarding now drafts one Epic per phase instead of a single Epic for the
   whole project. The two skills contradicted each other — `plan-management`
   asks for "Epics for the whole outline up front", `project-onboarding` said
