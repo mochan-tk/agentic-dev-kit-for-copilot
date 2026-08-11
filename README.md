@@ -111,7 +111,11 @@ to your application and is never touched by the scaffold's checks.
   (`task/<issue-number>-<short-slug>`) = 1 PR (`Closes #<n>`).
 - **Labels:** `type:epic`, `type:task`, `ai:ready`, `needs:human`,
   `needs:replan`, and exactly one of `exec:cloud | exec:app | exec:cli |
-  exec:ide` per task.
+  exec:ide` per task. Three more are situational, not per-task:
+  `risk:high` pauses a task after its plan comment until a human approves
+  (the default is pass-through), `retro:candidate` marks observed friction
+  for the retro loop, and `from:adopter` marks a feedback report — triage
+  input, not a work order.
 - **Task issue sections (parsed — do not rename):** Objective, Context &
   references, Acceptance criteria, Out of scope, File ownership,
   Verification, Routing, Handoff notes.

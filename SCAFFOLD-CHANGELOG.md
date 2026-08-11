@@ -41,6 +41,14 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The README Conventions label list is complete again: it named nine of the
+  twelve labels `setup-labels.sh` creates. The three that were missing are
+  now covered in the same bullet — `risk:high` (described by its effect:
+  pauses a task after its plan comment until a human approves, where the
+  default is pass-through), `retro:candidate`, and `from:adopter`. An agent
+  reading only the README could not previously know the `risk:high` lever
+  existed (refs #3 in mochan-tk/agentic-dev-kit-for-copilot).
+
 - The "Use this template" adoption path is dropped; the installer is the
   single way in and the repository stays non-template. The template path
   copied the whole tree with no filter — this kit's own development
