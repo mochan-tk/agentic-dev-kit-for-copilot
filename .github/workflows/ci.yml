@@ -34,6 +34,13 @@ jobs:
       - name: Action references are SHA-pinned
         run: bash .github/scripts/check-action-pins.sh
 
+      # A job-level permissions block replaces the workflow-level grant, so a
+      # job that checks out must repeat `contents: read`. The failure is
+      # invisible here — public repositories clone without a token — and only
+      # bites adopters on private ones, hence a static check.
+      - name: Job permissions cover checkout
+        run: bash .github/scripts/check-workflow-permissions.sh
+
       # Escalation-wording wall: failure budgets live only in the normative
       # skills; every other surface defers to the ladder without restating
       # counts (duplicated numbers drift from the design authority).
@@ -70,6 +77,12 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
+      # A job-level block replaces the workflow-level grant rather than
+      # adding to it, so `contents: read` has to be repeated here — without
+      # it `actions/checkout` fails with "Repository not found" on private
+      # repositories. Public repositories clone without a token, which is
+      # why this scaffold's own CI cannot catch the omission.
+      contents: read
       issues: read
       pull-requests: read
     steps:
