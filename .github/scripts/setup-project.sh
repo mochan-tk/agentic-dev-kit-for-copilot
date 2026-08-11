@@ -16,9 +16,9 @@
 #
 # Subcommands:
 #   init   Create (or reuse) a Projects v2 board titled "<repo> roadmap" by
-#   init   Create (or reuse) a Projects v2 board titled "<repo> roadmap" by
 #          default, add DATE fields `Start date` and `Target date` and a
-#          SINGLE_SELECT field `Kind` (options Epic, Task) if missing, link
+#          SINGLE_SELECT field `Kind` (options Epic, Task) if missing, create
+#          the `Roadmap`, `Kanban` and `Backlog` views if missing, link
 #          the project to the repository, and print the project number and
 #          URL. Re-running is a no-op. Projects v2 boards are always
 #          user/org-owned (repo-owned boards no longer exist); the repo
@@ -41,10 +41,11 @@
 #                            current directory belongs to (via `gh repo view`).
 #   -h, --help               Show this help and exit.
 #
-# One-time manual steps (not scriptable): create the Roadmap *view* in the
-# project UI, pick `Start date` / `Target date` as its date fields, and set
-# "Group by" to `Kind` to separate Epics from Tasks — view creation and
-# configuration are not exposed by the GitHub API.
+# Views are created by name (`Roadmap`, `Kanban`, `Backlog`) and matched by
+# name on re-runs, so an adopter's own views are never renamed or removed.
+# What stays manual: `createProjectV2View` takes only a name and a layout —
+# its `configuration` input carries `visibleFieldIds` alone — so the Roadmap
+# view's date fields and "Group by: Kind" must be set once in the UI.
 #
 # Requires: gh >= 2.45 (`gh project link`) authenticated with the `project`
 # scope, and jq.
@@ -216,6 +217,41 @@ reuse it and complete the fields and the repository link"
     echo "Created SINGLE_SELECT field 'Kind' (Epic, Task)."
   fi
 
+  # Working views. `createProjectV2View` takes a name and a layout; its
+  # `configuration` input carries only `visibleFieldIds`, so grouping and the
+  # roadmap's date fields cannot be set through the API and stay manual.
+  # Matched by name, so an adopter's own views are never renamed or removed.
+  local project_id existing_views view_spec view_name view_layout
+  project_id="$(gh project view "$number" --owner "$owner" --format json --jq '.id')"
+  # shellcheck disable=SC2016  # $id is a GraphQL variable, not a shell expansion
+  existing_views="$(gh api graphql -f query='
+    query($id: ID!) {
+      node(id: $id) { ... on ProjectV2 { views(first: 50) { nodes { name } } } }
+    }' -f id="$project_id" --jq '.data.node.views.nodes[].name' 2>/dev/null || true)"
+
+  for view_spec in "Roadmap:ROADMAP_LAYOUT" "Kanban:BOARD_LAYOUT" "Backlog:TABLE_LAYOUT"; do
+    view_name="${view_spec%%:*}"
+    view_layout="${view_spec##*:}"
+    if printf '%s\n' "$existing_views" | grep -Fxq "$view_name"; then
+      echo "View '$view_name' already exists; skipping."
+      continue
+    fi
+    # A board still sets up without its views: Projects permissions vary by
+    # account and organization, so a refusal here warns rather than aborts.
+    # shellcheck disable=SC2016  # $p/$n/$l are GraphQL variables, not shell expansions
+    if gh api graphql -f query='
+      mutation($p: ID!, $n: String!, $l: ProjectV2ViewLayout!) {
+        createProjectV2View(input: {projectId: $p, name: $n, layout: $l}) {
+          projectV2View { id }
+        }
+      }' -f p="$project_id" -f n="$view_name" -f l="$view_layout" >/dev/null 2>&1; then
+      echo "Created '$view_name' view ($view_layout)."
+    else
+      echo "warning: could not create the '$view_name' view; add it in the"
+      echo "         project UI (New view -> ${view_layout%%_*} layout)."
+    fi
+  done
+
   # Safe to repeat: linking an already-linked repository succeeds silently.
   gh project link "$number" --owner "$owner" --repo "$REPO"
   echo "Linked project #$number to $REPO."
@@ -227,9 +263,10 @@ reuse it and complete the fields and the repository link"
   url="$(gh project view "$number" --owner "$owner" --format json --jq '.url')"
   echo "Project number: $number"
   echo "Project URL:    $url"
-  echo "One-time manual steps: create a Roadmap view in the project UI, pick"
-  echo "'Start date' / 'Target date' as its date fields, and set 'Group by'"
-  echo "to 'Kind' to separate Epics from Tasks."
+  echo "Remaining manual step: open the Roadmap view and pick 'Start date' /"
+  echo "'Target date' as its date fields, then set 'Group by' to 'Kind' to"
+  echo "separate Epics from Tasks — the API creates views but cannot configure"
+  echo "grouping or date fields."
 }
 
 cmd_dates() {
