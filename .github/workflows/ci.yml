@@ -1,0 +1,177 @@
+# Deterministic verification gates (layer 1 of .github/skills/verification/SKILL.md).
+# These checks are the ceiling on agent autonomy: the cloud agent iterates on
+# their failures, and branch rulesets should require them before merge.
+name: CI
+
+on:
+  pull_request:
+    # 'edited' is not a default activity type: without it, a PR body edited
+    # after a green run never re-triggers CI, so the task-ritual wall's
+    # verdict on the body-parsed task link and plan link could go stale.
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Supply-chain wall: every action reference must be pinned to a full
+      # commit SHA with a trailing version comment (tags can be moved or
+      # re-signed; SHAs cannot). Logic lives in the script so the guard
+      # regression tests (.github/scripts/tests/) can exercise it offline.
+      - name: Action references are SHA-pinned
+        run: bash .github/scripts/check-action-pins.sh
+
+      # Escalation-wording wall: failure budgets live only in the normative
+      # skills; every other surface defers to the ladder without restating
+      # counts (duplicated numbers drift from the design authority).
+      - name: Escalation counts stay in the normative skills
+        run: bash .github/scripts/check-escalation-wording.sh
+
+      # CUSTOMIZE: replace the placeholder below with the project's real
+      # gates, and keep them in sync with the "validated commands" section of
+      # .github/copilot-instructions.md. Pin any action you add to a full
+      # commit SHA (resolve one with:
+      # gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha).
+      # Examples:
+      #
+      # - uses: actions/setup-node@<full-commit-sha> # vX.Y.Z
+      #   with: { node-version: 22, cache: npm }
+      # - run: npm ci
+      # - run: npm run lint
+      # - run: npm test
+      #
+      # Firmware logic tests run on the host — no hardware in CI
+      # (.github/instructions/firmware.instructions.md):
+      # - run: pip install --upgrade platformio
+      # - run: pio test -e native -d firmware
+      # - run: pio run -d firmware        # build all envs as a compile gate
+
+      - name: Scaffold tuning status
+        run: bash .github/scripts/tuning-status.sh --ci
+
+  # The ledger wall: the PR's linked Task must carry a start claim and a plan
+  # comment before it can merge (session-orchestration start ritual, steps
+  # 4-5) — work that starts without a claim leaves the ledger unable to
+  # explain who did what.
+  task-ritual:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Linked Task carries start claim + plan comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/check-task-ritual.sh
+
+  # Lints the scaffold itself: shell scripts, workflow files, and the
+  # consistency of issue-form templates and Markdown path references.
+  scaffold-self-check:
+    runs-on: ubuntu-latest
+    env:
+      SHELLCHECK_VERSION: v0.11.0
+      SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The guards guard the repo; these tests guard the guards. Offline
+      # regression cases (sandbox repos + a gh fixture shim) must pass
+      # before the walls below are trusted.
+      - name: Guard regression tests
+        run: bash .github/scripts/tests/run-tests.sh
+
+      - name: Install pinned shellcheck
+        run: |
+          curl -fsSLo shellcheck.tar.xz "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          echo "${SHELLCHECK_SHA256}  shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf shellcheck.tar.xz
+          sudo install "shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          rm -rf shellcheck.tar.xz "shellcheck-${SHELLCHECK_VERSION}"
+          shellcheck --version
+
+      - name: Shellcheck scaffold-owned shell scripts
+        # Scope: .github/** only — app-owned scripts (e.g. a top-level
+        # scripts/ dir) are the application's own business, not the
+        # scaffold's. The pathspec matches recursively.
+        run: git ls-files -z '.github/*.sh' | xargs -0 shellcheck -S style
+
+      # Validates the scaffold-shipped dev container (template repository
+      # and "Use this template" copies). Gated on the sync-header sentinel
+      # in post-create.sh: adopting repos without it — installer adopters,
+      # or apps with their own dev container (where JSONC is legitimate) —
+      # are never linted, per the ownership rule above.
+      - name: Validate the scaffold-shipped dev container
+        run: |
+          if ! grep -qs 'ci.yml' .devcontainer/post-create.sh; then
+            echo "No scaffold-shipped dev container detected — skipping."
+            exit 0
+          fi
+          jq empty .devcontainer/devcontainer.json || {
+            echo "::error::.devcontainer/devcontainer.json must stay strict JSON (jq-parseable); drop this step if you intentionally moved to JSONC."
+            exit 1
+          }
+          git ls-files -z '.devcontainer/*.sh' | xargs -0 -r shellcheck -S style
+
+      - name: Install pinned actionlint
+        run: |
+          curl -fsSLo actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          sudo install actionlint /usr/local/bin/actionlint
+          rm -f actionlint.tar.gz actionlint
+          actionlint --version
+
+      - name: Actionlint workflow files
+        run: actionlint -color
+
+      - name: Check issue-form templates stay in sync with body templates
+        run: bash .github/scripts/check-template-sync.sh
+
+      - name: Check Markdown path references resolve
+        run: bash .github/scripts/check-md-links.sh
+
+      - name: Check connector definitions conform
+        run: bash .github/scripts/check-connectors.sh
+
+  # The Copilot execution-plane wall: surface frontmatter, size ceilings,
+  # and the English-only rule.
+  copilot-surface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate the Copilot surface
+        run: |
+          # The wall parses frontmatter with PyYAML; probe the dependency
+          # first so a missing module is exit 2 (missing tool), never a
+          # silent pass.
+          python3 -c "import yaml" || {
+            echo "::error::PyYAML is not importable — the surface wall cannot parse frontmatter."
+            exit 2
+          }
+          bash .github/scripts/check-copilot-surface.sh

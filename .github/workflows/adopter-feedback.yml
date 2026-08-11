@@ -1,0 +1,52 @@
+# adopter-feedback.yml — receiving end of the consent-gated adopter
+# feedback loop (ADR-0002). Helper-filed reports (feedback-lib.sh) arrive
+# label-free because external reporters hold no label permissions, and on
+# fresh template copies the feedback.yml form's `labels:` frontmatter is
+# ignored too (GitHub skips labels that don't exist in the repository).
+# This workflow classifies both paths as `from:adopter`:
+#   - helper reports: body *starts with* the fixed v1 marker (anchored —
+#     an issue merely quoting a report elsewhere in its body must not be
+#     classified);
+#   - form reports: title carries the `[adopter-feedback]` prefix the
+#     form pre-populates.
+#
+# Security posture: issue titles/bodies are untrusted input. Both are
+# bound through `env:` and never interpolated into the script; the job
+# holds `issues: write` only and checks nothing out. The REST labels
+# endpoint auto-creates a missing label, so adopter copies of this file
+# work without setup-labels.sh having run.
+name: adopter-feedback
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply from:adopter on marker match
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          classify=0
+          case "$ISSUE_BODY" in
+            '<!-- adopter-feedback:v1 -->'*) classify=1 ;;
+          esac
+          case "$ISSUE_TITLE" in
+            '[adopter-feedback]'*) classify=1 ;;
+          esac
+          if [ "$classify" -eq 1 ]; then
+            gh api -X POST "repos/$REPO/issues/$ISSUE_NUMBER/labels" \
+              -f 'labels[]=from:adopter'
+            echo "Marker found: applied from:adopter to #$ISSUE_NUMBER."
+          else
+            echo "No adopter-feedback marker in #$ISSUE_NUMBER; nothing to do."
+          fi

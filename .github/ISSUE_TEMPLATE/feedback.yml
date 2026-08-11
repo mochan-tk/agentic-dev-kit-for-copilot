@@ -1,0 +1,55 @@
+# Receiving end of the consent-gated adopter feedback loop (ADR-0002).
+# Manual path: adopters describe a scaffold problem themselves. The
+# automated path (feedback-lib.sh) files marker-tagged reports instead.
+# Classification: the `labels:` line below works only where the label
+# already exists (GitHub ignores unknown labels in form frontmatter); on
+# fresh template copies .github/workflows/adopter-feedback.yml applies
+# it instead, keyed on the [adopter-feedback] title prefix.
+name: Adopter feedback
+description: Report a problem with a scaffold-owned script or guard.
+title: "[adopter-feedback] "
+labels: ["from:adopter"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Reference, don't paste**: never include
+        secrets, tokens, or logs containing private paths or internal
+        hostnames — describe where the evidence lives instead.
+  - type: dropdown
+    id: script
+    attributes:
+      label: Affected script
+      description: The scaffold script or area where the problem appeared.
+      options:
+        - scaffold-init
+        - setup-labels
+        - setup-project
+        - setup-ruleset
+        - setup-sources
+        - other / general
+    validations:
+      required: true
+  - type: input
+    id: scaffold-version
+    attributes:
+      label: Scaffold version marker
+      description: >-
+        Paste the `<!-- scaffold-version: ... -->` line from your
+        repository's SCAFFOLD-CHANGELOG.md, if present.
+      placeholder: "<!-- scaffold-version: repo=owner/name sha=<40-hex> date=YYYY-MM-DD -->"
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran and the failure you observed.
+    validations:
+      required: true
+  - type: textarea
+    id: what-expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true

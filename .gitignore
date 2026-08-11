@@ -1,0 +1,15 @@
+# Repository hygiene — keep session artifacts and OS/editor cruft out of git.
+
+# The root-level plan.md is a per-session cache, never committed
+# (.github/skills/session-orchestration/SKILL.md). Root-anchored on purpose:
+# plan.md files elsewhere (e.g. spec-kit's specs/**/plan.md) are real content.
+/plan.md
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor swap/backup files
+*.swp
+*.swo
+*~

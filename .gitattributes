@@ -1,0 +1,15 @@
+# Scaffold-owned paths are authored with LF. Pin them so a checkout with
+# core.autocrlf=true (the Git for Windows default) can never rewrite the
+# bash scripts to CRLF — under Git Bash/MSYS a CRLF shebang script dies
+# with "$'\r': command not found". Pinning also silences the
+# "LF will be replaced by CRLF" warning flood while the installer stages.
+#
+# Trade-off: .github/** covers files YOU add there too (workflows, docs);
+# LF is safe for YAML, Markdown, and shell. This file is seeded — it is
+# yours after install — so extend or adjust the rules as your app needs.
+.github/** text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+AGENTS.md text eol=lf
+README.md text eol=lf
+SCAFFOLD-CHANGELOG.md text eol=lf

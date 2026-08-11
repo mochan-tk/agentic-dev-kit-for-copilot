@@ -1,0 +1,13 @@
+# CODEOWNERS — review gate for paths agents must not change unilaterally.
+#
+# CUSTOMIZE: replace @mochan-tk with this project's own user or team during
+# onboarding (.github/skills/project-onboarding/SKILL.md). Pair this file
+# with a branch ruleset (scripts/setup-ruleset.sh) so the assignments are
+# actually enforced on pull requests.
+#
+# Agreements are human-owned decisions; workflows are the verification
+# gates; the connector framework carries the normative Context Contract —
+# all need a human reviewer on every change (README, step 5).
+/.github/docs/agreements/    @mochan-tk
+/.github/workflows/  @mochan-tk
+/.github/connectors/ @mochan-tk

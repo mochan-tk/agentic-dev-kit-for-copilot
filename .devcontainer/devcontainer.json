@@ -1,0 +1,17 @@
+{
+  "name": "agentic-dev-scaffold (template development)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "timonwong.shellcheck",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ]
+    }
+  }
+}

@@ -1,0 +1,28 @@
+# Monthly retro hygiene (retro skill, "Scheduled hygiene" trigger): run
+# .github/scripts/retro-hygiene.sh to file the idempotent "Retro hygiene review
+# <YYYY-MM>" issue labeled needs:human. Deterministic checks only — no AI
+# in CI. Issues created with the default GITHUB_TOKEN intentionally do not
+# trigger other workflows.
+name: Retro hygiene
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: File the monthly retro hygiene review issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/retro-hygiene.sh --create-issue -R "$GITHUB_REPOSITORY"

@@ -1,0 +1,3 @@
+# Force structured issues: humans use the forms above; agents/CLI use the
+# canonical body templates in .github/skills/plan-management/templates/.
+blank_issues_enabled: false

@@ -1,0 +1,9 @@
+# Dependabot — keep the GitHub Actions pinned in .github/workflows/ current.
+# Version-update PRs flow through the same review gates as any other PR.
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

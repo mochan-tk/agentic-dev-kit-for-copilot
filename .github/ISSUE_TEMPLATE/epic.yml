@@ -1,0 +1,56 @@
+# Epic (outline item) form. Mirrors the canonical body template
+# .github/skills/plan-management/templates/epic-body.md — keep in sync.
+name: Epic
+description: >-
+  Coarse outline item holding an outcome and a rolling-wave phase outline.
+  Decomposed into Task sub-issues just-in-time (AGENTS.md, rolling-wave rule).
+title: "Epic: "
+labels: ["type:epic"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep Epics coarse. Only the phase about to start gets decomposed into
+        Task sub-issues — via the `/breakdown-epic` prompt or
+        `.github/skills/plan-management/SKILL.md`. Rationale comments on this
+        issue are the plan's change log.
+  - type: input
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What is true about the product/system when this Epic is done.
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How we will know, at Epic level. Cite REQ-### where one exists.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope & non-goals
+      value: |
+        - In scope:
+        - Out of scope:
+    validations:
+      required: true
+  - type: textarea
+    id: outline
+    attributes:
+      label: Phase outline
+      description: Coarse ordered outline; update as reality changes.
+      value: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Agreements this Epic is grounded in, if any (REQ-### / ADR links).

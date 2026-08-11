@@ -1,0 +1,130 @@
+# Work-order form for a single AI task. Mirrors the canonical body template
+# .github/skills/plan-management/templates/task-body.md — keep the two in sync
+# (section headings are parsed by agents and scripts).
+name: "AI Task (work order)"
+description: >-
+  Self-contained work order for one agent session. The body of this issue is
+  the executing agent's entire brief (AGENTS.md applies).
+labels: ["type:task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **After filing** (forms cannot do these): mirror *Routing — Surface*
+        as the matching `exec:*` label, set the parent Epic
+        (`gh issue edit <n> --set-parent <epic>`), wire dependencies
+        (`--add-blocked-by`), and add `ai:ready` only once the brief meets the
+        planner quality bar (`.github/agents/planner.agent.md`).
+        CLI-created tasks should use
+        `.github/skills/plan-management/scripts/new-task.sh` instead.
+  - type: input
+    id: objective
+    attributes:
+      label: Objective
+      description: One sentence — the observable outcome this task delivers.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context & references
+      description: >-
+        Everything the executing agent must read. Assume it sees nothing
+        beyond this issue and these links. Derived issues cite the origin
+        as #N in one line (tracking-graph rule, plan-management skill).
+      value: |
+        - Epic: #
+        - Agreements (if any):
+        - Facts the agent needs:
+        - Derived from: # <!-- delete the line if this task has no origin issue -->
+
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: >-
+        Executable checks that land before implementation (test-first): each
+        criterion is provable by running a Verification command or observing
+        an artifact — the wall judges, not the account. Cite REQ-###
+        where one exists.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Explicit non-goals for THIS task.
+      placeholder: "-"
+    validations:
+      required: true
+  - type: textarea
+    id: ownership
+    attributes:
+      label: File ownership
+      description: >-
+        Paths (globs allowed) this task may modify. The diff must stay inside
+        them (AGENTS.md, single-writer rule). Parallel tasks must not overlap.
+      placeholder: "- src/pairing/**"
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: >-
+        How to run the pre-placed tests that decide the acceptance criteria:
+        commands with expected results, executable on the routed surface
+        (exec:cloud tasks get no hardware).
+      render: bash
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Routing — Surface
+      description: >-
+        See .github/skills/task-routing/SKILL.md. Mirror as the exec:* label.
+      options:
+        - "exec:cloud"
+        - "exec:app"
+        - "exec:cli"
+        - "exec:ide"
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Routing — Suggested role
+      options:
+        - default
+        - planner
+        - orchestrator
+        - reviewer
+      default: 0
+  - type: dropdown
+    id: model-tier
+    attributes:
+      label: Routing — Model/reasoning tier
+      options:
+        - high-reasoning
+        - standard
+        - fast
+        - local
+      default: 1
+  - type: input
+    id: parallel-safe
+    attributes:
+      label: Routing — Parallel-safe
+      placeholder: "yes | no — <why>"
+    validations:
+      required: true
+  - type: textarea
+    id: handoff
+    attributes:
+      label: Handoff notes
+      description: Optional — state another agent would need to take over.
