@@ -45,6 +45,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- `setup-project.sh init` now creates the board's working views —
+  `Roadmap` (roadmap layout), `Kanban` (board layout), `Backlog` (table
+  layout). It previously created none and told the adopter to build them in
+  the UI, because view creation "is not exposed by the GraphQL API"; that
+  stopped being true, and `createProjectV2View` handles all three layouts.
+  Views are matched by name on re-runs, so nothing is duplicated and an
+  adopter's own views are never renamed or removed; a refused creation warns
+  and leaves the board and its fields intact, since Projects write access
+  varies by account. Still manual, and now stated as such: the Roadmap view's
+  date fields and "Group by: Kind" — `createProjectV2View`'s configuration
+  input carries `visibleFieldIds` alone (refs #18).
+
 - The onboarding evidence PR no longer fails the `task-ritual` wall. The wall
   demands every PR link a Task issue carrying a start claim and a plan
   comment, but during onboarding no Task exists — the PR *is* the deliverable
