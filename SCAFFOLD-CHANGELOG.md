@@ -45,6 +45,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The parent-session protocol now explains gated cloud CI. A dispatched
+  `exec:cloud` task can finish correctly — agent run green, draft PR opened,
+  fix included — while every check on that PR sits at `action_required`,
+  because many organizations gate workflow runs from this class of actor.
+  `gh pr checks` then reports "no checks reported", which reads as CI never
+  firing, and an adopter concluded the cloud agent had errored when it had
+  not. The dispatch step now names the two states and the diagnostic that
+  separates them (read the agent's own run, not just the PR's checks), and
+  says the gate is an organization Actions policy rather than a repository
+  setting — so adopters stop looking for a switch the scaffold could have
+  flipped. Where no such policy exists nothing appears (refs #28).
+
 - Agent-authored handoffs now name skills instead of VS Code-only commands.
   An earlier pass fixed the README, the installer banner and the Epic
   template, but stopped short of the text agents *write*: the pointer
