@@ -197,6 +197,15 @@ You are the WORKER session for Task issue #<n> in <owner>/<repo>.
    `.github/skills/task-routing/SKILL.md`.
    Dispatching a `risk:high` task? Its child pauses after the plan comment —
    review promptly and reply with an approval (or steer) to release it.
+   A dispatched cloud task whose PR shows *no* checks has usually not
+   failed: many organizations gate workflow runs from this class of actor,
+   leaving every run at `action_required` until someone approves it from
+   the repository's Actions tab. Read the agent's own run before concluding
+   anything — `gh run list` showing `Running Copilot cloud agent → success`
+   next to `CI → action_required` means the work landed and only CI is
+   waiting. The gate is an organization Actions policy, not a repository
+   setting, so it cannot be cleared from here; where no such policy exists,
+   nothing appears and there is nothing to do.
 2. **Issue-first, dedicated-session — no exceptions for infra/ops.** Ad-hoc
    requests (e.g. a human asking "can you deploy this?"), and cloud/deploy/
    infra work in general (provisioning, secrets, deploy unblocking), get a
