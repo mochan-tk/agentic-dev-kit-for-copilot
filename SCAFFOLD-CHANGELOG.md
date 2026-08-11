@@ -1,11 +1,15 @@
 # Scaffold Changelog & Lineage
 
-This is the **template repository** for the agentic-dev-scaffold. Instances
-are created from it (GitHub "Template repository"); this file tracks the
-template's own version history and how instances move between versions. In
-an instance, this same file records which template version the instance
+This is the **source repository** for the agentic-dev kit. Adopting
+repositories install it with `.github/scripts/scaffold-init.sh`; this file
+tracks the kit's own version history and how instances move between
+versions. In an instance, this same file records which version the instance
 adopted. The project's own changelog, if any, lives elsewhere — this file is
 about the scaffolding only.
+
+Convention: cite issues of *this* repository as a bare `#<n>`. Never carry a
+bare number over from another repository — a bare `#<n>` always resolves
+here, so an inherited number silently links to an unrelated issue.
 
 <!-- scaffold-version: repo=mochan-tk/agentic-dev-kit-for-copilot sha=unknown date=unknown -->
 **Scaffold version adopted by this instance:** v1.0.0 *(this is the template
@@ -41,6 +45,16 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Issue references in this changelog no longer mis-resolve. GitHub resolves
+  a bare `#<n>` against the repository the file lives in, so the numbers
+  inherited from where this kit was developed did not go dead — they linked
+  to unrelated issues here, and would have gone on colliding as numbering
+  grew into their range. Those citations are dropped (the prose already says
+  what changed); references to this repository's own issues stay. A new
+  guard, `check-changelog-refs.sh`, fails CI on any bare number above this
+  repository's known range, and the changelog header states the convention
+  (refs #14).
+
 - The adoption instructions now name skills first: prompt files under
   `.github/prompts/` are a VS Code Copilot Chat feature, so `/onboard-project`
   is not a command in a Copilot app session or in Copilot CLI — it arrives as
@@ -50,8 +64,7 @@ inherit what this one learned.
   carries every instruction the prompt does, so nothing is lost by pointing
   adopters at it. The install banner, README steps 2 and 6, the repo map, and
   the Epic template now read "run the `<name>` skill (in VS Code: `/<shortcut>`)";
-  the prompt files keep working unchanged for VS Code users (refs #12 in
-  mochan-tk/agentic-dev-kit-for-copilot).
+  the prompt files keep working unchanged for VS Code users (refs #12).
 
 - The install banner now shows a push command that works on the app-session
   path. It previously printed a bare `git push`, which assumes the adopter
@@ -62,7 +75,7 @@ inherit what this one learned.
   remote default branch), prints `git push origin HEAD:<default>` with the
   branch name resolved locally from `origin/HEAD` (placeholder when it
   cannot be resolved), and names the protected-branch alternative in one
-  clause (refs #10 in mochan-tk/agentic-dev-kit-for-copilot).
+  clause (refs #10).
 
 - The install banner now tells adopters to **push**, not just commit. Step
   1 named only `git commit`, so an adopter who followed it literally left
@@ -70,8 +83,7 @@ inherit what this one learned.
   breaking label bootstrapping and onboarding mid-flight. The banner now
   names both commands, says why the push matters, and makes clear that
   `/onboard-project` can do both if you skip them; a regression test keeps
-  the wording from drifting back (refs #8 in
-  mochan-tk/agentic-dev-kit-for-copilot).
+  the wording from drifting back (refs #8).
 
 - The README Conventions label list is complete again: it named nine of the
   twelve labels `setup-labels.sh` creates. The three that were missing are
@@ -79,7 +91,7 @@ inherit what this one learned.
   pauses a task after its plan comment until a human approves, where the
   default is pass-through), `retro:candidate`, and `from:adopter`. An agent
   reading only the README could not previously know the `risk:high` lever
-  existed (refs #3 in mochan-tk/agentic-dev-kit-for-copilot).
+  existed (refs #3).
 
 - The "Use this template" adoption path is dropped; the installer is the
   single way in and the repository stays non-template. The template path
@@ -87,28 +99,28 @@ inherit what this one learned.
   records (`docs/`, 15 files), its `LICENSE`, `.vscode/`, `.devcontainer/`
   and the full changelog — none of which the installer ships. A brand-new
   repository is still fully served: `git init`, then run the installer
-  (refs #1 in mochan-tk/agentic-dev-kit-for-copilot).
+  (refs #1).
 
 - The top-of-README adoption banner is deleted: readers scan for Getting
   started directly, and the banner dual-maintained both the install
   commands and the onboarding journey. Install commands now appear exactly
-  once (step 1, restoring the #220 single-carrier principle and superseding
-  the #226 "banner stays" note); the journey lives in Getting started,
+  once (step 1, restoring the single-carrier principle and superseding
+  the "banner stays" note); the journey lives in Getting started,
   where step 2 (Onboard) now points at reviewing the drafted Epic and
   running `/breakdown-epic` (full flow stays in step 6); `gh auth login`
-  was already covered by Prerequisites (refs #228).
+  was already covered by Prerequisites.
 
 - Getting started step 1 inlines both installer one-liners (sh +
   PowerShell) instead of pointing readers back to the top banner ~150
   lines away; the banner stays for repo-page visitors. Supersedes that
-  aspect of the #220 dedup: the install commands intentionally appear in
-  both places (refs #226).
+  aspect of the dedup: the install commands intentionally appear in
+  both places.
 
 - README Getting started is restructured for scannability: every step (and
   the Platforms note) now opens with a bold verb-first lead sentence and
   carries its details as short bullets instead of running prose — all six
   steps, every fact, both `--upgrade` code blocks, and each *Done when:*
-  line are preserved (refs #224).
+  line are preserved.
 
 - The README's duplicated guidance is collapsed into single authoritative
   locations: the banner carries the install one-liners (Getting started
@@ -116,7 +128,7 @@ inherit what this one learned.
   Bash/WSL warning, and step 1 carries the "Use this template copies the
   whole tree" note — and the `--upgrade` re-run gains a copy-pastable
   bash code block beside the existing PowerShell one, which was lost when
-  Windows support was added (refs #220; 334 → 302 lines, no facts
+  Windows support was added (334 → 302 lines, no facts
   removed). A full README-vs-reality audit in the same change fixed two
   stale repo-map notes: the CODEOWNERS line now lists all three guarded
   paths (agreements/, workflows/, connectors/) and the setup-ruleset.sh
@@ -127,21 +139,21 @@ inherit what this one learned.
   chat message that announces the evidence PR must end with the numbered
   handoff block, and problems (queued or failing checks, blockers) are
   reported above the block, never instead of it (from adopter feedback
-  #211 re-validation, fixed by #218 — the durable carriers from #213
+  adopter re-validation — the durable carriers from the earlier hardening
   worked, but the chat message announced the PR plus CI status and
   dropped the handoff again: "final message" was undefined, "courtesy
   copy" read as optional, and the problem report crowded out the ritual).
   The `/onboard-project` prompt mirrors the trigger.
 
 - The README quickstart banner now names `/breakdown-epic` as the concrete
-  move after reviewing the drafted Epic (from adopter feedback #211, fixed
-  by #216 — the command was only named deep in Getting started, so an
+  move after reviewing the drafted Epic (from adopter feedback — the
+  command was only named deep in Getting started, so an
   adopter whose onboarding session ended without the closing handoff had
   no visible path from the Epic to Task issues; the banner is the one
   carrier that does not depend on agent compliance).
 
 - Onboarding now produces durable outputs instead of chat-only ones (from
-  adopter feedback #211, fixed by #213 — an onboarding run drifted into
+  adopter feedback — an onboarding run drifted into
   implementing application code, ended without the closing handoff, and
   its undone items evaporated with the session). The skill gains a third
   invariant ("onboarding tunes; it does not build"), a
@@ -152,7 +164,7 @@ inherit what this one learned.
   `/onboard-project` prompt mirrors all three.
 
 - `setup-project.sh init` now detects a **closed** same-title board before
-  creating anything (from adopter feedback #208, fixed by #212 —
+  creating anything (from adopter feedback —
   `gh project list` hides closed projects, so a closed roadmap board was
   invisible to the reuse path and init would create a duplicate, or
   dead-end in orgs that refuse API creation). Init exits with the exact
@@ -163,7 +175,7 @@ inherit what this one learned.
   init to have fields and the repository link completed.
 
 - `setup-project.sh init` no longer trusts gh's project number blindly
-  (from adopter feedback #208, fixed by #209 — on Windows,
+  (from adopter feedback — on Windows,
   `gh project create` answered with number `0`, which gh's own project
   commands treat as "no number supplied", so a successfully created
   board cascaded into a `field-list` failure and was left without
@@ -173,8 +185,8 @@ inherit what this one learned.
   mode exits with the owner, the title, and the recovery. The header's
   gh requirement now reads `>= 2.45` (`gh project link`) instead of the
   impossible `2.95`.
-- The roadmap board gains an owner (from adopter feedback #205, fixed
-  by #206 — "attach any time later" had no owner: onboarding deferred
+- The roadmap board gains an owner (from adopter feedback — "attach any
+  time later" had no owner: onboarding deferred
   it, the breakdown prompt never mentioned it, and plan-management even
   mandated date spans at decomposition against a board nothing created):
   the first `/breakdown-epic` run now checks for the board and offers
@@ -184,41 +196,41 @@ inherit what this one learned.
   conditional on the board existing, and onboarding P2 defers to that
   owner explicitly. A decline or a missing `project` scope
   (`gh auth refresh -s project`) never blocks decomposition.
-- Onboarding P6 gains a closing handoff (from adopter feedback #197,
-  fixed by #198 — a real run ended at "pushed, PR not created" after
+- Onboarding P6 gains a closing handoff (from adopter feedback — a real
+  run ended at "pushed, PR not created" after
   context compaction, leaving the adopter with no next move): P6 now
   completes only when the evidence PR exists (a blocked creation must
   be stated with the exact `gh pr create` command), and the final
   message must hand the adopter their next moves — merge the evidence
   PR, review the linked draft Epic, run `/breakdown-epic` on it to
-  start decomposition (#200 named the triggers: the handoff originally
+  start decomposition (a follow-up named the triggers: the handoff originally
   said only "say the word", which left `/breakdown-epic` and
   `/start-task` undiscoverable).
 - The Windows `--upgrade` invocation is now documented (README and the
-  `scaffold-init.ps1` header, from adopter feedback fixed by #195):
-  plain `irm … | iex` cannot forward flags, so upgrades use the script
+  `scaffold-init.ps1` header, from adopter feedback): plain `irm … | iex`
+  cannot forward flags, so upgrades use the script
   block form `& ([scriptblock]::Create((irm <raw-url>))) --upgrade` —
   the shim already forwards arguments; only the documentation was
   missing.
 - Onboarding P0 gains a commit preflight: an uncommitted or unpushed
   scaffold is detected before anything else, and after one consent
   question the agent commits (`Adopt agentic-dev scaffold`) and pushes
-  it itself (from adopter feedback #192, fixed by #193 — the manual
+  it itself (from adopter feedback — the manual
   banner step was a functional prerequisite with no guard: app/cloud
   sessions see no scaffold at all, the evidence PR bloats, and early
   branch-protection activation locks the adoption commit out). No
   GitHub write (labels, ruleset, Epic) happens before the push; the
-  install banner now says onboarding offers to commit for you. #203
+  install banner now says onboarding offers to commit for you. A follow-up
   tightened the check to the real prerequisite — the scaffold must be
   reachable from the remote *default branch*, not merely pushed (from
-  adopter feedback #202: a real run landed the adoption commit on a
+  adopter feedback: a real run landed the adoption commit on a
   feature branch, both legacy checks passed, and GitHub Actions later
   failed mid-flight because the default branch had no scaffold) — and
   the remedy now lands the commit on the default branch immediately,
   never deferring it to the evidence PR.
 - The installer gains `--upgrade`: adopted repositories can now pull
-  scaffold updates without hand-diffing (from adopter feedback #189,
-  fixed by #190 — the previous choice was refuse-or-`--force`, and
+  scaffold updates without hand-diffing (from adopter feedback — the
+  previous choice was refuse-or-`--force`, and
   `--force` flattens tuned files, so adopters stayed frozen at their
   adopted version). On collision, scaffold-owned machinery (scripts,
   skills, agents, prompts, issue/PR templates, this changelog) is
@@ -234,7 +246,7 @@ inherit what this one learned.
   runs `.github/scripts/setup-ruleset.sh` per the answer — the manual
   "run the script, then enable it in Settings → Rules → Rulesets" step
   most adopters never performed is gone from the handoff (from adopter
-  feedback #186, fixed by #187). The installer banner shrinks to two
+  feedback). The installer banner shrinks to two
   next steps (commit → onboard). The script now promotes an existing
   same-name ruleset's enforcement in place (partial-body PUT, verified
   live — rules/conditions/bypass untouched) instead of skipping, and
@@ -249,7 +261,7 @@ inherit what this one learned.
 - Onboarding now closes P2 by bootstrapping the canonical labels and
   drafting a coarse outline Epic from the adopter's goal and handed-over
   material, handing its URL over for review **while** P3 verification
-  runs — from adopter feedback (#183, #184): verification is the long
+  runs — from adopter feedback: verification is the long
   stretch and the adopter previously waited idle, with the first Epic
   sequenced entirely after onboarding. The Epic stays draft-marked and
   undecomposed (rolling-wave; no invented REQ-###s); the label bootstrap
@@ -257,28 +269,28 @@ inherit what this one learned.
   (or file your own)"; the legacy path's characterization-tests
   recommendation now targets the draft Epic and is restated in the PR.
 - The "register repo-resident docs?" interview question is gone, from
-  adopter feedback (#180, #181): its answer was always the recommended
+  adopter feedback: its answer was always the recommended
   choice, so it gathered nothing only a human knows. Documents already
   committed to the repository are no longer registered into
   `.github/docs/context/` at all — P1's inventory names them and agents
   read them in place; only handed-over (external) material lands in
   context/. The unconditional hand-over invitation is unchanged.
 - Material-intake wording no longer promises an upload control the
-  question dialog lacks, from adopter feedback (#177, #178): the
+  question dialog lacks, from adopter feedback: the
   onboarding invitation now leads with the two universal channels —
   file paths and pasted text — and frames attachments as a
   surface-conditional follow-up sent in a regular chat message after
   answering; interviewing agents are told the dialog itself takes only
   a choice or typed text.
-- Label bootstrap folded into onboarding, from adopter feedback (#174,
-  #175): the manual "Bootstrap labels" step is gone from the installer's
+- Label bootstrap folded into onboarding, from adopter feedback: the
+  manual "Bootstrap labels" step is gone from the installer's
   handoff banner (now three steps: commit → onboard → ruleset) and from
   README's quick-adopt and Getting-started paths. `/onboard-project`
   already ran `setup-labels.sh`; the onboarding skill now runs it
   unconditionally (it is idempotent) and records the output as evidence.
   The installer stays local-write-only, and `setup-labels.sh` remains
   available for standalone use (`-R owner/repo`).
-- CRLF landmine defused, from adopter feedback (#166, #172): the template
+- CRLF landmine defused, from adopter feedback: the template
   now ships a root `.gitattributes` pinning scaffold paths (`.github/**`
   and the root scaffold files) to LF, and the installer seeds it like
   `README.md`/`.gitignore` (kept untouched when the target already has
@@ -293,8 +305,7 @@ inherit what this one learned.
   now appends a note to run the `bash ...` next steps inside Git Bash —
   plain `bash` typed into PowerShell may launch the WSL launcher, which
   lacks the user's `gh` login. POSIX banner output is unchanged, and
-  README's quick-adopt note and "Bootstrap labels" step now say the same
-  (#169, fixed by #170).
+  README's quick-adopt note and "Bootstrap labels" step now say the same.
 - Install progress and speed, from adopter feedback: `scaffold-init.sh`
   prints one plain status line per phase (resolving the ref, downloading
   and unpacking, file plan, installing with file count, staging) instead
@@ -302,7 +313,7 @@ inherit what this one learned.
   loop is replaced by one `mkdir -p` plus a single `tar` pipe — ~250
   process spawns down to ~3, the dominant cost on Git Bash (MSYS) under
   corporate antivirus. `--dry-run` output is unchanged; no terminal
-  control codes, so piped output stays clean (#165, fixed by #167).
+  control codes, so piped output stays clean.
 - Windows install: the repo-root guard in `scaffold-init.sh` no longer
   compares the shell's `pwd -P` to `git rev-parse --show-toplevel` — on
   Git Bash those spell the same directory differently (`/c/...` vs
@@ -310,7 +321,7 @@ inherit what this one learned.
   repository root. The guard now uses `git rev-parse --show-prefix`
   (empty exactly at the root), and the previously uncovered
   subdirectory-refusal case gained a regression test. From adopter
-  feedback (#162, fixed by #163).
+  feedback.
 - Interview is now hand-over only, from adopter feedback: the last
   three non-hand-over questions (forbidden paths, secrets policy, org
   board) are deleted — path limits are per-task File ownership, secrets
@@ -320,43 +331,42 @@ inherit what this one learned.
   the answer (spec-kit → workspace path; default → chat attachments /
   paths / pasted text, with the register/skip add-on for repo-resident
   docs). `/onboard-project` step 2 reworded to match; the ≤10 bank cap
-  is gone (#159 → #160).
+  is gone.
 - Interview bank cut to owner-only questions, from adopter feedback:
   the four infrastructure questions (active vs frozen areas, trusted
   build/lint/test commands, firmware envs/device host, runtime pins)
   are deleted — facts the repo could answer belong to P1/P3, absent
   signals are recorded as "none found", firmware envs are auto-judged
-  and the device host is discovered at routing time (#155); the spec
+  and the device host is discovered at routing time; the spec
   hand-over invitation (attach in chat / file paths / paste) is now
   extended unconditionally — the register/skip question for
   repo-resident docs is additional, never a replacement — and the
-  interviewer receives handed-over material before leaving P2 (#154).
-  Bank shrinks 9 → 5 (#154, #155 → #156).
+  interviewer receives handed-over material before leaving P2.
+  Bank shrinks 9 → 5.
 - README "Getting started" step 1 now shows the Windows (PowerShell)
   one-liner next to the `curl` forms — the intro blockquote had it
-  since the #135 fix, but the step-by-step guide did not (#152).
+  since the fix, but the step-by-step guide did not.
 - Onboarding question bank revised from adopter feedback, three items
   from one interview: repo-resident docs found by P1 now get a plain
   register/skip question — landing mechanics (copy vs reference index)
-  and scaffold paths are banned from question and choices (#147);
+  and scaffold paths are banned from question and choices;
   the two hand-over questions share one term, existing vs *future*
-  "specification or design material" (#149); the CI/cloud-agent
+  "specification or design material"; the CI/cloud-agent
   constraint questions are deleted — P3 measures gate behavior
   empirically and runner sizing is discover-when-needed. Bank shrinks
-  11 → 9 (#147, #149, #150 → #148).
+  11 → 9.
 - Agent-mediated installs no longer lose the handoff: the installer
   banner now addresses an installing AI agent directly — relay the
   next steps to the human and offer to run `/onboard-project` — so the
   guidance survives when the one-liner is executed as a tool call
-  from a chat instead of a human terminal. Adopter feedback
-  (#144 → #145).
+  from a chat instead of a human terminal. Adopter feedback.
 - Onboarding now wires in context connectors: P2 gains a connector
   question (Q10 — built-in interview default vs existing spec-kit
   workspace, "don't know" safe), P4 activates the choice via
   `.github/scripts/setup-sources.sh` and points at `/kickoff-context`
   as the follow-on; `/onboard-project` step list mentions the
-  activation. Closes the Epic #82 integration seam reported by adopter
-  feedback (#140 → #141).
+  activation. Closes the Epic integration seam reported by adopter
+  feedback.
 - gh authentication preflight: `setup-labels.sh` and `setup-ruleset.sh`
   now probe `gh api user` up front and fail with `run: gh auth login`
   before doing any work (previously they died mid-run on the first API
@@ -364,20 +374,19 @@ inherit what this one learned.
   like gh-absent — resolution and tarball fetch fall back to
   `git ls-remote` + codeload, so public adoption works logged-out; fetch
   errors now hint that private sources need `gh auth login`. README
-  adoption steps gain step ⓪ (authenticate once). Adopter feedback
-  (#138 → #139).
+  adoption steps gain step ⓪ (authenticate once). Adopter feedback.
 - Onboarding interview: context-intake question (P2 Q9) reworded into
   adopter language — asks for specification/design material, names the
   intake paths (chat attachment, file path, pasted text) and format
   guidance (Markdown preferred); landing mechanics stay in the P4 seed
-  step. First adopter-feedback-driven change (#133 → #134).
+  step. First adopter-feedback-driven change.
 - Windows adoption path: new `.github/scripts/scaffold-init.ps1` bootstrap
   locates Git Bash (standard Git for Windows locations, then `PATH`;
   the WSL launcher is skipped) and re-executes the canonical bash
   installer through it — arguments forwarded, exit code propagated;
   SHA pinning and all safety logic stay in the bash script, the single
   implementation. README documents the PowerShell one-liner; all other
-  scaffold scripts run inside Git Bash or WSL (#132 → #135).
+  scaffold scripts run inside Git Bash or WSL.
 
 ### v1.0.0 — 2026-08-09
 
