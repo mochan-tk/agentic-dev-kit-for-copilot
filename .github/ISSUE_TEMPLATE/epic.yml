@@ -11,8 +11,8 @@ body:
     attributes:
       value: |
         Keep Epics coarse. Only the phase about to start gets decomposed into
-        Task sub-issues — via the `/breakdown-epic` prompt or
-        `.github/skills/plan-management/SKILL.md`. Rationale comments on this
+        Task sub-issues — via the `plan-management` skill (in VS Code, the
+        `/breakdown-epic` shortcut does the same). Rationale comments on this
         issue are the plan's change log.
   - type: input
     id: outcome

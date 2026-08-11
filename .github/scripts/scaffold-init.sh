@@ -567,12 +567,13 @@ else
   echo "      to reach it before onboarding — a push to any other branch"
   echo "      does not count. If that branch is protected, push your own"
   echo "      branch and open a PR instead. Skip all of this and"
-  echo "      /onboard-project offers to do it for you."
-  echo "   2. Onboard interactively:    open GitHub Copilot (VS Code Chat, CLI,"
-  echo "      or an app session) and run /onboard-project — it interviews you,"
-  echo "      bootstraps the canonical labels, offers to enable branch"
-  echo "      protection, verifies commands by running them, and opens the"
-  echo "      evidence PR."
+  echo "      onboarding offers to do it for you."
+  echo "   2. Onboard interactively:    open GitHub Copilot (app session, CLI,"
+  echo "      or VS Code Chat) and run the 'project-onboarding' skill — in"
+  echo "      VS Code the shortcut '/onboard-project' does the same. It"
+  echo "      interviews you, bootstraps the canonical labels, then"
+  echo "      offers to enable branch protection, verifies commands by"
+  echo "      running them, and opens the evidence PR."
   # Git for Windows / MSYS2 shells always export MSYSTEM; WSL, macOS and
   # Linux never do. Warn there: typing plain 'bash' into PowerShell may
   # resolve to the WSL launcher (different filesystem, no gh login) — the
@@ -587,7 +588,7 @@ else
   echo " non-zero — the untuned state is machine-visible."
   echo
   echo " AI agent running this install on a human's behalf: relay the two"
-  echo " next steps above to the human and offer to run /onboard-project"
-  echo " now — do not summarize this handoff away."
+  echo " next steps above to the human and offer to run the"
+  echo " 'project-onboarding' skill now — do not summarize this handoff away."
   echo "=================================================================="
 fi

@@ -41,6 +41,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The adoption instructions now name skills first: prompt files under
+  `.github/prompts/` are a VS Code Copilot Chat feature, so `/onboard-project`
+  is not a command in a Copilot app session or in Copilot CLI — it arrives as
+  plain text and works only if the model infers a skill was meant. Skills are
+  the portable layer (an open standard loaded by VS Code, Copilot CLI, and the
+  cloud agent alike), and `.github/skills/project-onboarding/SKILL.md` already
+  carries every instruction the prompt does, so nothing is lost by pointing
+  adopters at it. The install banner, README steps 2 and 6, the repo map, and
+  the Epic template now read "run the `<name>` skill (in VS Code: `/<shortcut>`)";
+  the prompt files keep working unchanged for VS Code users (refs #12 in
+  mochan-tk/agentic-dev-kit-for-copilot).
+
 - The install banner now shows a push command that works on the app-session
   path. It previously printed a bare `git push`, which assumes the adopter
   is on the default branch with an upstream configured — neither holds in a

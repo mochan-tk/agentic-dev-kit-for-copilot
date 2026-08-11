@@ -458,7 +458,8 @@ fi
 # Agent-mediated installs (#144) drop the handoff unless the banner tells
 # the installing agent to relay it — assert that instruction is printed.
 if grep -q "AI agent running this install" "$OUT145" \
-   && grep -q "offer to run /onboard-project" "$OUT145"; then
+   && grep -q "offer to run the" "$OUT145" \
+   && grep -q "'project-onboarding' skill now" "$OUT145"; then
   t_ok "handoff banner carries the agent-relay instruction"
 else
   t_fail "handoff banner carries the agent-relay instruction"
@@ -466,7 +467,7 @@ fi
 
 # --- handoff banner: two steps, labels+ruleset folded into onboarding ------
 # The manual "Bootstrap labels" (#175) and "Branch ruleset" (#187) steps
-# moved inside /onboard-project; the banner must show commit -> onboard,
+# moved inside onboarding; the banner must show commit -> onboard,
 # mention the consent-gated protection offer, and say "two next steps".
 if ! grep -q "Bootstrap labels:" "$OUT145" \
    && ! grep -q "Branch ruleset:" "$OUT145" \
@@ -554,7 +555,7 @@ if grep -q "refreshed   .github/scripts/some-guard.sh" "$OUT_UPG" \
 else
   t_fail "upgrade banner reports refreshed and kept files by class"
 fi
-if ! grep -q "offer to run /onboard-project" "$OUT_UPG" \
+if ! grep -q "'project-onboarding' skill now" "$OUT_UPG" \
    && grep -q "AI agent running this upgrade" "$OUT_UPG" \
    && grep -q "git diff --cached" "$OUT_UPG"; then
   t_ok "upgrade banner replaces onboarding handoff with diff-review handoff"

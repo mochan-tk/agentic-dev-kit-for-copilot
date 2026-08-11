@@ -69,7 +69,8 @@ docs/                              This repository's own development records: co
     session-orchestration/           parent/child session protocol
     verification/                    gates, evidence, CI-failure triage
     retro/                           failures -> system improvements (+ upstreaming)
-  prompts/                         Slash commands: /onboard-project /kickoff-context
+  prompts/                         VS Code Copilot Chat shortcuts to the skills above:
+                                   /onboard-project /kickoff-context
                                    /distill-context /breakdown-epic /start-task
                                    /replan /retro
   connectors/                      Context connectors: Contract + conformance rules
@@ -210,10 +211,9 @@ bash ≥ 3.2).
 
    *Done when:* `.github/scripts/tuning-status.sh` lists the pristine `CUSTOMIZE`
    markers and exits non-zero — the untuned state is machine-visible.
-2. **Onboard** — run `/onboard-project` in VS Code Copilot Chat, Copilot
-   CLI, or a Copilot app session (any surface that reads
-   `.github/prompts/`), or hand any capable agent
-   `.github/skills/project-onboarding/SKILL.md`.
+2. **Onboard** — run the `project-onboarding` skill in a Copilot app
+   session, Copilot CLI, or VS Code Copilot Chat; in VS Code the shortcut
+   `/onboard-project` does the same.
 
    - It inventories the repo, asks only the gaps, verifies commands by
      running them, and fills or removes every `CUSTOMIZE` block across
@@ -226,8 +226,9 @@ bash ≥ 3.2).
    - It ends with one evidence PR — review and merge it (the **license
      merge**). Manual fallback: search the repo for `CUSTOMIZE` and fill
      by hand.
-   - After the merge, review the drafted Epic and run `/breakdown-epic`
-     on it to turn it into Task issues (full flow: step 6).
+   - After the merge, review the drafted Epic and break it down into Task
+     issues — the `plan-management` skill (VS Code: `/breakdown-epic`);
+     full flow in step 6.
 
    *Done when:* `.github/scripts/tuning-status.sh` exits 0 on the merged main.
 3. **MCP** — interactive surfaces read `.vscode/mcp.json`; for the cloud
@@ -281,8 +282,9 @@ bash ≥ 3.2).
      agreements PR → human merges (= agreement). Skip when there is nothing
      above the promotion bar yet — most knowledge rides in Task issues.
    - Review the Epic drafted during onboarding — edit or replace it (form
-     or `templates/epic-body.md`) — then run `/breakdown-epic` → approve →
-     Task issues exist, wired and routed.
+     or `templates/epic-body.md`) — then break it down (`plan-management`;
+     VS Code: `/breakdown-epic`) → approve → Task issues exist, wired and
+     routed.
    - Dispatch the frontier: `exec:cloud` → assign the issue to Copilot;
      `exec:app` → open a parent session with the **orchestrator** agent and
      let it spawn one child session per task (`/start-task` inside each);
