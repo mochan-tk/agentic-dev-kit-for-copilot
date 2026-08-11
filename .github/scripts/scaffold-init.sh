@@ -553,8 +553,11 @@ else
   [ -e LICENSE ] || echo " no LICENSE installed — the license choice is yours to make."
   echo
   echo " Next steps:"
-  echo "   1. Commit the scaffold:      git commit -m 'Adopt agentic-dev scaffold'"
-  echo "      (skip it and /onboard-project offers to commit and push for you)"
+  echo "   1. Commit and push:          git commit -m 'Adopt agentic-dev scaffold'"
+  echo "                                git push"
+  echo "      Actions only run from the default branch, so the scaffold has"
+  echo "      to land there before onboarding. Skip both and"
+  echo "      /onboard-project offers to commit and push for you."
   echo "   2. Onboard interactively:    open GitHub Copilot (VS Code Chat, CLI,"
   echo "      or an app session) and run /onboard-project — it interviews you,"
   echo "      bootstraps the canonical labels, offers to enable branch"
