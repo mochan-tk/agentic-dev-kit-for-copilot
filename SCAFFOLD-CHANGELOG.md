@@ -45,6 +45,20 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Agent-authored handoffs now name skills instead of VS Code-only commands.
+  An earlier pass fixed the README, the installer banner and the Epic
+  template, but stopped short of the text agents *write*: the pointer
+  embedded in every drafted Epic body, the closing handoff block, and the
+  remaining prose references. An adopter running onboarding in a Copilot app
+  session was told to "run `/breakdown-epic`" and "`/start-task`" — neither
+  exists on that surface, and no skill answers to those names either
+  (`plan-management` serves decomposition and replanning,
+  `session-orchestration` serves task start). The Epic-body pointer mattered
+  most: it is committed to GitHub and read by whoever opens the issue later.
+  The README's first-run flow is corrected too; the lifecycle table and repo
+  map still name the prompt files, where they are the subject rather than an
+  instruction (refs #25).
+
 - The `task-ritual` CI job can check out private repositories again. It
   declared its own `permissions:` block, and a job-level block *replaces* the
   workflow-level grant rather than merging with it — so `contents: read` was
