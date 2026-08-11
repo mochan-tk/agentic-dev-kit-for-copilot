@@ -221,14 +221,14 @@ bash ≥ 3.2).
      `copilot-setup-steps.yml`).
    - Along the way it bootstraps the canonical label set
      (`.github/scripts/setup-labels.sh` — idempotent; `-R owner/repo`
-     targets another repo) and drafts an outline Epic from your goal and
-     material for you to review.
+     targets another repo) and drafts one outline Epic per phase from your
+     goal and material for you to review.
    - It ends with one evidence PR — review and merge it (the **license
      merge**). Manual fallback: search the repo for `CUSTOMIZE` and fill
      by hand.
-   - After the merge, review the drafted Epic and break it down into Task
-     issues — the `plan-management` skill (VS Code: `/breakdown-epic`);
-     full flow in step 6.
+   - After the merge, review the drafted Epics and break the first phase
+     down into Task issues — the `plan-management` skill (VS Code:
+     `/breakdown-epic`); full flow in step 6.
 
    *Done when:* `.github/scripts/tuning-status.sh` exits 0 on the merged main.
 3. **MCP** — interactive surfaces read `.vscode/mcp.json`; for the cloud
@@ -281,10 +281,10 @@ bash ≥ 3.2).
    - When decisions must outlive their tasks, run `/distill-context` →
      agreements PR → human merges (= agreement). Skip when there is nothing
      above the promotion bar yet — most knowledge rides in Task issues.
-   - Review the Epic drafted during onboarding — edit or replace it (form
-     or `templates/epic-body.md`) — then break it down (`plan-management`;
-     VS Code: `/breakdown-epic`) → approve → Task issues exist, wired and
-     routed.
+   - Review the Epics drafted during onboarding — edit or replace them (form
+     or `templates/epic-body.md`) — then break the first phase down
+     (`plan-management`; VS Code: `/breakdown-epic`) → approve → Task issues
+     exist, wired and routed.
    - Dispatch the frontier: `exec:cloud` → assign the issue to Copilot;
      `exec:app` → open a parent session with the **orchestrator** agent and
      let it spawn one child session per task (`/start-task` inside each);

@@ -45,6 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Onboarding now drafts one Epic per phase instead of a single Epic for the
+  whole project. The two skills contradicted each other — `plan-management`
+  asks for "Epics for the whole outline up front", `project-onboarding` said
+  "the outline Epic" — and the singular won in practice: one adoption ended
+  with nine phases inside one Epic, every later phase invisible, and the
+  natural-looking repair was a program Epic with phase Epics beneath it. The
+  graph has exactly two levels (Epic → Task), so that fix would have been
+  unsupported. Phase Epics are now siblings wired `blocked-by` in order; the
+  `/breakdown-epic` pointer, the deferred-from-onboarding ledger and the
+  closing handoff all ride the first phase's Epic, and a one-phase outline
+  still yields exactly one Epic. `plan-management` now states the sibling
+  rule outright rather than leaving it to be inferred (refs #22).
+
 - Decomposition now corrects the Epic's state line. Onboarding opens a draft
   Epic with "nothing is decomposed until you approve", but nothing ever
   removed that marker, so an Epic that had been reviewed, approved and split
