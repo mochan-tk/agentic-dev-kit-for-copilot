@@ -45,6 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The onboarding evidence PR no longer fails the `task-ritual` wall. The wall
+  demands every PR link a Task issue carrying a start claim and a plan
+  comment, but during onboarding no Task exists — the PR *is* the deliverable
+  — so every adopter hit a red check on their very first PR and could only
+  merge by bypassing it. The wall now exempts that PR when three signals
+  agree: the skill-mandated title `scaffold: onboard <project>`, a base
+  branch whose scaffold-version marker names a real commit (so the template
+  repository itself cannot claim it), and a base that still carries CUSTOMIZE
+  markers. The last two make the exemption self-limiting — it holds at most
+  once per adopting repository and lapses the moment onboarding merges.
+  Separately, the task-link extractor now tolerates a qualifier between
+  keyword and number, so the accurate `Refs Epic #2` parses (refs #16).
+
 - Issue references in this changelog no longer mis-resolve. GitHub resolves
   a bare `#<n>` against the repository the file lives in, so the numbers
   inherited from where this kit was developed did not go dead — they linked
