@@ -1,8 +1,9 @@
 # Agentic Development Scaffold (GitHub-native)
 
 Repository wiring for running an AI-agent development lifecycle on GitHub —
-with GitHub Copilot cloud (coding) agent, the GitHub Copilot app's
-parent/child sessions, Copilot CLI, and IDE agents — such that **the plan,
+conducted from the **GitHub Copilot app**, whose parent/child sessions carry
+the orchestration model, with the Copilot cloud (coding) agent, Copilot CLI
+and IDE agents executing individual tasks — such that **the plan,
 the work, the evidence, and the lessons all live on GitHub**, not in chat
 windows. Everything here is plain files: version it, review it, and let the
 improvement loops evolve it.
@@ -141,9 +142,11 @@ degrades every request a little.
 ## Getting started
 
 **Prerequisites:** `gh` (authenticated — check with `gh auth status`; the
-setup scripts refuse to run without it), `jq`, and GitHub Copilot access
-on at least one surface (VS Code Copilot Chat, Copilot CLI, or a GitHub
-Copilot app session).
+setup scripts refuse to run without it), `jq`, and the **GitHub Copilot
+app** — the lifecycle runs on its session hierarchy (a program session
+starts each Epic's session, which supervises its Tasks), which no other
+surface provides. Copilot CLI and IDE chat execute individual tasks
+alongside it; they are not substitutes for the app.
 
 **Supported plans:** public repositories work on any GitHub plan; private
 ones require a paid plan (the scaffold relies on features that need one),
@@ -212,8 +215,9 @@ bash ≥ 3.2).
    *Done when:* `.github/scripts/tuning-status.sh` lists the pristine `CUSTOMIZE`
    markers and exits non-zero — the untuned state is machine-visible.
 2. **Onboard** — run the `project-onboarding` skill in a Copilot app
-   session, Copilot CLI, or VS Code Copilot Chat; in VS Code the shortcut
-   `/onboard-project` does the same.
+   session. (The skill also loads in Copilot CLI and VS Code Copilot Chat,
+   where `/onboard-project` is a shortcut for it — but the loop it hands you
+   off to needs the app's sessions.)
 
    - It inventories the repo, asks only the gaps, verifies commands by
      running them, and fills or removes every `CUSTOMIZE` block across
