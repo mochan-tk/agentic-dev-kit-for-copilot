@@ -15,6 +15,7 @@ record on GitHub while using sessions for speed.
 
 | Plan object | Session object | Workspace object |
 |---|---|---|
+| The Epic set (whole project) | One program session (conductor of conductors) | — |
 | Epic issue | Parent (orchestrator) session | — |
 | Task issue | One supervisor session (ritual only, no code edits) | — |
 | Pull request | One active worker session | One worktree + branch `task/<n>-<slug>` (or accepted tool-prefixed variant) |
@@ -188,6 +189,33 @@ You are the WORKER session for Task issue #<n> in <owner>/<repo>.
 - Do NOT post comments on the issue; report to your supervisor session and stop.
 ```
 
+## Program session protocol
+
+One program session per project, started when the phase Epics first exist
+(onboarding drafts them) and kept for the life of the plan. It conducts
+conductors: it never decomposes, dispatches Tasks, or edits code itself.
+
+1. **Start an Epic's session when that phase's turn comes** — when its
+   `blocked-by` Epics are closed, or the frontier has run dry. Hand it the
+   Epic number and nothing else; the Epic is the brief.
+2. **Epic sessions are siblings, not descendants.** An Epic session that
+   sees the next phase becoming actionable reports that to the program
+   session rather than starting a peer itself: sessions spawning their
+   successors nest one level deeper per phase, and after a few phases the
+   tree is unreadable. Epics are siblings in the issue graph; their sessions
+   mirror that.
+3. **Watch across Epics, not within one.** Phase-spanning trouble is the
+   program session's business: an Epic whose blockers never clear, a
+   dependency that turns out to be backwards, repeated escalations of the
+   same shape. Within an Epic, its own session decides.
+4. **Replan across phases** (`plan-management` skill) when reality diverges
+   from the outline — reordering phases, splitting one, dropping another.
+   Record the rationale on the affected Epic, not in session memory.
+5. **Ending.** Program sessions die like any other: before one ends, the
+   state of play must be legible from GitHub alone — each Epic's status
+   visible from its issue, its comments, and the board. Whoever restarts a
+   program session reads the graph, not the transcript.
+
 ## Parent session protocol
 
 1. Dispatch only from the frontier (`plan-management` skill), after checking
@@ -227,6 +255,12 @@ You are the WORKER session for Task issue #<n> in <owner>/<repo>.
    with one instruction: record first.
 6. Route `needs-replan` outcomes to the planner procedure
    (`plan-management` §Replanning) and post the rationale on the Epic.
+7. When the Epic's phase is done — its Tasks closed, their PRs merged, the
+   Epic's own state line current — tell the program session so the next
+   phase gets a session. Do not start that session yourself: the program
+   session keeps Epic sessions siblings (see Program session protocol). If
+   no program session is running, say so in the Epic's closing comment and
+   name the next Epic, so a human or a fresh program session can pick it up.
 
 ## Copilot app session tree
 

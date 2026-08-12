@@ -45,6 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The session model gains a program layer, so the next phase has an owner.
+  The mapping table bound an Epic to a parent session, but nothing said how
+  one starts — an adopter finishing a phase had no stated next move, and
+  phase-level decisions landed in whichever session happened to be open. A
+  program session now sits above the Epic sessions: it starts each one as
+  its phase comes up, watches across phases, and replans the outline when
+  reality diverges. Epic sessions report upward instead of spawning their
+  successors, which keeps them siblings — mirroring the issue graph, where
+  Epics are siblings too, and keeping the session tree at a constant depth
+  rather than one level deeper per phase. The `orchestrator` agent already
+  described this conductor and only scoped itself to one Epic; it now covers
+  both layers (refs #29).
+
 - The parent-session protocol now explains gated cloud CI. A dispatched
   `exec:cloud` task can finish correctly — agent run green, draft PR opened,
   fix included — while every check on that PR sits at `action_required`,
