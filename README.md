@@ -35,7 +35,7 @@ without a human in the loop.
 | Phase | What happens | Lives in |
 |---|---|---|
 | 0. Onboard | Tune the scaffold to the project: inventory → gap interview → run-verified commands → fill every CUSTOMIZE → evidence PR | `project-onboarding` skill, `tuning-status.sh` |
-| 1. Collect | Land raw information with provenance — *pluggable via context connectors* (`.github/connectors/`): the built-in interview flow is the default, an existing spec-kit workspace can be adopted instead | `.github/docs/context/` via `context-collection` skill; `/kickoff-context` prompt; `setup-sources.sh` wizard |
+| 1. Collect | Land raw information with provenance — *pluggable via context connectors* (`.github/connectors/`): the built-in interview flow is the default, an existing spec-kit workspace can be adopted instead | `.github/docs/context/` via `context-collection` skill; `setup-sources.sh` wizard |
 | 2. Distill & agree | Turn raw material into reviewed truth (REQ/ADR/glossary/non-goals) via PR — *only when a decision must outlive its task* (promotion bar in the skill); place each piece of knowledge in a context tier. With a non-builtin connector, the enabled source satisfies the same Context Contract | `.github/docs/agreements/` via `context-distillation` skill; contract in `.github/connectors/README.md` |
 | 3. Plan & orchestrate | Rolling-wave issue graph (Epics → just-in-time Task sub-issues, `blocked-by` ordering, actionable frontier); parent/child sessions execute it | `plan-management` + `session-orchestration` skills, issue templates |
 | 4. Route & execute | Each task carries one `exec:*` label + Routing block deciding surface, role, and model tier | `task-routing` skill, `.github/agents/` |
@@ -70,10 +70,8 @@ docs/                              This repository's own development records: co
     session-orchestration/           parent/child session protocol
     verification/                    gates, evidence, CI-failure triage
     retro/                           failures -> system improvements (+ upstreaming)
-  prompts/                         VS Code Copilot Chat shortcuts to the skills above:
-                                   /onboard-project /kickoff-context
-                                   /distill-context /breakdown-epic /start-task
-                                   /replan /retro
+  prompts/                         VS Code Copilot Chat shortcuts to the skills
+                                   above (the app loads the skills directly)
   connectors/                      Context connectors: Contract + conformance rules
                                    (README.md), builtin + speckit definitions, template
   ISSUE_TEMPLATE/                  Web forms mirroring the canonical bodies
@@ -215,9 +213,7 @@ bash ≥ 3.2).
    *Done when:* `.github/scripts/tuning-status.sh` lists the pristine `CUSTOMIZE`
    markers and exits non-zero — the untuned state is machine-visible.
 2. **Onboard** — run the `project-onboarding` skill in a Copilot app
-   session. (The skill also loads in Copilot CLI and VS Code Copilot Chat,
-   where `/onboard-project` is a shortcut for it — but the loop it hands you
-   off to needs the app's sessions.)
+   session.
 
    - It inventories the repo, asks only the gaps, verifies commands by
      running them, and fills or removes every `CUSTOMIZE` block across
@@ -231,8 +227,8 @@ bash ≥ 3.2).
      merge**). Manual fallback: search the repo for `CUSTOMIZE` and fill
      by hand.
    - After the merge, review the drafted Epics and break the first phase
-     down into Task issues — the `plan-management` skill (VS Code:
-     `/breakdown-epic`); full flow in step 6.
+     down into Task issues with the `plan-management` skill; full flow in
+     step 6.
 
    *Done when:* `.github/scripts/tuning-status.sh` exits 0 on the merged main.
 3. **MCP** — interactive surfaces read `.vscode/mcp.json`; for the cloud
@@ -283,21 +279,19 @@ bash ≥ 3.2).
 6. **First run:**
    - Collect sources into `.github/docs/context/<topic>/` (`context-collection`).
    - When decisions must outlive their tasks, distill them
-     (`context-distillation`; VS Code: `/distill-context`) →
+     (`context-distillation`) →
      agreements PR → human merges (= agreement). Skip when there is nothing
      above the promotion bar yet — most knowledge rides in Task issues.
    - Review the Epics drafted during onboarding — edit or replace them (form
      or `templates/epic-body.md`) — then break the first phase down
-     (`plan-management`; VS Code: `/breakdown-epic`) → approve → Task issues
+     (`plan-management`) → approve → Task issues
      exist, wired and routed.
    - Dispatch the frontier: `exec:cloud` → assign the issue to Copilot;
      `exec:app` → open a parent session with the **orchestrator** agent and
-     let it spawn one child session per task (`session-orchestration`;
-     VS Code: `/start-task` inside each);
+     let it spawn one child session per task (`session-orchestration`);
      `exec:ide` → a human pairs in the IDE (hardware work lands here).
-   - PRs flow through the gates; on deviations replan (`plan-management`;
-     VS Code: `/replan`); periodically
-     run the `retro` skill (VS Code: `/retro`) so the system learns. Monthly, `retro-hygiene.yml` files
+   - PRs flow through the gates; on deviations replan (`plan-management`);
+     periodically run the `retro` skill so the system learns. Monthly, `retro-hygiene.yml` files
      a `Retro hygiene review <YYYY-MM>` issue surfacing promotion-overdue
      retro candidates and always-on budget drift.
    *Done when:* the first task PR merges with its evidence table — you have

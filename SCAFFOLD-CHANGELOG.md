@@ -45,16 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
-- The README no longer presents Copilot CLI and IDE chat as alternatives to
-  the GitHub Copilot app. Prerequisites said Copilot access "on at least one
-  surface" would do, which is plainly false: the lifecycle runs on the app's
-  session hierarchy — a program session starting each Epic's session, which
+- The README now reads as documentation for a kit used **in the GitHub
+  Copilot app**. Prerequisites said Copilot access "on at least one surface"
+  would do, which is plainly false: the lifecycle runs on the app's session
+  hierarchy — a program session starting each Epic's session, which
   supervises its Tasks — and no other surface can spawn a session or receive
-  a report from one. The opening paragraph, Prerequisites and Getting started
-  step 2 now name the app as required and say why in one clause. What CLI and
-  IDE chat actually do is unchanged and still visible: they execute
-  individual tasks, and `exec:ide` remains the route for work that wants a
-  human at the keyboard or physical hardware (refs #33).
+  a report from one. The opening paragraph, Prerequisites and Getting
+  started now name the app as required and say why, and the VS Code slash
+  shortcuts are gone from the walkthrough: the README names skills, which is
+  what an app session loads. The prompt files keep one line in the
+  repository map, where they are the subject rather than an instruction.
+  What CLI and IDE chat actually do is unchanged and still visible: they
+  execute individual tasks, and `exec:ide` remains the route for work that
+  wants a human at the keyboard or physical hardware (refs #33).
 
 - `setup-project.sh` now fails up front when `gh` is not authenticated,
   matching the three sibling setup scripts. It was the only one without the
