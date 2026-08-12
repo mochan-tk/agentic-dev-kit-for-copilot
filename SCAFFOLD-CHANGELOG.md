@@ -45,6 +45,17 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Agent-authored text no longer offers VS Code shortcuts. The README dropped
+  them when the Copilot app became the stated requirement, but the skills,
+  the Epic template and the installer banner stayed on the older convention
+  of naming both — so an app session ended onboarding by telling its user to
+  run `/breakdown-epic`, a command that surface does not have. The closing
+  handoff, the pointer written into each drafted Epic body, the context
+  follow-on, the Epic form's guidance and the banner's step 2 now name skills
+  only. `exec:ide` still names VS Code in the routing table, where it is a
+  fact about where that class of task runs rather than an instruction, and
+  the prompt files are unchanged for anyone using them (refs #35).
+
 - The README now reads as documentation for a kit used **in the GitHub
   Copilot app**. Prerequisites said Copilot access "on at least one surface"
   would do, which is plainly false: the lifecycle runs on the app's session

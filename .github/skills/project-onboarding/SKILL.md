@@ -162,7 +162,7 @@ give the adopter something to review during it:
    *"Draft from onboarding — review and edit freely; nothing is decomposed
    until you approve."* End the **first phase's** body with the next-move
    pointer: *"When this Epic looks right, decompose it with the
-   `plan-management` skill (in VS Code: `/breakdown-epic`)."* —
+   `plan-management` skill."* —
    the pointer rides in the body because the closing chat handoff may never
    reach whoever picks the Epic up. Later phases stay coarse until their
    turn and say so instead.
@@ -195,7 +195,7 @@ unrun command.
   copied file that still names the template author cannot gate reviews.
 - Run `.github/scripts/setup-sources.sh` to activate the connector chosen
   in P2 step 1 (records it in the SOURCES.md registry); the
-  `context-collection` skill (VS Code: `/kickoff-context`) is
+  `context-collection` skill is
   the follow-on that lands future context through it. Skip only when the
   adopter kept the default and no spec-kit workspace exists — then note
   the wizard can be run later.
@@ -246,10 +246,10 @@ report them *above* the block, never instead of it.
 2. Review and edit the P2-close draft Epics — link them here, first phase
    first (or say they were skipped and point at the Epic form).
 3. When the first phase's Epic looks right, decompose it with the
-   `plan-management` skill (VS Code: `/breakdown-epic`) — decomposition
+   `plan-management` skill — decomposition
    into Task issues starts only on your approval, one phase
    at a time; each ready Task then runs with the `session-orchestration`
-   skill (VS Code: `/start-task`).
+   skill.
 
 The same three moves ride durable carriers: the evidence PR description
 **ends with a `## Next steps` section**, and the first phase Epic's body
