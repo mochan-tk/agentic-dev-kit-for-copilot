@@ -197,7 +197,8 @@ conductors: it never decomposes, dispatches Tasks, or edits code itself.
 
 1. **Start an Epic's session when that phase's turn comes** — when its
    `blocked-by` Epics are closed, or the frontier has run dry. Hand it the
-   Epic number and nothing else; the Epic is the brief.
+   Epic number and nothing else; the Epic is the brief. Name it `Epic #<n>`
+   (session naming: §Copilot app session tree).
 2. **Epic sessions are siblings, not descendants.** An Epic session that
    sees the next phase becoming actionable reports that to the program
    session rather than starting a peer itself: sessions spawning their
@@ -241,7 +242,8 @@ conductors: it never decomposes, dispatches Tasks, or edits code itself.
    session like any other task — never inline in the parent. No issue, no
    work: evidence recorded after the fact on a closed issue does not count.
 3. When dispatching a **supervisor**, pass the issue number only — the
-   issue is the brief. If
+   issue is the brief, and name the session `Task #<n> supervisor`
+   (workers: `PR #<n> worker`; naming rule in §Copilot app session tree). If
    you feel the need to add substantial instructions in the dispatch message,
    the brief is incomplete: fix the issue first. Supervisor→worker kickoffs
    are the exception: they use the complete Worker kickoff template above,
@@ -276,6 +278,13 @@ tree. Two structural facts shape it:
   creator in the sidebar. The tree shape is grouping, not memory: roles are
   portable (§1), and a dead session at any tier is replaced by a successor
   resuming from the ledger.
+
+**Name sessions after what they work on**, so a sidebar of open sessions can
+be read without opening any of them: `Program`, `Epic #1`, `Task #6
+supervisor`, `PR #12 worker`. Keep the `#` — a bare number could be anything,
+and a worker's PR number is not its Task's. Issue titles stay out: names are
+display strings in a narrow column, where short and uniform beats descriptive
+and truncated.
 
 App tools that instantiate the protocol:
 

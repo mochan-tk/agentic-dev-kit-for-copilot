@@ -45,6 +45,17 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Sessions now have a naming convention: `Program`, `Epic #1`, `Task #6
+  supervisor`, `PR #12 worker`. Nothing said how to name a session, so agents
+  labelled them by role — `Task 6 supervisor` — and a sidebar of open
+  sessions read as a list of numbered roles with no way to tell which issue
+  each one served. Keeping the `#` is the point: a bare number could be
+  anything, and a worker's PR number is not its Task's. Issue titles stay
+  out deliberately, since session names are display strings in a narrow
+  column where short and uniform beats descriptive and truncated. The rule
+  is stated where sessions are created and referenced from both dispatch
+  steps (refs #37).
+
 - Agent-authored text no longer offers VS Code shortcuts. The README dropped
   them when the Copilot app became the stated requirement, but the skills,
   the Epic template and the installer banner stayed on the older convention
