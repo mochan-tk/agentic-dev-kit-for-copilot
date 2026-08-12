@@ -79,6 +79,13 @@ usage_error() {
 require_tools() {
   command -v gh >/dev/null 2>&1 || fail "gh CLI not found on PATH"
   command -v jq >/dev/null 2>&1 || fail "jq not found on PATH"
+  # Probe the token, not just the binary: an unauthenticated gh otherwise
+  # fails later inside a project API call, where the error names the call
+  # rather than the cause. Same probe and wording as the sibling setup
+  # scripts.
+  gh api user --jq .login >/dev/null 2>&1 \
+    || fail "gh is not authenticated
+  fix: run: gh auth login"
 }
 
 REPO=""

@@ -45,6 +45,13 @@ inherit what this one learned.
 
 ### Unreleased
 
+- `setup-project.sh` now fails up front when `gh` is not authenticated,
+  matching the three sibling setup scripts. It was the only one without the
+  probe, so an unauthenticated run got as far as a project API call and
+  failed there, reporting the call rather than the cause. The check lives in
+  the existing `require_tools()`, so every subcommand is covered, and the
+  message is byte-identical to the other scripts (refs #5).
+
 - The session model gains a program layer, so the next phase has an owner.
   The mapping table bound an Epic to a parent session, but nothing said how
   one starts — an adopter finishing a phase had no stated next move, and
