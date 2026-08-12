@@ -39,9 +39,15 @@ case "${1:-}" in
     esac
     ;;
   api)
-    # The only GraphQL reads/writes the script makes on the project surface.
+    # `$*` still holds the leading `api`, so match on the path that follows.
     args="$*"
     case "$args" in
+      "api user"*)
+        # The auth preflight probes `gh api user`. AUTHED=0 models an
+        # unauthenticated gh, which the real CLI reports as a failed call.
+        [ "${AUTHED:-1}" = "1" ] || exit 1
+        printf 'octocat\n'
+        ;;
       *createProjectV2View*)
         [ "${CREATE_FAILS:-0}" = "1" ] && exit 1
         printf '%s\n' "$args" >> "$CREATED_LOG"
@@ -64,7 +70,7 @@ PATH="$WORK/bin:$PATH"
 export PATH
 
 run_init() {
-  VIEWS_FIXTURE="$1" CREATED_LOG="$2" CREATE_FAILS="${3:-0}" \
+  VIEWS_FIXTURE="$1" CREATED_LOG="$2" CREATE_FAILS="${3:-0}" AUTHED="${AUTHED:-1}" \
     bash "$SCRIPT" init --owner o -R o/r 2>&1
 }
 
@@ -131,6 +137,35 @@ if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -q 'warning: could not create'
   t_ok "a refused view creation warns and setup still completes"
 else
   t_fail "a refused view creation warns and setup still completes (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/    # /'
+fi
+
+# --- unauthenticated gh stops the run at the preflight ---------------------
+# Without this guard the script proceeds and fails later inside a project API
+# call, where the error names the call rather than the cause. The three
+# sibling setup scripts have had this probe all along.
+: > "$WORK/views-auth.txt"
+: > "$WORK/created-auth.log"
+out=$(AUTHED=0 run_init "$WORK/views-auth.txt" "$WORK/created-auth.log")
+rc=$?
+if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -q 'gh is not authenticated'; then
+  t_ok "unauthenticated gh fails at the preflight"
+else
+  t_fail "unauthenticated gh fails at the preflight (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/    # /'
+fi
+if printf '%s\n' "$out" | grep -q 'gh auth login'; then
+  t_ok "the preflight names the fix"
+else
+  t_fail "the preflight names the fix"
+fi
+# Stopping *before* any project call is the point: a guard that fires after
+# the board is half-built is not a preflight.
+if [ ! -s "$WORK/created-auth.log" ] \
+   && ! printf '%s\n' "$out" | grep -q 'Reusing project\|Created DATE field'; then
+  t_ok "the preflight stops before touching the project"
+else
+  t_fail "the preflight stops before touching the project"
   printf '%s\n' "$out" | sed 's/^/    # /'
 fi
 
