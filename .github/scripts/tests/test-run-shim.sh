@@ -66,16 +66,20 @@ else
 fi
 
 # --- behavioural: needs an interpreter ------------------------------------
+# PWSH_BIN allows an interpreter that is installed but not on PATH; the
+# usual names are tried first so nothing has to be configured.
 PWSH=""
-for candidate in pwsh powershell /tmp/pwsh/pwsh; do
+for candidate in pwsh powershell "${PWSH_BIN:-}"; do
+  [ -n "$candidate" ] || continue
   if command -v "$candidate" >/dev/null 2>&1; then PWSH="$candidate"; break; fi
   if [ -x "$candidate" ]; then PWSH="$candidate"; break; fi
 done
 
 if [ -z "$PWSH" ]; then
   echo "# skip - no PowerShell interpreter; run.ps1's behaviour was not executed."
-  echo "#        Structural assertions above still ran. Install PowerShell to"
-  echo "#        exercise the argument, resolution and missing-bash paths."
+  echo "#        Structural assertions above still ran. Install PowerShell, or"
+  echo "#        set PWSH_BIN, to exercise the argument, resolution and"
+  echo "#        missing-bash paths."
   t_summary; exit
 fi
 
