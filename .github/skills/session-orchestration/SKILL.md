@@ -29,15 +29,33 @@ implement directly (small-task exemption), declared in the plan comment.
 
 **Who posts what:** claim, plan, worker-dispatch, and outcome comments on
 the Task issue belong to the **supervisor**; the PR is opened and iterated
-by the **worker**. Before a worker starts, the supervisor posts a
-worker-dispatch comment (worker branch, target PR, scope); a replacement
+by the **worker**. Before a worker starts, the supervisor **creates the
+worker session, confirms it exists, and only then** posts a worker-dispatch
+comment naming it — session name, session ID, and branch, plus the target PR
+and scope. No verified worker, no implementation: a dispatch comment for a
+session that was never created records a split that did not happen, which is
+the one thing this trail exists to show (ADR-0003). A supervisor that cannot
+raise a worker either declares the small-task exemption in its plan comment
+and implements directly, or escalates — it does not write the comment
+anyway. A replacement
 worker is preceded by a comment releasing the old worker and naming its
 successor.
 **Machine-checked format:** the worker-dispatch comment's *first line* must
 match the regex `^Dispatching worker`, and the release comment's *first
 line* must match `^Releasing worker` — no leading blank line, greeting, or
 Markdown heading before either — as enforced by
-`.github/scripts/check-task-ritual.sh`. The same wall requires every task to
+`.github/scripts/check-task-ritual.sh`. That first line also carries the
+worker's identity, in this shape:
+
+```
+Dispatching worker: PR #12 worker (session 6af9582d-42d1-425d-82c8-f9ec651225a8), branch task/12-fix-esp32
+```
+
+The branch is compared against the PR's head ref, so a dispatch written for
+one task cannot satisfy another's trail. The session ID is the evidence that
+a session was really raised; CI cannot confirm it, because session trees are
+app-local, so it is recorded for humans and later audits rather than
+machine-verified. The same wall requires every task to
 declare its execution mode (ADR-0003): either a dispatch trail (earliest
 dispatch after the earliest plan and before the PR's first commit, a release
 between successive dispatches, dispatch and release comments unedited) or a

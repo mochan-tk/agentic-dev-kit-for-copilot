@@ -28,6 +28,14 @@
 #   - a worker-dispatch comment starts with "Dispatching worker"; a release
 #     comment starts with "Releasing worker" (first-line regexes, exactly
 #     like the claim);
+#   - a dispatch's first line names the worker session and its branch. The
+#     branch must be the PR's head ref (managed prefixes allowed), which is
+#     what stops one task's dispatch from satisfying another's trail. The
+#     session ID is required but **not verified**: session trees are
+#     app-local and no API reachable from CI can enumerate them, so it is a
+#     durable record for humans and audits, not proof. This wall shows that
+#     a specific session and branch were claimed — the supervisor is
+#     responsible for having actually raised the session before writing it;
 #   - any dispatch comment selects the two-tier path: the earliest dispatch
 #     must not predate the earliest plan and must not postdate the PR's
 #     first commit (committer date, ties pass), every dispatch after the
@@ -185,7 +193,7 @@ markers=$(api "repos/{owner}/{repo}/issues/${issue}/comments" --paginate --jq '
   .[] |
   (if (.body | test("^(Starting|Resuming) in session")) then [ "CLAIM", .created_at, .updated_at ] | @tsv else empty end),
   (if ((.body | test("(^|\\n)## Plan\\b")) or (.body | startswith("Plan:"))) then [ "PLAN", .created_at, .updated_at ] | @tsv else empty end),
-  (if (.body | test("^Dispatching worker")) then [ "DISPATCH", .created_at, .updated_at ] | @tsv else empty end),
+  (if (.body | test("^Dispatching worker")) then [ "DISPATCH", .created_at, .updated_at, (.body | split("\n")[0]) ] | @tsv else empty end),
   (if (.body | test("^Releasing worker")) then [ "RELEASE", .created_at, .updated_at ] | @tsv else empty end),
   (if (((.body | test("(^|\\n)## Plan\\b")) or (.body | startswith("Plan:"))) and (.body | ascii_downcase | contains("no worker will be spawned"))) then [ "EXEMPT", .created_at, .updated_at ] | @tsv else empty end)
 ')
@@ -255,6 +263,40 @@ if [[ "$markers" == *DISPATCH* ]]; then
   earliest_dispatch=$(printf '%s\n' "$markers" | awk -F '\t' '$1 == "DISPATCH" { print $2 }' | sort | head -n1)
   mode_desc="two-tier (dispatch ${earliest_dispatch})"
 
+  # Worker identity. The dispatch comment names the session it raised and the
+  # branch that session works on. The branch is checkable — it must be the
+  # PR's head ref, so a dispatch written for one task cannot satisfy
+  # another's trail. The session ID is not: session trees are app-local and
+  # no API here can enumerate them, so it is required as a durable record for
+  # humans and audits, never treated as proof. What this wall can show is
+  # that the supervisor claimed a specific session and a matching branch.
+  head_ref=$(api "repos/{owner}/{repo}/pulls/${PR}" --jq '.head.ref')
+  while IFS=$'\t' read -r _kind _created _updated first_line; do
+    [[ -n "$first_line" ]] || continue
+    if ! printf '%s\n' "$first_line" | grep -qE 'session[[:space:]]+[0-9a-fA-F-]{8,}'; then
+      echo "FAIL: issue #${issue} has a worker-dispatch comment that names no session:"
+      echo "        ${first_line}"
+      echo "      Create the worker session first, then record it — 'Dispatching worker: PR #<n> worker (session <id>), branch <branch>' (session-orchestration skill)."
+      ok=false
+      continue
+    fi
+    dispatch_branch=$(printf '%s\n' "$first_line" | sed -n 's/.*branch[[:space:]]\{1,\}\([^ ,)]\{1,\}\).*/\1/p')
+    if [[ -z "$dispatch_branch" ]]; then
+      echo "FAIL: issue #${issue} has a worker-dispatch comment that names no branch:"
+      echo "        ${first_line}"
+      echo "      Record the worker's branch so the dispatch can be tied to this PR (session-orchestration skill)."
+      ok=false
+    elif [[ -n "$head_ref" && "$dispatch_branch" != "$head_ref" && "$head_ref" != *"$dispatch_branch" ]]; then
+      # Managed surfaces prefix the branch they generate (AGENTS.md §4), so a
+      # head ref ending in the dispatched name is the same branch.
+      echo "FAIL: issue #${issue} dispatches branch '${dispatch_branch}', but PR #${PR} is from '${head_ref}'."
+      echo "      A dispatch names the branch its worker actually works on (session-orchestration skill)."
+      ok=false
+    fi
+  done <<EOF
+$(printf '%s\n' "$markers" | awk -F '\t' '$1 == "DISPATCH"')
+EOF
+
   # Chronology 3 — the dispatch follows the plan of record: the supervisor
   # dispatches a worker to execute an already-posted plan (ADR-0003).
   if [[ "$earliest_plan" > "$earliest_dispatch" ]]; then
@@ -301,6 +343,17 @@ if [[ "$markers" == *DISPATCH* ]]; then
   done <<< "$dispatches"
 elif [[ "$markers" == *EXEMPT* ]]; then
   mode_desc="declared small-task exemption"
+
+  # The exemption is a declaration made *before* implementing, mirroring
+  # plan-before-commit. Without this, a plan carrying the phrase posted after
+  # the work still satisfies the mode check — the exemption becomes something
+  # claimed in hindsight rather than a decision the trail records.
+  earliest_exempt=$(printf '%s\n' "$markers" | awk -F '\t' '$1 == "EXEMPT" { print $2 }' | sort | head -n1)
+  if [[ -n "$first_commit" && "$earliest_exempt" > "$first_commit" ]]; then
+    echo "FAIL: PR #${PR}'s first commit (${first_commit}, committer date) predates the small-task exemption on issue #${issue} (${earliest_exempt})."
+    echo "      Declare the exemption in the plan comment before implementing (AGENTS.md §4; session-orchestration skill)."
+    ok=false
+  fi
 else
   echo "FAIL: issue #${issue} declares no execution mode: no worker-dispatch comment ('Dispatching worker …' first line) and no plan comment containing 'no worker will be spawned'."
   echo "      Dispatch a worker or declare the small-task exemption in the plan comment (AGENTS.md §4; session-orchestration skill)."
