@@ -45,6 +45,20 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The `orchestrator` agent can now run the protocol it exists to run. Its
+  `tools` allowlist granted `read`, `search`, `execute`, `agent` and
+  `github/*` — and `tools` is strict, so every app session tool was
+  withheld. Five of the six rows in session-orchestration's own protocol
+  table were unavailable to it: it could not dispatch, steer, approve a
+  `risk:high` plan, or tear a worker down. An adopter found it when a
+  `Program` session could not create an Epic session. The tools are now
+  named (product-specific names are ignored where they do not apply, which
+  is what makes a portable profile able to carry them), `edit` stays
+  withheld, and `check-agent-tools.sh` reconciles the allowlist against the
+  protocol table so the two cannot drift apart again — including rejecting
+  `edit` under any alias and the `*` wildcard. The defect dated from the
+  first commit, which is to say no Program session had ever been run on
+  this agent, here included (#47).
 - A dispatched session is now proven to have **started**, not merely to exist.
   An adopter reported a child session created with a kickoff going idle having
   run nothing: the session was there, the work never began, no error surfaced,

@@ -11,6 +11,8 @@
 #   6. English-only:  alphabetic characters in scaffold-owned text files
 #                     (AGENTS.md, SCAFFOLD-CHANGELOG.md, .github/**) are
 #                     Latin script; app-owned files are out of scope.
+#   7. Agent tools:   delegated to check-agent-tools.sh — the orchestrator's
+#                     allowlist must still grant what the protocol uses.
 #
 # Frontmatter is parsed with PyYAML (yaml.safe_load semantics plus a
 # duplicate-key rejection); malformed YAML fails the wall with file:line.
@@ -226,3 +228,9 @@ print(
     f"(of {len(tracked_set)} tracked)."
 )
 PY
+
+# The frontmatter above is validated as YAML; whether the tools it grants
+# match the protocol the agent is told to run is a separate question, and
+# one nothing asked until an adopter's Program session could not create a
+# session (#47). Delegated so the check stays testable on its own inputs.
+bash "$ROOT/.github/scripts/check-agent-tools.sh"
