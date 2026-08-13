@@ -6,10 +6,19 @@ file as part of your PR (see the retro skill).
 
 ## First contact
 
-At the start of a session, run `bash .github/scripts/tuning-status.sh --quiet`.
-If it exits non-zero, this scaffold is **not onboarded**: your first reply
-must say so, offer to run `/onboard-project` (the project-onboarding skill),
-and wait for an explicit yes or no before taking on any other task.
+At the start of a session, run `bash .github/scripts/tuning-status.sh --quiet`
+— on Windows, `pwsh .github/scripts/run.ps1 tuning-status.sh --quiet` instead,
+because typing `bash` there reaches the WSL launcher rather than Git Bash even
+when Git for Windows is correctly installed.
+
+Read the exit code as three answers, not two. **0** means tuned. **1** means
+`CUSTOMIZE` markers remain: this scaffold is **not onboarded**, so your first
+reply must say so, offer to run `/onboard-project` (the project-onboarding
+skill), and wait for an explicit yes or no before taking on any other task.
+**Anything else** — a usage error, a missing interpreter, a script that is not
+there — means the check did not run. Say that plainly and say what you will do
+next; never report it as either answer, and never carry on as though the
+scaffold were tuned.
 
 `AGENTS.md` at the repository root defines the operating protocol
 (persistence rule, record-before-report, verify-before-done, unit of work,

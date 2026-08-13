@@ -45,6 +45,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Windows can run the first-contact check. `bash` there reaches the WSL
+  launcher, not Git Bash — the Git for Windows installer leaves `…\Git\bin`
+  off `PATH` deliberately, while `System32\bash.exe` is on it by default, so
+  the documented command failed on a correctly configured machine. New
+  `.github/scripts/run.ps1` resolves the real Git Bash (install locations
+  first, `System32` excluded) and re-executes any scaffold script through it,
+  forwarding arguments and exit code; it carries no judgement of its own, so
+  there is no second implementation to drift from the canonical `.sh`. The
+  same edit stops the check's exit code being read as two answers when it has
+  three: tuned, not tuned, and *could not run* — the last is now reported as
+  itself rather than as "not onboarded". macOS and Linux are unaffected: their
+  command is unchanged (#49).
 - The `orchestrator` agent can now run the protocol it exists to run. Its
   `tools` allowlist granted `read`, `search`, `execute`, `agent` and
   `github/*` — and `tools` is strict, so every app session tool was
