@@ -46,8 +46,9 @@ dispatch, verification, outcome — and edits no application code; before a
 worker starts, it posts a worker-dispatch comment on the Task issue, and a
 replacement is preceded by a release-and-successor comment. Workers execute
 the approved plan in autopilot with no plan gate of their own, escalating
-per §6 when the plan breaks. For trivial tasks the supervisor may implement
-directly, declared in the plan comment ("no worker will be spawned").
+per §6 when the plan breaks. For trivial tasks the supervisor — and only a
+Task supervisor, never a conductor — may implement directly, declared in
+the plan comment ("no worker will be spawned").
 Stacked PRs = N sequential workers (only the final layer carries
 `Closes #<n>`, earlier layers `Refs #<n>`; activation gated by #89).
 Branch: `task/<issue-number>-<short-slug>`; a managed surface's generated

@@ -24,8 +24,39 @@ One Task issue per supervisor session — never batch several issues into one
 session (reports become unattributable) and never split one issue across
 supervisors without replanning first. A PR has exactly one active worker at
 a time; use a separate worktree per concurrent worker so parallel sessions
-cannot write to the same checkout. For trivial tasks the supervisor may
-implement directly (small-task exemption), declared in the plan comment.
+cannot write to the same checkout. For trivial tasks **a Task supervisor**
+may implement directly (small-task exemption), declared in its plan comment;
+conductors have no such exemption — see Role boundaries.
+
+**A sub-agent is not a session.** The `agent` tool starts a helper *inside the
+caller's workspace*: same checkout, same branch, same write access, gone when
+the turn ends. Only `create_session` yields the isolated workspace and branch
+this model depends on. Calling a sub-agent "the Epic session" satisfies the
+word and defeats the isolation — the work lands in the conductor's own
+checkout, which is exactly what the layering exists to prevent. So: dispatch
+an Epic or a Task by creating a session and **confirming it exists** before
+the work proceeds; if it cannot be created, say so and stop rather than
+continuing in place. Sub-agents remain fine for what they are — bounded
+read-only research inside one turn.
+
+**Role boundaries.** A session's role is fixed when it is created; it is not
+something a session reasons its way out of mid-run. A conductor (program or
+Epic) that finds itself about to edit application files, check out a Task
+branch, or commit has met the boundary, whatever the justification: file or
+locate the Task issue, dispatch it, and verify — or escalate (§6). "It is
+small" is not a route around this; the small-task exemption belongs to Task
+supervisors, whose job is that one Task, and it does not extend to a
+conductor deciding to do the work itself.
+
+**What enforces this, and what does not.** The `orchestrator` role withholds
+`edit`, which is a real runtime grant. It keeps `execute`, because every
+conducting step runs on it — the frontier script, `gh` reads for
+verification, `gh` writes for labels, comments and merges — and a shell can
+also write files, so the grant narrows the path without closing it. Nothing
+here can pin a role to a session, deny writes per session, or hand a
+conductor a read-only workspace: those are runtime features this scaffold
+does not control. Treat the rules above as rules, not as a fence — and when
+a conductor crosses them anyway, that is a retro, not a footnote.
 
 **Who posts what:** claim, plan, worker-dispatch, and outcome comments on
 the Task issue belong to the **supervisor**; the PR is opened and iterated
