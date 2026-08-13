@@ -45,6 +45,27 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Worker dispatches are now tied to a session and a branch, and the
+  small-task exemption must be declared before implementing. A dispatch
+  comment carried branch, PR and scope in prose, so nothing distinguished a
+  real dispatch from a supervisor that wrote the comment and implemented the
+  work itself — the split ADR-0003 exists to produce could not be shown. The
+  comment's first line now names the worker session, its ID and its branch,
+  and the wall requires the branch to be the PR's head ref (managed prefixes
+  allowed), which also stops one task's dispatch from satisfying another's
+  trail. What the wall cannot do is stated in its header rather than implied:
+  session trees are app-local, so the ID is a durable record for humans and
+  audits, never proof — the supervisor is responsible for raising the session
+  before writing the comment, and for not writing it at all when it cannot.
+  The exemption gains the chronology its dispatch counterpart already had:
+  declared after the first commit, it is hindsight rather than a decision the
+  trail records. Task supervision is also given its agent role — the default
+  agent with the session-orchestration skill — so `orchestrator`, which
+  conducts the program and Epic layers, is not chosen for it (refs #40, #7).
+  Release consumption from #7 is deliberately not implemented: it needs a
+  matching algorithm of its own, "ties pass" was a considered trade-off, and
+  the same-second collision it guards against has not been observed.
+
 - Onboarding now creates the program session and hands off to it, and
   conducting sessions are no longer torn down. The program layer had no
   creator — its protocol said it starts "when the phase Epics first exist"

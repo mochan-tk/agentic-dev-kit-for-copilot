@@ -23,7 +23,7 @@ WORK=$(mktemp -d "${TMPDIR:-/tmp}/guardtest.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 install_gh_shim "$WORK"
 
-PR_JSON='{"user":{"login":"mochan-tk","type":"User"},"body":"Closes #12\\n\\nPlan: https://github.com/o/r/issues/12#issuecomment-777"}'
+PR_JSON='{"user":{"login":"mochan-tk","type":"User"},"head":{"ref":"task/12-x"},"body":"Closes #12\\n\\nPlan: https://github.com/o/r/issues/12#issuecomment-777"}'
 ISSUE_TASK='{"labels":[{"name":"type:task"}]}'
 PLAN_COMMENT_12='{"issue_url":"https://api.github.com/repos/o/r/issues/12","body":"## Plan\\n\\n1. Steps."}'
 
@@ -44,7 +44,7 @@ exempt_plan_sentence_at() {
   printf '{"body":"## Plan\\n\\n1. Steps.\\n\\nNo worker will be spawned.","created_at":"%s","updated_at":"%s"}' "$1" "${2:-$1}"
 }
 dispatch_at() {
-  printf '{"body":"Dispatching worker w1 on branch task/12-x.","created_at":"%s","updated_at":"%s"}' "$1" "${2:-$1}"
+  printf '{"body":"Dispatching worker: PR #99 worker (session 6af9582d-42d1-425d-82c8-f9ec651225a8), branch task/12-x","created_at":"%s","updated_at":"%s"}' "$1" "${2:-$1}"
 }
 release_at() {
   printf '{"body":"Releasing worker w1 (context exhausted); successor w2 follows.","created_at":"%s","updated_at":"%s"}' "$1" "${2:-$1}"
@@ -135,5 +135,50 @@ new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(dispatch_at 2026-01-01
   "$(commits_at 2026-01-01T10:00:00Z)"
 GH_FIXTURES="$CASE" expect_rc_grep 1 'dispatch .* predates earliest plan' \
   "dispatch overrides declared exemption" bash "$GUARD" 12
+
+# --- a dispatch naming no session fails -----------------------------------------
+# The point of the two-tier split is that a worker session really exists. A
+# dispatch comment that names none records a split that may not have happened.
+dispatch_no_session_at() {
+  printf '{"body":"Dispatching worker w1 on branch task/12-x.","created_at":"%s","updated_at":"%s"}' "$1" "${2:-$1}"
+}
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_no_session_at 2026-01-01T09:10:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 1 'names no session' \
+  "dispatch without a session identifier fails" bash "$GUARD" 12
+
+# --- a dispatch naming another task's branch fails ------------------------------
+# Without this, one task's dispatch comment satisfies another's trail: the
+# first line matched, and nothing tied it to this PR.
+dispatch_wrong_branch_at() {
+  printf '{"body":"Dispatching worker: PR #99 worker (session 6af9582d-42d1-425d-82c8-f9ec651225a8), branch task/34-other","created_at":"%s","updated_at":"%s"}' "$1" "${2:-$1}"
+}
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_wrong_branch_at 2026-01-01T09:10:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 1 "dispatches branch 'task/34-other'" \
+  "dispatch naming another branch fails" bash "$GUARD" 12
+
+# --- a managed-surface branch prefix still matches ------------------------------
+# Managed surfaces prefix the branch they generate (AGENTS.md §4), so a head
+# ref ending in the dispatched name is the same branch.
+PR_PREFIXED='{"user":{"login":"mochan-tk","type":"User"},"head":{"ref":"copilot/task/12-x"},"body":"Closes #12\\n\\nPlan: https://github.com/o/r/issues/12#issuecomment-777"}'
+new_case "$PR_PREFIXED" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_at 2026-01-01T09:10:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 0 'two-tier' \
+  "managed-prefix head ref matches the dispatched branch" bash "$GUARD" 12
+
+# --- a retroactive exemption fails ----------------------------------------------
+# The exemption is a decision recorded before implementing, mirroring
+# plan-before-commit; claimed afterwards it is hindsight, not a trail.
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(exempt_plan_at 2026-01-01T11:00:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 1 'predates the small-task exemption' \
+  "exemption declared after the first commit fails" bash "$GUARD" 12
+
+# --- an exemption declared before the commit still passes -----------------------
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(exempt_plan_at 2026-01-01T09:05:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 0 'exemption' \
+  "exemption declared before the first commit passes" bash "$GUARD" 12
 
 t_summary

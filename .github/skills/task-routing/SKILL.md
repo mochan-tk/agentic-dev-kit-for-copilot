@@ -17,6 +17,12 @@ task's supervisor lives in an app session while its worker is the cloud
 coding agent). When a supervisor implements directly under the declared
 small-task exemption, the label routes that single session.
 
+**A Task supervisor runs on the default agent** with
+`.github/skills/session-orchestration/SKILL.md` as its manual — the ritual is
+fully described there, so no separate role definition exists. Do not pick
+`orchestrator` for it: that role conducts the program and Epic layers, and
+its loop is written for a different job.
+
 ## Routing inputs
 
 Score the task on five axes before choosing:
