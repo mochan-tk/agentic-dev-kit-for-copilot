@@ -5,7 +5,18 @@ description: Conductor session, at either layer — program (starts each Epic's 
 # (docs.github.com/en/copilot/reference/custom-agents-configuration):
 # no `edit` — the orchestrator conducts and verifies, it never edits files;
 # `agent` lets it invoke other custom agents (planner, reviewer) as
-# subagents; `github/*` is the GitHub MCP read-only toolset.
+# subagents — note a subagent shares this workspace and is never a
+# substitute for a session (session-orchestration, "A sub-agent is not a
+# session"); `github/*` is the GitHub MCP read-only toolset, present only
+# when the adopter configures that server.
+#
+# `execute` is required and is also the hole in the fence. Every step below
+# runs on it: frontier.sh, `gh issue view` / `gh pr view` / `gh pr checks`
+# for verification, and the writes this role does own — labels, Epic
+# comments, closing issues, merging. A shell can equally check out a branch
+# and write files, so withholding `edit` narrows the path without closing
+# it. The boundary ends here and discipline continues: a conductor that
+# finds itself implementing has already crossed it (AGENTS.md §4).
 tools: ["read", "search", "execute", "agent", "github/*"]
 ---
 

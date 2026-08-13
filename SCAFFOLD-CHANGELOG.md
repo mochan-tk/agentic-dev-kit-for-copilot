@@ -45,6 +45,23 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Conductor sessions are held to their role, and the limits of that are
+  stated. An adopter reported a program conductor implementing Task work in
+  its own workspace — twice, the second time after being corrected — by
+  calling a sub-agent "the Epic session" and invoking the small-task
+  exemption. The documents already forbade it; the gap was that nothing said
+  a sub-agent runs in the *caller's* workspace and is never a substitute for
+  a session, that a role is fixed at creation rather than reasoned about
+  mid-run, or that the exemption belongs to Task supervisors alone. All three
+  are now stated, and dispatch must confirm a real session exists before work
+  proceeds. The `orchestrator` role's tool grant is explained rather than
+  left to look like a fence: it withholds `edit`, but keeps `execute` because
+  every conducting step runs on it, and a shell writes files too — so the
+  grant narrows the path without closing it. Immutable role metadata,
+  per-session write denial and read-only workspaces are runtime features this
+  scaffold does not control, and the skill says so instead of implying
+  otherwise (refs #43).
+
 - Worker dispatches are now tied to a session and a branch, and the
   small-task exemption must be declared before implementing. A dispatch
   comment carried branch, PR and scope in prose, so nothing distinguished a
