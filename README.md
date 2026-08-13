@@ -146,6 +146,13 @@ starts each Epic's session, which supervises its Tasks), which no other
 surface provides. Copilot CLI and IDE chat execute individual tasks
 alongside it; they are not substitutes for the app.
 
+**On Windows**, also install [Git for Windows](https://gitforwindows.org) —
+the app already requires Git, and its `bash.exe` is what runs these scripts.
+Do not type `bash` there: the installer leaves `…\Git\bin` off `PATH` by
+design, so `bash` finds the WSL launcher in `System32` instead. Run scaffold
+scripts through the launcher, which locates the real Git Bash for you:
+`pwsh .github/scripts/run.ps1 <script.sh> [arguments]`.
+
 **Supported plans:** public repositories work on any GitHub plan; private
 ones require a paid plan (the scaffold relies on features that need one),
 so `setup-sources.sh` treats private + Free as a hard stop — make the
