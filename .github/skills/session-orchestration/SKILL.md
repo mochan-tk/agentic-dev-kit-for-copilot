@@ -34,10 +34,18 @@ the turn ends. Only `create_session` yields the isolated workspace and branch
 this model depends on. Calling a sub-agent "the Epic session" satisfies the
 word and defeats the isolation — the work lands in the conductor's own
 checkout, which is exactly what the layering exists to prevent. So: dispatch
-an Epic or a Task by creating a session and **confirming it exists** before
-the work proceeds; if it cannot be created, say so and stop rather than
-continuing in place. Sub-agents remain fine for what they are — bounded
-read-only research inside one turn.
+an Epic or a Task by creating a session, and prove it **started** before the
+work proceeds. Existence is not that proof — a session can sit there having
+run nothing — and neither is the status the app reports. The proof is on
+GitHub: the child's claim comment on the Task issue, read with `gh`. No claim
+comment, no start, whatever the sidebar shows. When it has not started,
+dispatch once more; if the second attempt leaves the issue equally silent,
+escalate with `needs:human`, because what is broken is the tooling and not
+the plan. What that emphatically does not license is finishing the work here:
+a dispatch that will not start is the moment a conductor is most tempted to
+implement, and giving in is the boundary violation below, not an exception to
+it. Sub-agents remain fine for what they are — bounded read-only research
+inside one turn.
 
 **Role boundaries.** A session's role is fixed when it is created; it is not
 something a session reasons its way out of mid-run. A conductor (program or
@@ -55,7 +63,12 @@ verification, `gh` writes for labels, comments and merges — and a shell can
 also write files, so the grant narrows the path without closing it. Nothing
 here can pin a role to a session, deny writes per session, or hand a
 conductor a read-only workspace: those are runtime features this scaffold
-does not control. Treat the rules above as rules, not as a fence — and when
+does not control. The same limit shows up at dispatch: whether a session that
+ran nothing is reported as failed rather than idle, whether its launch error
+ever reaches the creator, whether a turn count rides the notification, and
+whether a retry exists at all belong to the app — which is precisely why the
+start check above looks at GitHub, the one place this scaffold can see.
+Treat the rules above as rules, not as a fence — and when
 a conductor crosses them anyway, that is a retro, not a footnote.
 
 **Who posts what:** claim, plan, worker-dispatch, and outcome comments on
@@ -305,7 +318,10 @@ merge — a phase started against a half-tuned repository verifies nothing.
 5. On receiving a report: verify the record exists on the issue and spot-check
    the evidence with your own `gh` calls before updating labels/Project state
    or dispatching dependents. An unrecorded report is returned to the child
-   with one instruction: record first.
+   with one instruction: record first. **Silence is checked the same way.** A
+   child that wakes its parent having written nothing on the issue has not
+   been quietly productive — it has not started, or it has died. Read the
+   issue before concluding anything about a child that never spoke.
 6. Route `needs-replan` outcomes to the planner procedure
    (`plan-management` §Replanning) and post the rationale on the Epic.
 7. When the Epic's phase is done — its Tasks closed, their PRs merged, the
@@ -347,7 +363,7 @@ App tools that instantiate the protocol:
 | `create_session` (kickoff prompt, mode, model) | Dispatch a supervisor or worker with a complete kickoff; choose mode (`autopilot` for workers) and model per the routing block |
 | `open_issue_session` | Dispatch straight from a Task issue — the issue is the brief |
 | `respond_to_session_plan` | The `risk:high` plan-approval gate, exercised by the parent |
-| `notify_on_idle` | Wake the parent when a child finishes — the dispatch loop's completion signal |
+| `notify_on_idle` | Wake the parent when a child stops. A wake is not a completion — it fires identically for finished, dead, and never-started — so what happened is read on the issue, not inferred from the notification |
 | `send_session_message` | Steering, escalation (§6), and the report hop (pointer, not payload) |
 | `archive_session` | Dispose of a finished worker; its context is released, the record stays on GitHub |
 
