@@ -45,6 +45,23 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Onboarding now creates the program session and hands off to it, and
+  conducting sessions are no longer torn down. The program layer had no
+  creator — its protocol said it starts "when the phase Epics first exist"
+  while onboarding never mentioned it — and no rule said how long an Epic or
+  program session lives, so the leaf-first teardown guidance read as
+  applying all the way up. Together those produced the observed behaviour:
+  the first session became the Epic session, and when that Epic finished the
+  same session carried on as the next one, phase after phase in a single
+  thread. Onboarding now ends by creating a `Program` session and handing it
+  the Epics; that session waits for the evidence PR to merge before starting
+  the first Epic's session, since a phase run against a half-tuned
+  repository verifies nothing. Teardown is stated per layer: workers and
+  Task supervisors are archived as before, an Epic session lives until its
+  Epic closes, and the program session lives as long as the plan — which is
+  what keeps `Epic #1` and `Epic #2` visible side by side and guarantees a
+  live session owns starting the next phase (refs #39).
+
 - Sessions now have a naming convention: `Program`, `Epic #1`, `Task #6
   supervisor`, `PR #12 worker`. Nothing said how to name a session, so agents
   labelled them by role — `Task 6 supervisor` — and a sidebar of open

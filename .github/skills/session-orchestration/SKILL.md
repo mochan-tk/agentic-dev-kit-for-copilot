@@ -191,9 +191,11 @@ You are the WORKER session for Task issue #<n> in <owner>/<repo>.
 
 ## Program session protocol
 
-One program session per project, started when the phase Epics first exist
-(onboarding drafts them) and kept for the life of the plan. It conducts
-conductors: it never decomposes, dispatches Tasks, or edits code itself.
+One program session per project, created by onboarding as its closing move
+(`project-onboarding` P6) once the phase Epics exist, and kept for the life
+of the plan. It conducts conductors: it never decomposes, dispatches Tasks,
+or edits code itself. Its first move waits for the onboarding evidence PR to
+merge — a phase started against a half-tuned repository verifies nothing.
 
 1. **Start an Epic's session when that phase's turn comes** — when its
    `blocked-by` Epics are closed, or the frontier has run dry. Hand it the
@@ -259,8 +261,11 @@ conductors: it never decomposes, dispatches Tasks, or edits code itself.
    (`plan-management` §Replanning) and post the rationale on the Epic.
 7. When the Epic's phase is done — its Tasks closed, their PRs merged, the
    Epic's own state line current — tell the program session so the next
-   phase gets a session. Do not start that session yourself: the program
-   session keeps Epic sessions siblings (see Program session protocol). If
+   phase gets a session, then stop. Do not start that session yourself and
+   do not carry on as it: the program session keeps Epic sessions siblings
+   (see Program session protocol), and a session that continues into the
+   next phase makes the tree a single thread again. Stay open until the
+   Epic closes — rework and late questions come back here. If
    no program session is running, say so in the Epic's closing comment and
    name the next Epic, so a human or a fresh program session can pick it up.
 
@@ -304,6 +309,15 @@ stay alive through review (rework returns to the same worker), so teardown
 runs after the merge, not at closeout: the requester messages the
 supervisor to tear down → the supervisor archives its worker(s) and
 acknowledges → only then does the requester archive the supervisor.
+
+**Conducting sessions are not torn down with them.** Teardown covers the
+executing layers only: workers and Task supervisors, which carry the
+heaviest context and whose record already lives on GitHub. An **Epic
+session lives until its Epic closes**; the **program session lives as long
+as the plan**. Keeping them is what makes the tree readable — `Epic #1` and
+`Epic #2` side by side — and guarantees a live session owns starting the
+next phase. Archiving them instead leaves the plan with no conductor, and
+the next phase gets absorbed into whatever session is still open.
 
 ## Resume protocol (crash-only)
 
