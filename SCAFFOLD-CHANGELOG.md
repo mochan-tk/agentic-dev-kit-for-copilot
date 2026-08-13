@@ -45,6 +45,17 @@ inherit what this one learned.
 
 ### Unreleased
 
+- CI now runs the documented Windows invocation on a Windows runner. Two
+  adopter reports in one day — the orchestrator's tool grant (#47) and the
+  Windows first-contact command (#49) — were the same failure: neither had
+  regressed, both were wrong from the day they were written, and nothing here
+  had ever executed either. Every job in `ci.yml` ran on Linux, so the
+  launcher adopters actually touch was the one surface CI never did. The new
+  `windows-launcher` job drives `run.ps1` the way an adopter does and tells a
+  raising launcher apart from a repository that merely reports untuned — the
+  two look identical through an exit code alone. Nothing was added to the
+  always-on instruction files: the job is the fix, and a sentence restating
+  it would be scar tissue (#51).
 - Windows can run the first-contact check. `bash` there reaches the WSL
   launcher, not Git Bash — the Git for Windows installer leaves `…\Git\bin`
   off `PATH` deliberately, while `System32\bash.exe` is on it by default, so

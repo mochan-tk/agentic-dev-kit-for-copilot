@@ -191,3 +191,51 @@ jobs:
             exit 2
           }
           bash .github/scripts/check-copilot-surface.sh
+
+  # Why a Windows runner for one command: #47 and #49 both shipped broken and
+  # stayed broken, because nothing here had ever executed them (retro #51).
+  # Every other job runs on Linux, so the Windows launcher — the one surface
+  # adopters touch that CI never did — is exercised here the way they run it.
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: The documented Windows invocation resolves Git Bash
+        shell: pwsh
+        run: |
+          # `--quiet` documents no output and an exit code only, so stderr
+          # holds a PowerShell error or nothing. That is the discriminator:
+          # a launcher that raises and a repository that still has CUSTOMIZE
+          # markers both leave the exit code at 1, and this repository is the
+          # template, so 1 is its normal answer.
+          & pwsh .github/scripts/run.ps1 tuning-status.sh --quiet 2> launcher-stderr.txt
+          $code = $LASTEXITCODE
+          $err = (Get-Content launcher-stderr.txt -Raw -ErrorAction SilentlyContinue)
+          Remove-Item launcher-stderr.txt -ErrorAction SilentlyContinue
+          if ($err) {
+            throw "run.ps1 raised instead of returning an exit code:`n$err"
+          }
+          if ($code -ne 0 -and $code -ne 1) {
+            throw "run.ps1 returned $code; tuning-status.sh --quiet documents 0 (tuned) or 1 (markers remain)."
+          }
+          "run.ps1 returned $code - Git Bash was resolved and the script ran."
+          # Actions appends `exit $LASTEXITCODE` to a pwsh step, so the code
+          # this step deliberately accepts would otherwise fail it. Reached
+          # only when both assertions above passed; a throw never gets here.
+          exit 0
+
+      - name: Record what bare bash resolves to here
+        shell: pwsh
+        run: |
+          # Diagnostic, never an assertion. A hosted runner's PATH is not a
+          # stock desktop's: if Git\bin happens to be on it here, bare `bash`
+          # works on this machine and would still fail for the adopter. This
+          # line is what tells a future reader which of the two they are
+          # looking at.
+          $found = @(Get-Command bash -All -CommandType Application -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.Source })
+          if ($found) { $found -join "`n" } else { "bash is not on PATH at all" }
+          exit 0
