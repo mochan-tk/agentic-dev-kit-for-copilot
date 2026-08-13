@@ -45,6 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
+- A dispatched session is now proven to have **started**, not merely to exist.
+  An adopter reported a child session created with a kickoff going idle having
+  run nothing: the session was there, the work never began, no error surfaced,
+  and the parent carried on believing the task was done. Their second
+  reproduction — default branch, effort `medium`, failing before any reasoning
+  — puts the cause squarely in the app, so the fix here is detection, not
+  prevention. The predicate moves from existence to the child's claim comment
+  on the issue, read with `gh`; an idle notification is described as a wake
+  that fires the same way for finished, dead, and never-started; and silence
+  from a child is checked rather than assumed successful. A dispatch that will
+  not start escalates as `needs:human` and is explicitly not a licence for the
+  conductor to implement the Task itself — the same temptation that produced
+  the boundary violation above (#45).
 - Conductor sessions are held to their role, and the limits of that are
   stated. An adopter reported a program conductor implementing Task work in
   its own workspace — twice, the second time after being corrected — by
