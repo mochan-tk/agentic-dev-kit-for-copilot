@@ -222,6 +222,10 @@ jobs:
             throw "run.ps1 returned $code; tuning-status.sh --quiet documents 0 (tuned) or 1 (markers remain)."
           }
           "run.ps1 returned $code - Git Bash was resolved and the script ran."
+          # Actions appends `exit $LASTEXITCODE` to a pwsh step, so the code
+          # this step deliberately accepts would otherwise fail it. Reached
+          # only when both assertions above passed; a throw never gets here.
+          exit 0
 
       - name: Record what bare bash resolves to here
         shell: pwsh
@@ -234,3 +238,4 @@ jobs:
           $found = @(Get-Command bash -All -CommandType Application -ErrorAction SilentlyContinue |
             ForEach-Object { $_.Source })
           if ($found) { $found -join "`n" } else { "bash is not on PATH at all" }
+          exit 0
