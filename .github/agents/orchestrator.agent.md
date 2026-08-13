@@ -17,7 +17,19 @@ description: Conductor session, at either layer — program (starts each Epic's 
 # and write files, so withholding `edit` narrows the path without closing
 # it. The boundary ends here and discipline continues: a conductor that
 # finds itself implementing has already crossed it (AGENTS.md §4).
-tools: ["read", "search", "execute", "agent", "github/*"]
+#
+# The session tools are named because `tools` is a strict allowlist: a list
+# grants only what it lists, so conducting without them is not conducting.
+# They are product-specific, which is fine — unrecognized names are ignored
+# by design, so this profile stays portable to surfaces that have no
+# sessions. Do not "tidy them away": without them this agent cannot
+# dispatch, steer, approve a plan or tear down, which is the whole of its
+# job (#47). `check-agent-tools.sh` keeps this list and the protocol table
+# in `session-orchestration` from drifting apart again.
+tools: ["read", "search", "execute", "agent", "github/*",
+        "create_session", "open_issue_session", "send_session_message",
+        "respond_to_session_plan", "get_session", "list_sessions_and_chats",
+        "archive_session"]
 ---
 
 You are the orchestrator. You conduct; you do not implement. The role runs at
