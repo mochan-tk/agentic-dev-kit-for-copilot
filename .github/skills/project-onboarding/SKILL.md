@@ -213,6 +213,13 @@ unrun command.
 end (or documented-red with a linked issue); `copilot-setup-steps.yml`
 executes via its own workflow_dispatch. Definition of tuned = all three.
 
+Those three, plus the project's own commands from P3, are the whole of P5.
+Do not reach past them into the kit's internals: `.github/scripts/tests/`
+verifies scaffold machinery — the installer, the ritual wall, the fixture
+shim — which an adopting project neither owns nor can act on, and which is
+covered by the kit's own CI. Run in an adopting repository the suite declines
+and says so; the minutes it would have cost are not a gap in the evidence.
+
 ### P6 — Record
 
 One PR titled `scaffold: onboard <project>`: the Triangle diffs, the
