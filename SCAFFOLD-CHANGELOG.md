@@ -45,6 +45,21 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The kit's guard tests stay home. An adopter onboarding an existing project
+  spent over an hour, roughly thirty minutes of it inside `run-tests.sh` —
+  investigating seven Windows failures in tests they had not touched, for
+  machinery their project does not use. Nothing ever told them to run it:
+  `run-tests.sh` appears in no skill or instruction, but P5 asks for green CI
+  and `ci.yml` runs the suite, so every adopter inherited it. The tests now
+  decline outside the template, keyed on the `scaffold-version` marker
+  (`sha=unknown` is the template, a real sha is an adopter) — which reaches
+  repositories that already have `ci.yml`, since `--upgrade` never refreshes
+  workflows. `FORCE_GUARD_TESTS=1` overrides. The runner also takes suite
+  names, so one failing suite re-runs in seconds instead of six minutes, and
+  it now prints that expected runtime up front: this repository's own
+  maintainer read those six minutes as a hang, twice, on the day this was
+  written. P5 says plainly that it does not reach into the kit's internals
+  (#58).
 - The PR that installs the scaffold is no longer failed by the wall it
   installs. An adopter opened one and `task-ritual` rejected it for having no
   Task link — in a repository with no issues, no `AGENTS.md` on `main`, and

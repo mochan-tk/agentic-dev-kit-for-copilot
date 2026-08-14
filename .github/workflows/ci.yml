@@ -112,7 +112,10 @@ jobs:
 
       # The guards guard the repo; these tests guard the guards. Offline
       # regression cases (sandbox repos + a gh fixture shim) must pass
-      # before the walls below are trusted.
+      # before the walls below are trusted. They are the kit's own, not an
+      # adopting project's: in a repository that installed the scaffold this
+      # step prints one line and exits 0, because the machinery under test
+      # belongs to us and its CI is here (#58).
       - name: Guard regression tests
         run: bash .github/scripts/tests/run-tests.sh
 
