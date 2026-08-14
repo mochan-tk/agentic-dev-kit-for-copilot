@@ -101,8 +101,10 @@ case "$path" in
   user) fixture="$GH_FIXTURES/user.json" ;;
   orgs/*) fixture="$GH_FIXTURES/org.json" ;;
   repos/*/pulls/*/commits) fixture="$GH_FIXTURES/commits.json" ;;
+  repos/*/pulls/*/files*) fixture="$GH_FIXTURES/pull-files.json" ;;
   repos/*/pulls/*) fixture="$GH_FIXTURES/pull.json" ;;
   repos/*/contents/SCAFFOLD-CHANGELOG.md*) fixture="$GH_FIXTURES/contents-changelog.json" ;;
+  repos/*/contents/AGENTS.md*) fixture="$GH_FIXTURES/contents-agents.json" ;;
   repos/*/contents/*) fixture="$GH_FIXTURES/contents.json" ;;
   repos/*/issues/comments/*) fixture="$GH_FIXTURES/comment.json" ;;
   repos/*/issues/*/comments) fixture="$GH_FIXTURES/comments.json" ;;
@@ -112,7 +114,11 @@ case "$path" in
   repos/*) fixture="$GH_FIXTURES/repo.json" ;;
   *) echo "gh shim: no fixture mapped for '$path'" >&2; exit 64 ;;
 esac
-[ -f "$fixture" ] || { echo "gh shim: missing fixture $fixture" >&2; exit 64; }
+# An absent fixture stands for a 404. The scaffold reads several paths that
+# legitimately do not exist (a base branch without AGENTS.md is the whole
+# signal of the adoption exemption), so a missing file must fail the way the
+# API does — exit 1 — not as a shim error.
+[ -f "$fixture" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
 jq -r "$jq_expr" "$fixture"
 SHIM
   chmod +x "$1/bin/gh"

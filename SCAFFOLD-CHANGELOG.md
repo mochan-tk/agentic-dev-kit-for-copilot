@@ -45,6 +45,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The PR that installs the scaffold is no longer failed by the wall it
+  installs. An adopter opened one and `task-ritual` rejected it for having no
+  Task link — in a repository with no issues, no `AGENTS.md` on `main`, and
+  the enforcing workflow arriving in that very diff. The onboarding exemption
+  could not help: its self-limiting signal asks whether the base is already
+  adopted, which an adoption PR is by definition not. This path is ours to
+  support rather than an edge case, since README step 4 recommends a ruleset
+  that *requires* a pull request. A third exemption now covers it, on
+  structural signals only — the base has no `AGENTS.md`, and the PR adds both
+  `AGENTS.md` and `.github/copilot-instructions.md`. No title is involved:
+  adoption PRs have no naming convention. It is self-limiting the same way
+  the second one is — after the merge the base has `AGENTS.md` forever (#53).
 - A supervising session verifies the record, not the artifact. An adopter
   measured three runs of the same verification for one result — supervisor,
   Epic orchestrator and program session each running `gh pr view` and the same
