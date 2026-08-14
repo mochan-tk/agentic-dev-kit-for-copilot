@@ -62,7 +62,7 @@
 # Usage:
 #   check-task-ritual.sh [<pr-number>]     # or set PR_NUMBER
 #
-# Exemptions — two, both narrow:
+# Exemptions — three, all narrow:
 #   1. Allowlisted dependency bots skip the ritual (default: dependabot[bot]
 #      renovate[bot] github-actions[bot]; override with RITUAL_EXEMPT_BOTS,
 #      space-separated logins). Any other bot author — cloud coding agents
@@ -75,6 +75,10 @@
 #      CUSTOMIZE markers. Those last two make the exemption self-limiting: it
 #      holds at most once per adopting repository and lapses the moment
 #      onboarding merges.
+#   3. The adoption PR — the one that installs the scaffold. Its base has no
+#      AGENTS.md and it adds both AGENTS.md and copilot-instructions.md.
+#      No title is involved: adoption PRs have no naming convention. Also
+#      self-limiting — after the merge the base has AGENTS.md forever.
 #
 # Requires: GitHub CLI (gh), authenticated. Repo context comes from the
 # checkout ({owner}/{repo} placeholders); set GH_REPO to override.
@@ -171,6 +175,48 @@ if printf '%s\n' "$title" | grep -qE '^scaffold: onboard '; then
     echo "      already onboarded;"
   fi
   echo "      the full start ritual applies."
+fi
+
+# The adoption PR — the one that *installs* this scaffold — has no upstream
+# Task either, and for a stronger reason: when it opens, the repository has no
+# scaffold, usually no issues, and the workflow doing this enforcing arrives in
+# that very diff. Exemption 2 cannot cover it; its self-limiting signal asks
+# whether the base is already adopted, which is exactly what an adoption PR is
+# not.
+#
+# This path is ours to support, not an edge case. The installer stages without
+# committing, and README step 4 recommends a ruleset on `main` that *requires* a
+# pull request — so an adopter who follows that advice cannot push the adoption
+# commit directly, and the only route left is the one this exemption unblocks.
+#
+# Every signal is structural. Title is not among them: adoption PRs have no
+# naming convention (the reported one read "Add Agentic Dev Kit for Copilot
+# scaffold"), and a title an author chooses is not evidence anyway.
+#
+#   1. the base carries no AGENTS.md — read at ?ref=<base>, so the workflow's
+#      checkout is irrelevant;
+#   2. this PR adds AGENTS.md (status "added", not "modified");
+#   3. it also adds .github/copilot-instructions.md, so a repository writing an
+#      AGENTS.md of its own cannot claim the exemption.
+#
+# Self-limiting by construction: after the merge the base has AGENTS.md, so
+# signal 1 can never hold again there. This template excludes itself the same
+# way — main carries the scaffold.
+if ! api "repos/{owner}/{repo}/contents/AGENTS.md?ref=${base_ref}" --jq '.sha' >/dev/null 2>&1; then
+  # A 3000-file listing cap applies; the scaffold is ~90 files, so a PR that
+  # hits the cap is not an adoption PR and simply fails the signal below.
+  added=$(api "repos/{owner}/{repo}/pulls/${PR}/files?per_page=100" --paginate \
+    --jq '[.[] | select(.status == "added") | .filename]' 2>/dev/null || echo '[]')
+  adds_agents=$(printf '%s' "$added" | grep -c '"AGENTS.md"' || true)
+  adds_instructions=$(printf '%s' "$added" | grep -c '"\.github/copilot-instructions\.md"' || true)
+
+  if [[ "$adds_agents" -ge 1 && "$adds_instructions" -ge 1 ]]; then
+    echo "PASS: PR #${PR} adopts the scaffold — base '${base_ref}' has no AGENTS.md,"
+    echo "      and this PR adds AGENTS.md and .github/copilot-instructions.md."
+    echo "      No Task issue can exist yet: the ritual this wall enforces arrives"
+    echo "      in this diff. The exemption lapses the moment this merges."
+    exit 0
+  fi
 fi
 
 # The first task link names the primary Task under review. A qualifier may sit

@@ -189,6 +189,12 @@ bash ≥ 3.2).
    - Stages the files without committing and records the adoption in
      `SCAFFOLD-CHANGELOG.md`; the seeded `.gitattributes` pins scaffold
      paths to LF so the bash scripts survive Windows checkouts.
+   - Commit them however your repository works — directly on the default
+     branch, or through a pull request. Step 4's ruleset makes the pull
+     request mandatory once it is in place, so the ritual wall exempts the
+     PR that adds `AGENTS.md` and `copilot-instructions.md` to a repository
+     that has neither. It has no Task issue to link because it is what
+     brings the ritual with it.
    - Safety: collisions refuse unless you pass `--force`; `--dry-run`
      previews the plan and writes nothing; symlinked paths always
      refuse; the fetch is pinned to a commit SHA resolved before
