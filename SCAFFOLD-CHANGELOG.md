@@ -45,6 +45,22 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The README says what the kit is for before it says how it is built. Its
+  opening called this "an AI-agent development lifecycle" — which reads as a
+  kit for *building* AI agents, the opposite of the truth — and then spent
+  thirty lines on repository wiring, design premises and the execution plane
+  without naming a single problem any of it solves. It now opens with the
+  three pains (work you cannot see, decisions that scatter, not knowing how
+  much to delegate), defines **Agentic Development** as a layer over the
+  process a reader already runs rather than a replacement for it, and states
+  the two theses and the three places the new-team-member analogy breaks,
+  since the whole design follows from those. Two things that were buried are
+  now sections of their own: how the system learns (a second failure of a kind
+  is a pattern, answered with mechanism; project-agnostic lessons flow back to
+  the template) and how to start small, in three levels a reader can pick
+  between by the shape of their pain. The front-page name is **Agentic
+  Development Kit**; "scaffold" keeps its narrower job of naming what gets
+  installed into a repository (#62).
 - The kit's guard tests stay home. An adopter onboarding an existing project
   spent over an hour, roughly thirty minutes of it inside `run-tests.sh` —
   investigating seven Windows failures in tests they had not touched, for
