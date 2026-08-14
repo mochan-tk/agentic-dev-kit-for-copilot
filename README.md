@@ -3,28 +3,92 @@
        width="200" alt="A circular emblem: a fairy conductor, eyes closed, raising a baton as notes drift upward">
 </p>
 
-# Agentic Development Scaffold (GitHub-native)
+# Agentic Development Kit
 
-Repository wiring for running an AI-agent development lifecycle on GitHub —
-conducted from the **GitHub Copilot app**, whose parent/child sessions carry
-the orchestration model, with the Copilot cloud (coding) agent, Copilot CLI
-and IDE agents executing individual tasks — such that **the plan,
-the work, the evidence, and the lessons all live on GitHub**, not in chat
-windows. Everything here is plain files: version it, review it, and let the
-improvement loops evolve it.
+Three things go wrong when you hand work to AI agents. You cannot **see** what
+was done. Decisions **scatter** across chat windows. And you are never sure
+**how much** you can safely delegate. This repository is a working answer to
+those three — as plain files you can version, review and change.
 
-Two design premises. First, sessions are ephemeral and agents are stateless,
-so GitHub (issues, PRs, committed files) is the only shared memory. Second,
-**this scaffold is generic by design**: project truth is injected once,
-through the `project-onboarding` skill, and kept honest afterwards by
-`.github/scripts/tuning-status.sh` — so the same template serves any project and can
-be sharply tuned the moment a target arrives.
+**Agentic Development** is the name for that answer: a layer of practice laid
+over the process you already run. Waterfall, Scrum, Kanban — it replaces none
+of them. Requirements, design, implementation, test and release stay exactly
+where they are. What changed is *who does the work*. The moment a worker with
+no memory joins the team, the process quietly loses the human recall and
+oversight it was always built on. This layer fills that hole.
 
-The execution plane is **Copilot-native**: the GitHub ledger and
+## Two theses
+
+It starts somewhere unremarkable: **an AI agent is a new team member.** You
+hand a colleague work as an issue, take delivery as a pull request, and judge
+quality by review. GitHub already carries that machinery, so working with
+agents needs no new one.
+
+The analogy then breaks in exactly three places, and everything here follows
+from them. An agent **loses its memory every morning** — yesterday's agreement
+and the correction you typed are both gone. It **multiplies faster than you
+can watch** — three capable colleagues become ten overnight. And its
+**probation never ends** — trust does not accumulate the way it does with a
+human hire.
+
+From the first break comes the thesis the rest hangs on: **conversation
+evaporates; only what lands in the repository and its issues persists.** Not a
+slogan, a definition. A commit, an issue, a pull request comment — those are
+landings. A brilliant exchange inside a session is not, and by tomorrow it is
+indistinguishable from something that never happened.
+
+Three disciplines fall out of that, and they are the floor everything else
+stands on. **record-before-report**: the outcome is written to the issue
+before anyone is told. **verify-before-done**: a claim of completion cites a
+command or a check, never a memory. **single-writer**: parallel tasks never
+share a file, or the plan serialises them instead.
+
+## The system learns
+
+A first failure is information. **The second of the same kind is a pattern**,
+and a pattern is answered with mechanism, not with a reminder in chat — you
+are talking to a colleague who forgets every morning. Land the lesson in a
+file and it reaches every surface and every future session at once. That is
+the `retro` loop, and it is why failure rates fall over a project's life: not
+because the models got smarter, but because the conventions grew.
+
+Some lessons turn out not to be about your project at all. Those go back to
+the template this kit ships as, so the next project starts where the last one
+finished — organizational learning, compounding.
+
+## Start where you are
+
+None of this has to arrive at once.
+
+- **Level 1 — record-before-report.** Make agents write results into issues
+  and pull requests first. Doable today, and "invisible" starts shrinking
+  immediately.
+- **Level 2 — delegate one task properly.** Write one self-contained issue,
+  hand it to an agent, watch CI go green, land the merge. One small loop, and
+  it doubles as the trial run for how much you can delegate.
+- **Level 3 — full operation.** Verification gates, the actionable frontier,
+  parallel sessions, the learning loops above.
+
+You can tell which step you are on by the shape of the pain. Results scattered
+across chat windows? Start at 1. Delegation works, but only for the one person
+who knows the trick? Start at 2. Already running work in parallel? Take the
+Level 3 parts in whatever order hurts most.
+
+## How it is put together
+
+Everything here is plain files: version them, review them, let the loops
+change them. Two properties shape the rest. The kit is **generic by design** —
+project truth is injected once, through the `project-onboarding` skill, and
+kept honest afterwards by `.github/scripts/tuning-status.sh`, so the same
+template serves any project and can be sharply tuned the moment a target
+arrives. And its execution plane is **Copilot-native**: the GitHub ledger and
 `AGENTS.md` stay platform-neutral, while every other agent-facing surface —
 skills, custom agents, prompts, instruction files, CI walls — is built for
-GitHub Copilot exclusively. Other platforms get the constitution and the
-ledger — nothing else is promised.
+GitHub Copilot exclusively. The lifecycle is conducted from the **GitHub
+Copilot app**, whose parent/child sessions carry the orchestration model, with
+the Copilot cloud (coding) agent, Copilot CLI and IDE agents executing
+individual tasks. Other platforms get the constitution and the ledger —
+nothing else is promised.
 
 Human judgment does not spread evenly across this lifecycle; it concentrates
 at dispatch and at the **Three Merges**: the **agreement merge** (a
@@ -65,7 +129,7 @@ docs/                              This repository's own development records: co
   instructions/                    Path-scoped rules (.github/docs/, firmware/, code review)
   agents/                          Roles: orchestrator, planner, reviewer (*.agent.md)
   skills/                          Procedures (SKILL.md each):
-    project-onboarding/              tune this scaffold to the target project
+    project-onboarding/              tune the installed scaffold to the project
     context-collection/              intake with provenance
     context-distillation/            agreements + context tiering
     plan-management/                 issue graph, frontier, replanning
@@ -313,7 +377,7 @@ bash ≥ 3.2).
      a `Retro hygiene review <YYYY-MM>` issue surfacing promotion-overdue
      retro candidates and always-on budget drift.
    *Done when:* the first task PR merges with its evidence table — you have
-   closed the loop once, and the scaffold is carrying your project.
+   closed the loop once, and the kit is carrying your project.
 
 ## Scaffold lineage & upgrades (the second loop)
 
