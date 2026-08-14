@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/docs/logo.png"
+       width="200" alt="A fairy conductor, eyes closed, raising a baton as notes drift upward">
+</p>
+
 # Agentic Development Scaffold (GitHub-native)
 
 Repository wiring for running an AI-agent development lifecycle on GitHub —
