@@ -317,7 +317,9 @@ merge — a phase started against a half-tuned repository verifies nothing.
    prefer steering over restarting.
 5. On receiving a report: verify the record exists on the issue and spot-check
    the evidence with your own `gh` calls before updating labels/Project state
-   or dispatching dependents. An unrecorded report is returned to the child
+   or dispatching dependents — `gh` calls are the whole of it, because the
+   artifact is CI's to verify and not yours to rebuild (`verification`
+   §The layers). An unrecorded report is returned to the child
    with one instruction: record first. **Silence is checked the same way.** A
    child that wakes its parent having written nothing on the issue has not
    been quietly productive — it has not started, or it has died. Read the

@@ -39,6 +39,20 @@ Never compensate for a lower layer at a higher one ("reviewer will catch it")
 and never weaken a lower layer to pass ("delete the flaky test"). A failing
 gate is information; removing the gate destroys the information.
 
+**The layers run once, not once per session tier.** Layer 1 runs twice by
+design — the implementer runs it, then CI runs it — and CI's run is the
+authoritative one, which every session above reads through `gh pr checks`. So
+a supervising session verifies the **record**: the evidence table, the CI
+verdict, the diff against the ownership paths. It does not rebuild the
+artifact. Re-run a command only to resolve something specific — records that
+contradict each other or CI, evidence that is absent, a claim implausible on
+its face — and say which contradiction you were resolving. This sharpens
+verify-before-done rather than relaxing it: every ground truth `AGENTS.md` §3
+names (`git status`, `gh issue view`, `gh pr view`, `gh pr checks`) is a read
+of the record, not a build. Reading the record *is* the check, never a way
+around it — an absent or hand-waved evidence table still goes back to the
+child with one instruction: record first.
+
 ## Pre-PR checklist (implementer)
 
 1. Run every command in the Task issue's **Verification** section; capture

@@ -45,6 +45,18 @@ inherit what this one learned.
 
 ### Unreleased
 
+- A supervising session verifies the record, not the artifact. An adopter
+  measured three runs of the same verification for one result — supervisor,
+  Epic orchestrator and program session each running `gh pr view` and the same
+  build, with one task's RAM/Flash measurement executed twice and logged by the
+  Epic session itself as a coordination failure. Nothing here told them not to:
+  `verification`'s layers are CI layers, and they never said who runs them. They
+  now say it. Layer 1 runs twice by design — implementer, then CI — and CI's run
+  is authoritative, read from above through `gh pr checks`; a tier above
+  verifies the evidence table, the CI verdict and the diff against ownership,
+  and re-runs a command only to resolve a contradiction it can name. This
+  sharpens verify-before-done rather than relaxing it: every ground truth
+  `AGENTS.md` §3 lists is a read of the record, not a build (#55).
 - CI now runs the documented Windows invocation on a Windows runner. Two
   adopter reports in one day — the orchestrator's tool grant (#47) and the
   Windows first-contact command (#49) — were the same failure: neither had
