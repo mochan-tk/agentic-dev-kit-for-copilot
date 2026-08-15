@@ -116,6 +116,11 @@ change), but the effort tier is meaningful:
 | `fast` | Mechanical edits, renames, formatting, boilerplate | smaller/faster model |
 | `local` | Sensitive data, offline work | on-device model |
 
+Which model fills a tier is the adopter's answer, recorded in
+copilot-instructions' **Models** block — read it there rather than
+naming one here. Review is dispatched on the review model, which may
+differ from the implementation model on purpose.
+
 ## Role suggestion
 
 Suggest a role when a specialized definition exists in `.github/agents/`
