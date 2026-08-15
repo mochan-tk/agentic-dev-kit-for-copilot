@@ -45,6 +45,14 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Guard regression tests no longer spend six minutes sleeping through
+  failures they deliberately created. Five ritual suites consumed 344 of the
+  regression step's 361 seconds because every missing comment or broken link
+  paid the production GitHub retry backoff: three attempts with two-second
+  pauses. Production keeps that exact contract; offline tests set only the
+  pause to zero, keeping every attempt and assertion. A behavioral fixture
+  makes the first two API calls fail, the third succeed, and shims `sleep` to
+  prove the default remains two seconds without waiting for it (#66).
 - Roadmap creation and population moved from unreachable prose into the
   rolling-wave procedure that agents actually execute. An adopter created
   nine Epics but saw only one on the board: the board check sat sixty lines

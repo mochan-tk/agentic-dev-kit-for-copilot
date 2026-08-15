@@ -9,6 +9,13 @@
 TESTS_RUN=0
 TESTS_FAILED=0
 
+# Negative ritual fixtures deliberately make API reads fail. Production waits
+# two seconds before retrying a transient GitHub error; an offline JSON
+# fixture will not recover with time, so tests retain all three attempts and
+# remove only the pause. Respect an explicit caller value for retry-contract
+# tests.
+export RITUAL_API_RETRY_DELAY="${RITUAL_API_RETRY_DELAY:-0}"
+
 t_ok() {
   TESTS_RUN=$((TESTS_RUN + 1))
   echo "ok - $1"
