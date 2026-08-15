@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# setup-project.sh — bootstrap a GitHub Projects (v2) roadmap board and set
-# item dates, so Task/Epic issues can be visualized on a Projects roadmap
-# view with start/target spans.
+# setup-project.sh — bootstrap a GitHub Projects (v2) roadmap board, add
+# Task/Epic issues, and set dates only when real schedule spans exist.
 #
 # Idempotent: `init` reuses an open project with the same title, skips
-# date fields that already exist, and re-links safely; `dates` reuses the
-# project item when the issue is already on the board.
+# date fields that already exist, and re-links safely; `add` and `dates`
+# reuse the project item when the issue is already on the board.
 #
 # Usage:
 #   setup-project.sh init  [--owner <login>] [--title <title>] [-R owner/repo]
+#   setup-project.sh add   --project <number> --issue <n>
+#                          [--owner <login>] [-R owner/repo]
 #   setup-project.sh dates --project <number> --issue <n>
 #                          --start YYYY-MM-DD --target YYYY-MM-DD
 #                          [--owner <login>] [-R owner/repo]
@@ -23,6 +24,8 @@
 #          URL. Re-running is a no-op. Projects v2 boards are always
 #          user/org-owned (repo-owned boards no longer exist); the repo
 #          link makes the board show up in the repository's Projects tab.
+#   add    Add issue <n> to project <number> without inventing dates. Also
+#          sets `Kind` from `type:epic` / `type:task` when available.
 #   dates  Add issue <n> to project <number> (reusing the item when already
 #          present) and set both date fields. Dates must be YYYY-MM-DD; a
 #          target date earlier than the start date is rejected. Also sets
@@ -33,8 +36,8 @@
 #   --owner <login>          Project owner login (user or org). Default: the
 #                            owner of the target repository.
 #   --title <title>          init: board title. Default: "<repo> roadmap".
-#   --project <number>       dates: project number (printed by init).
-#   --issue <n>              dates: issue number to schedule.
+#   --project <number>       add/dates: project number (printed by init).
+#   --issue <n>              add/dates: issue number to add or schedule.
 #   --start <YYYY-MM-DD>     dates: start date.
 #   --target <YYYY-MM-DD>    dates: target date (not earlier than start).
 #   -R, --repo <owner/repo>  Target repository. Default: the repository the
@@ -120,6 +123,64 @@ option_id() {
     | jq -r --arg name "$3" --arg opt "$4" \
         '[.fields[] | select(.name == $name) | .options[]?
           | select(.name == $opt) | .id] | first // empty'
+}
+
+# Shared context for `add` and `dates`. Bash 3.2 has no namerefs, so these
+# values are deliberately scoped with a prefix rather than returned through
+# caller-owned variables.
+PROJECT_NODE_ID=""
+PROJECT_ITEM_ID=""
+PROJECT_ISSUE_URL=""
+PROJECT_ISSUE_LABELS=""
+
+load_project_issue() {
+  local project="$1" owner="$2" issue="$3" issue_json
+  # Resolving the URL via the API also fails fast when the issue is missing.
+  issue_json="$(gh issue view "$issue" --repo "$REPO" --json url,labels)"
+  PROJECT_ISSUE_URL="$(jq -r '.url' <<<"$issue_json")"
+  PROJECT_ISSUE_LABELS="$(jq -r '.labels[].name' <<<"$issue_json")"
+  PROJECT_NODE_ID="$(gh project view "$project" --owner "$owner" \
+    --format json --jq '.id')"
+}
+
+ensure_project_item() {
+  local project="$1" owner="$2"
+  # item-add is idempotent: when the issue is already on the board it
+  # returns the existing item's ID instead of failing or duplicating.
+  PROJECT_ITEM_ID="$(gh project item-add "$project" --owner "$owner" \
+    --url "$PROJECT_ISSUE_URL" --format json --jq '.id')"
+}
+
+apply_kind() {
+  local project="$1" owner="$2" issue="$3" kind=""
+  if printf '%s\n' "$PROJECT_ISSUE_LABELS" | grep -Fxq "type:epic"; then
+    kind="Epic"
+  elif printf '%s\n' "$PROJECT_ISSUE_LABELS" | grep -Fxq "type:task"; then
+    kind="Task"
+  fi
+  if [[ -z "$kind" ]]; then
+    echo "Note: issue #$issue has neither 'type:epic' nor 'type:task' label;" \
+      "leaving 'Kind' unset."
+    return 0
+  fi
+
+  # Older boards (init run before the Kind field existed) stay usable:
+  # setting Kind is best-effort, with a pointer to re-run init.
+  local kind_field_id kind_option_id
+  kind_field_id="$(field_id "$project" "$owner" "Kind")"
+  if [[ -z "$kind_field_id" ]]; then
+    echo "Note: project #$project has no 'Kind' field;" \
+      "re-run 'setup-project.sh init' to add it."
+    return 0
+  fi
+  kind_option_id="$(option_id "$project" "$owner" "Kind" "$kind")"
+  [[ -n "$kind_option_id" ]] \
+    || fail "field 'Kind' on project #$project has no '$kind' option"
+
+  gh project item-edit --id "$PROJECT_ITEM_ID" \
+    --project-id "$PROJECT_NODE_ID" --field-id "$kind_field_id" \
+    --single-select-option-id "$kind_option_id" >/dev/null
+  echo "Set Kind = $kind for issue #$issue."
 }
 
 cmd_init() {
@@ -276,6 +337,47 @@ reuse it and complete the fields and the repository link"
   echo "grouping or date fields."
 }
 
+cmd_add() {
+  local owner="" project="" issue=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --owner)
+        [[ -n "${2:-}" ]] || usage_error "--owner requires a login argument"
+        owner="$2"; shift 2 ;;
+      --project)
+        [[ -n "${2:-}" ]] || usage_error "--project requires a project number"
+        project="$2"; shift 2 ;;
+      --issue)
+        [[ -n "${2:-}" ]] || usage_error "--issue requires an issue number"
+        issue="$2"; shift 2 ;;
+      -R|--repo)
+        [[ -n "${2:-}" ]] || usage_error "$1 requires an owner/repo argument"
+        REPO="$2"; shift 2 ;;
+      -h|--help)
+        usage; exit 0 ;;
+      *)
+        usage_error "unknown argument for add: $1" ;;
+    esac
+  done
+  [[ -n "$project" && -n "$issue" ]] \
+    || usage_error "add requires --project and --issue"
+
+  local num_re='^[0-9]+$'
+  [[ "$project" =~ $num_re ]] \
+    || usage_error "--project must be a number, got: $project"
+  [[ "$issue" =~ $num_re ]] \
+    || usage_error "--issue must be a number, got: $issue"
+
+  require_tools
+  resolve_repo
+  [[ -n "$owner" ]] || owner="$REPO_OWNER"
+
+  load_project_issue "$project" "$owner" "$issue"
+  ensure_project_item "$project" "$owner"
+  echo "Added/reused issue #$issue ($REPO) on project #$project."
+  apply_kind "$project" "$owner" "$issue"
+}
+
 cmd_dates() {
   local owner="" project="" issue="" start="" target=""
   while [[ $# -gt 0 ]]; do
@@ -322,66 +424,31 @@ cmd_dates() {
   resolve_repo
   [[ -n "$owner" ]] || owner="$REPO_OWNER"
 
-  # Resolving the URL via the API also fails fast when the issue is missing.
-  local issue_json issue_url issue_labels project_id start_field_id target_field_id item_id
-  issue_json="$(gh issue view "$issue" --repo "$REPO" --json url,labels)"
-  issue_url="$(jq -r '.url' <<<"$issue_json")"
-  issue_labels="$(jq -r '.labels[].name' <<<"$issue_json")"
-  project_id="$(gh project view "$project" --owner "$owner" --format json --jq '.id')"
+  local start_field_id target_field_id
+  load_project_issue "$project" "$owner" "$issue"
   start_field_id="$(field_id "$project" "$owner" "Start date")"
   target_field_id="$(field_id "$project" "$owner" "Target date")"
   [[ -n "$start_field_id" && -n "$target_field_id" ]] \
     || fail "project #$project has no 'Start date'/'Target date' fields — run 'setup-project.sh init' first"
 
-  # item-add is idempotent: when the issue is already on the board it
-  # returns the existing item's ID instead of failing or duplicating.
-  item_id="$(gh project item-add "$project" --owner "$owner" \
-    --url "$issue_url" --format json --jq '.id')"
+  ensure_project_item "$project" "$owner"
 
-  gh project item-edit --id "$item_id" --project-id "$project_id" \
+  gh project item-edit --id "$PROJECT_ITEM_ID" --project-id "$PROJECT_NODE_ID" \
     --field-id "$start_field_id" --date "$start" >/dev/null
-  gh project item-edit --id "$item_id" --project-id "$project_id" \
+  gh project item-edit --id "$PROJECT_ITEM_ID" --project-id "$PROJECT_NODE_ID" \
     --field-id "$target_field_id" --date "$target" >/dev/null
 
   echo "Scheduled issue #$issue ($REPO) on project #$project:" \
     "Start date $start, Target date $target."
 
-  # Derive Kind from the scaffold's canonical labels (setup-labels.sh).
-  local kind=""
-  if printf '%s\n' "$issue_labels" | grep -Fxq "type:epic"; then
-    kind="Epic"
-  elif printf '%s\n' "$issue_labels" | grep -Fxq "type:task"; then
-    kind="Task"
-  fi
-  if [[ -z "$kind" ]]; then
-    echo "Note: issue #$issue has neither 'type:epic' nor 'type:task' label;" \
-      "leaving 'Kind' unset."
-    return 0
-  fi
-
-  # Older boards (init run before the Kind field existed) stay usable:
-  # setting Kind is best-effort, with a pointer to re-run init.
-  local kind_field_id kind_option_id
-  kind_field_id="$(field_id "$project" "$owner" "Kind")"
-  if [[ -z "$kind_field_id" ]]; then
-    echo "Note: project #$project has no 'Kind' field;" \
-      "re-run 'setup-project.sh init' to add it."
-    return 0
-  fi
-  kind_option_id="$(option_id "$project" "$owner" "Kind" "$kind")"
-  [[ -n "$kind_option_id" ]] \
-    || fail "field 'Kind' on project #$project has no '$kind' option"
-
-  gh project item-edit --id "$item_id" --project-id "$project_id" \
-    --field-id "$kind_field_id" --single-select-option-id "$kind_option_id" \
-    >/dev/null
-  echo "Set Kind = $kind for issue #$issue."
+  apply_kind "$project" "$owner" "$issue"
 }
 
 case "${1:-}" in
   init)      shift; cmd_init "$@" ;;
+  add)       shift; cmd_add "$@" ;;
   dates)     shift; cmd_dates "$@" ;;
   -h|--help) usage; exit 0 ;;
-  "")        usage_error "missing subcommand (init or dates)" ;;
+  "")        usage_error "missing subcommand (init, add or dates)" ;;
   *)         usage_error "unknown subcommand: $1" ;;
 esac
