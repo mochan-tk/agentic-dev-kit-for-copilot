@@ -45,6 +45,16 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Roadmap creation and population moved from unreachable prose into the
+  rolling-wave procedure that agents actually execute. An adopter created
+  nine Epics but saw only one on the board: the board check sat sixty lines
+  below the numbered decomposition steps, while `setup-project.sh` could add
+  an issue only through `dates`, which requires a schedule that future Epics
+  deliberately do not have yet. Step 0 now owns the one consent-gated board
+  offer, step 1 adds every Epic immediately, and step 6 schedules only issues
+  with real dates. New idempotent `add` places an issue and sets `Kind`
+  without touching date fields; `add` and `dates` share their item and Kind
+  logic so the two paths cannot drift (#54).
 - The README says what the kit is for before it says how it is built. Its
   opening called this "an AI-agent development lifecycle" — which reads as a
   kit for *building* AI agents, the opposite of the truth — and then spent
