@@ -48,6 +48,54 @@ ISSUE_TASK='{"labels":[{"name":"type:task"},{"name":"ai:ready"},{"name":"exec:ap
 PLAN_COMMENT_12='{"issue_url":"https://api.github.com/repos/o/r/issues/12","body":"## Plan\\n\\n1. Do the thing."}'
 PLAN_COMMENT_34='{"issue_url":"https://api.github.com/repos/o/r/issues/34","body":"## Plan\\n\\n1. Do the thing."}'
 
+# --- production retry contract --------------------------------------------
+# The first two gh calls fail; the third and every later call delegate to the
+# normal fixture shim. A sleep shim records the requested delay without
+# waiting, so this case proves both production defaults behaviorally:
+# three attempts, with two two-second pauses. The ordinary fixture suite
+# keeps RITUAL_API_RETRY_DELAY=0 through lib.sh.
+new_case "$HUMAN_PR_BODY" "[$CLAIM, $PLAN_HEADING]"
+# Keep later reads successful so the only retries observed are the two
+# transient failures injected by retry-bin/gh below.
+printf '%s\n' '{"sha":"base_has_agents"}' > "$CASE/contents-agents.json"
+mkdir -p "$WORK/retry-bin"
+cat > "$WORK/retry-bin/gh" <<'SHIM'
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "$*" >> "$RETRY_LOG"
+count=$(wc -l < "$RETRY_LOG" | tr -d ' ')
+if [ "$count" -le 2 ]; then
+  exit 1
+fi
+exec "$REAL_GH_SHIM" "$@"
+SHIM
+cat > "$WORK/retry-bin/sleep" <<'SHIM'
+#!/usr/bin/env bash
+set -u
+printf '%s\n' "$*" >> "$SLEEP_LOG"
+SHIM
+chmod +x "$WORK/retry-bin/gh" "$WORK/retry-bin/sleep"
+: > "$WORK/retry-calls.log"
+: > "$WORK/retry-sleeps.log"
+rc=0
+out=$(env -u RITUAL_API_RETRY_DELAY \
+  PATH="$WORK/retry-bin:$PATH" \
+  GH_FIXTURES="$CASE" \
+  REAL_GH_SHIM="$WORK/bin/gh" \
+  RETRY_LOG="$WORK/retry-calls.log" \
+  SLEEP_LOG="$WORK/retry-sleeps.log" \
+  bash "$GUARD" 12 2>&1) || rc=$?
+first_three_unique=$(head -n 3 "$WORK/retry-calls.log" | sort -u | wc -l | tr -d ' ')
+sleep_twos=$(grep -c '^2$' "$WORK/retry-sleeps.log")
+if [ "$rc" -eq 0 ] \
+   && [ "$first_three_unique" -eq 1 ] \
+   && [ "$sleep_twos" -eq 2 ]; then
+  t_ok "production retry remains three attempts with two-second pauses"
+else
+  t_fail "production retry remains three attempts with two-second pauses (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/    # /'
+fi
+
 # --- allowlisted bot PRs are exempt -------------------------------------------
 new_case '{"user":{"login":"dependabot[bot]","type":"Bot"},"body":"Bumps actions/checkout."}' '[]'
 GH_FIXTURES="$CASE" expect_rc 0 "allowlisted bot PR is exempt" bash "$GUARD" 12

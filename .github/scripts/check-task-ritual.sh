@@ -95,15 +95,19 @@ command -v gh >/dev/null 2>&1 || { echo "error: gh CLI not found" >&2; exit 1; }
 
 # GitHub occasionally answers with a transient HTML 5xx page ("invalid
 # character '<'"); a deterministic wall must not flake on that, so every API
-# read gets three attempts with a short pause.
+# read gets three attempts with a short pause. Offline fixtures set the pause
+# to zero through RITUAL_API_RETRY_DELAY; production keeps the two-second
+# default. The attempt count is never configurable.
 api() {
-  local attempt out
+  local attempt out delay="${RITUAL_API_RETRY_DELAY:-2}"
   for attempt in 1 2 3; do
     if out=$(gh api "$@" 2>&1); then
       printf '%s\n' "$out"
       return 0
     fi
-    [[ $attempt -lt 3 ]] && sleep 2
+    if [[ $attempt -lt 3 && "$delay" != "0" ]]; then
+      sleep "$delay"
+    fi
   done
   printf '%s\n' "$out" >&2
   return 1
