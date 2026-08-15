@@ -45,6 +45,19 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Onboarding asks which model builds and which model doubts. Nothing had ever
+  asked, so every adopter ran on whatever their app defaulted to and no
+  session downstream could know otherwise — and unlike path restrictions or
+  the roadmap board, no later phase can discover it: P1 reads manifests, P3
+  runs commands, and neither learns a team's preference. P2 now asks two
+  free-text questions and P4 records the answers where `task-routing` and
+  `verification` read them. The second question carries its reason in one
+  clause — a reviewer sharing the implementer's blind spot reviews less — as
+  a recommendation, not a rule; two identical answers are complete, and so
+  are two `auto`s. **The scaffold names no model anywhere**: it holds the
+  adopter's answer and no opinion about which models exist this month. The
+  retirement condition ships with the feature (#69), because a question that
+  outlives its usefulness is how an interview gets slowly worse (#68).
 - Guard regression tests no longer spend six minutes sleeping through
   failures they deliberately created. Five ritual suites consumed 344 of the
   regression step's 361 seconds because every missing comment or broken link

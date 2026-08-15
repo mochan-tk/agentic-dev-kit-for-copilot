@@ -30,7 +30,10 @@ is the cap and the exit, not an invitation to grind until green.
    ship "temporary" suppressions without a linked issue.
 3. **AI review** — Copilot code review and/or the `reviewer` agent, guided by
    `.github/instructions/code-review.instructions.md`. Catches claim/evidence
-   gaps and silent deviations before a human spends attention.
+   gaps and silent deviations before a human spends attention. Run it on the
+   review model recorded in copilot-instructions' **Models** block: a
+   reviewer sharing the implementer's blind spot reviews less, so where the
+   two differ, the difference is the point.
 4. **Human review** — judgment: is this the *right* change? Protected by
    branch ruleset (required PR + required checks + human approval on
    agent-authored PRs).

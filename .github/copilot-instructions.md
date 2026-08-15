@@ -67,6 +67,17 @@ execution-plane surface: frontmatter, ceilings, English-only.
         will fail in cloud environments — never use it there.
 -->
 
+## Models
+
+Recorded during onboarding (P2); `auto` means the app decides.
+
+- **Implementation:** `auto`
+- **Review:** `auto`
+
+Dispatch implementation work on the first, layer-3 review on the second
+(`task-routing`, `verification`). When they differ, that is deliberate: a
+reviewer sharing the implementer's blind spot reviews less.
+
 ## Working a Task issue
 
 The Task issue body is your work order: you read it, you never edit it
