@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # test-setup-project.sh — regression tests for .github/scripts/setup-project.sh.
 #
-# Scope here: the working views `init` ensures on the roadmap board. The
-# script talks to GitHub through `gh project …` and `gh api graphql`; the
-# shim below answers both from per-case fixtures, so no network, no auth and
-# no Projects permissions are needed.
+# Scope here: the working views `init` ensures and the item paths shared by
+# `add` / `dates`. The script talks to GitHub through `gh project …`,
+# `gh issue …`, and `gh api graphql`; the shim below answers all three, so no
+# network, auth, or Projects permissions are needed.
 #
 # Why views are worth a guard: `createProjectV2View` accepts only a name and
 # a layout, and the board is created once per adopting repository, so a
@@ -32,8 +32,24 @@ case "${1:-}" in
   project)
     case "${2:-}" in
       list)  printf '{"projects":[{"number":6,"title":"r roadmap","closed":false}]}\n' ;;
-      view)  printf '{"id":"PVT_test","url":"https://github.com/orgs/o/projects/6"}\n' ;;
-      field-list) printf '{"fields":[{"name":"Start date"},{"name":"Target date"},{"name":"Kind"}]}\n' ;;
+      view)
+        case "$*" in
+          *".url"*) printf 'https://github.com/orgs/o/projects/6\n' ;;
+          *)        printf 'PVT_test\n' ;;
+        esac
+        ;;
+      field-list)
+        printf '%s\n' '{"fields":[{"id":"F_START","name":"Start date"},{"id":"F_TARGET","name":"Target date"},{"id":"F_KIND","name":"Kind","options":[{"id":"O_EPIC","name":"Epic"},{"id":"O_TASK","name":"Task"}]}]}'
+        ;;
+      item-add)
+        printf '%s\n' "$*" >> "$ITEM_ADD_LOG"
+        # The real command carries `--jq .id`, so emit the projected value,
+        # not the pre-jq JSON object.
+        printf 'PVTI_existing\n'
+        ;;
+      item-edit)
+        printf '%s\n' "$*" >> "$ITEM_EDIT_LOG"
+        ;;
       link)  : ;;
       *)     : ;;
     esac
@@ -62,6 +78,10 @@ case "${1:-}" in
     esac
     ;;
   repo) printf 'o/r\n' ;;
+  issue)
+    printf '{"url":"https://github.com/o/r/issues/%s","labels":%s}\n' \
+      "${3:-42}" "${ISSUE_LABELS_JSON:-[]}"
+    ;;
   *) : ;;
 esac
 SHIM
@@ -72,6 +92,17 @@ export PATH
 run_init() {
   VIEWS_FIXTURE="$1" CREATED_LOG="$2" CREATE_FAILS="${3:-0}" AUTHED="${AUTHED:-1}" \
     bash "$SCRIPT" init --owner o -R o/r 2>&1
+}
+
+run_add() {
+  ITEM_ADD_LOG="$1" ITEM_EDIT_LOG="$2" ISSUE_LABELS_JSON="$3" \
+    bash "$SCRIPT" add --owner o --project 6 --issue 42 -R o/r 2>&1
+}
+
+run_dates() {
+  ITEM_ADD_LOG="$1" ITEM_EDIT_LOG="$2" ISSUE_LABELS_JSON="$3" \
+    bash "$SCRIPT" dates --owner o --project 6 --issue 42 \
+      --start 2026-08-01 --target 2026-08-05 -R o/r 2>&1
 }
 
 # --- an empty board gains all three views ---------------------------------
@@ -167,6 +198,66 @@ if [ ! -s "$WORK/created-auth.log" ] \
 else
   t_fail "the preflight stops before touching the project"
   printf '%s\n' "$out" | sed 's/^/    # /'
+fi
+
+# --- add places an undated Epic and sets Kind ------------------------------
+: > "$WORK/item-add-epic.log"
+: > "$WORK/item-edit-epic.log"
+out=$(run_add "$WORK/item-add-epic.log" "$WORK/item-edit-epic.log" \
+  '[{"name":"type:epic"}]')
+rc=$?
+if [ "$rc" -eq 0 ] \
+   && grep -q 'item-add.*--url https://github.com/o/r/issues/42' \
+      "$WORK/item-add-epic.log" \
+   && grep -q -- '--single-select-option-id O_EPIC' \
+      "$WORK/item-edit-epic.log"; then
+  t_ok "add places an undated Epic and sets Kind"
+else
+  t_fail "add places an undated Epic and sets Kind (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/    # /'
+fi
+if grep -q -- '--date' "$WORK/item-edit-epic.log"; then
+  t_fail "add does not write dates"
+else
+  t_ok "add does not write dates"
+fi
+
+# --- add derives Task Kind through the same helper -------------------------
+: > "$WORK/item-add-task.log"
+: > "$WORK/item-edit-task.log"
+run_add "$WORK/item-add-task.log" "$WORK/item-edit-task.log" \
+  '[{"name":"type:task"}]' >/dev/null
+if grep -q -- '--single-select-option-id O_TASK' "$WORK/item-edit-task.log"; then
+  t_ok "add derives Task Kind from the issue label"
+else
+  t_fail "add derives Task Kind from the issue label"
+fi
+
+# --- re-adding reuses the item ID returned by GitHub -----------------------
+: > "$WORK/item-add-twice.log"
+: > "$WORK/item-edit-twice.log"
+run_add "$WORK/item-add-twice.log" "$WORK/item-edit-twice.log" \
+  '[{"name":"type:epic"}]' >/dev/null
+run_add "$WORK/item-add-twice.log" "$WORK/item-edit-twice.log" \
+  '[{"name":"type:epic"}]' >/dev/null
+if [ "$(grep -c -- '--id PVTI_existing' "$WORK/item-edit-twice.log")" -eq 2 ]; then
+  t_ok "re-adding reuses the existing project item ID"
+else
+  t_fail "re-adding reuses the existing project item ID"
+fi
+
+# --- dates still writes two dates and applies Kind -------------------------
+: > "$WORK/item-add-dates.log"
+: > "$WORK/item-edit-dates.log"
+run_dates "$WORK/item-add-dates.log" "$WORK/item-edit-dates.log" \
+  '[{"name":"type:task"}]' >/dev/null
+date_edits=$(grep -c -- '--date 2026-08-' "$WORK/item-edit-dates.log")
+if [ "$date_edits" -eq 2 ] \
+   && grep -q -- '--single-select-option-id O_TASK' \
+      "$WORK/item-edit-dates.log"; then
+  t_ok "dates writes the real span and shares Kind handling"
+else
+  t_fail "dates writes the real span and shares Kind handling"
 fi
 
 t_summary

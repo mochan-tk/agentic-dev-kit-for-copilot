@@ -35,10 +35,26 @@ this.
 
 ## Rolling-wave decomposition
 
+0. **Own the roadmap decision here, before the first decomposition.** Look for
+   `<repo> roadmap` with `gh project list --owner <owner>`. If it is absent
+   and no Epic carries a comment beginning `Roadmap board: declined`, ask one
+   consent question; on yes run `.github/scripts/setup-project.sh init`, on no
+   post that exact marker on the current Epic and continue. The marker is a
+   repository-wide decision: later decompositions search all `type:epic`
+   issues (open and closed), so a human is not asked again after the first
+   decline. A declined or unavailable board never blocks decomposition. Once
+   the board exists, backfill every open `type:epic` issue returned by
+   `gh issue list --label type:epic --state open` with `setup-project.sh add`;
+   onboarding created those sibling Epics before this first decomposition, so
+   waiting for future creation would leave them invisible again.
 1. Create Epics for the whole outline up front — cheap, low detail, gives the
    "what comes next" visibility agents need for preparation. One Epic per
    phase, all siblings: the graph is two levels, so an Epic is never a
-   sub-issue of another Epic. Order them with `blocked-by`.
+   sub-issue of another Epic. Order them with `blocked-by`. When the roadmap
+   exists, add every Epic as it is created with
+   `.github/scripts/setup-project.sh add --project <number> --issue <n>` —
+   visibility must not wait for dates that rolling-wave planning deliberately
+   has not invented.
 2. Decompose an Epic into Task sub-issues only when its phase is about to
    start (or when the frontier is nearly empty). Detail decays; write it late.
 3. Every Task must clear the planner quality bar
@@ -46,7 +62,9 @@ this.
    see `.github/agents/planner.agent.md`). Only then add `ai:ready`.
    Criteria that can only be met after the merge (a tag, a release, a
    deploy check) must say so in the work order — they commit the PR to
-   `Refs #<n>` and a manual close (AGENTS.md §4).
+   `Refs #<n>` and a manual close (AGENTS.md §4). When the roadmap exists,
+   add each Task as it is created too; its visibility must not depend on
+   whether scheduling dates are known.
 4. Partition for parallelism: tasks meant to run concurrently must have
    disjoint **File ownership** path sets. If two tasks need the same paths,
    add a `blocked-by` edge between them — serialization by dependency beats
@@ -60,6 +78,9 @@ this.
    is the one issue body an executing session may edit: AGENTS.md §5 binds
    an agent to its own **Task** issue, and the Epic is the plan it works
    from, not the work order it executes.
+6. When the round has real dates, schedule its Epic and Tasks with
+   `.github/scripts/setup-project.sh dates`. Dates are evidence, not board
+   admission tickets: never invent them to make an issue visible.
 
 ## The frontier
 
@@ -105,11 +126,9 @@ gh issue list --label "ai:ready" --state open --json number,title,labels
 
 Optional: visualize Epics and Tasks as spans on a Projects v2 roadmap. The
 board stays a *view* of the issue graph — fields are derived from issues,
-never the reverse (see the Portfolio view row in the Data model). Creation
-has an owner: the first decomposition checks for the
-board and, when absent, offers `init` with one consent question — declining
-never blocks decomposition, and the board can still be attached manually
-any time.
+never the reverse (see the Portfolio view row in the Data model). Rolling-wave
+steps 0, 1, and 6 own *when* the board is offered, populated, and scheduled;
+this section owns only *how* those commands work.
 
 Bootstrap the board once per repository (idempotent: reuses the same-title
 project, skips existing fields, re-links safely). `init` creates the DATE
@@ -121,6 +140,13 @@ board:
 .github/scripts/setup-project.sh init      # creates "<repo> roadmap", owner = repo owner
 ```
 
+Put an Epic or Task on the board before it has dates (idempotent: reuses the
+existing item). The call sets `Kind` from the issue's canonical label:
+
+```bash
+.github/scripts/setup-project.sh add --project <number> --issue <n>
+```
+
 Projects v2 boards cannot be repo-owned — they always belong to a user or
 org, so the board URL is `github.com/orgs/<owner>/projects/<n>` (or
 `/users/...`). That is normal. `init` links the board to the repository,
@@ -128,10 +154,10 @@ which makes it appear in the repo's **Projects** tab
 (`https://github.com/<owner>/<repo>/projects`) — look for it there. Pass
 `--owner <login>` only to place the board under a different user/org.
 
-When the board exists, set an issue's schedule span when the Task is
-created during decomposition, and update it whenever replanning moves the
-schedule (re-running replaces both dates on the existing item). The same
-call sets `Kind` automatically
+When the board exists, set an issue's schedule span only when real dates are
+known, and update it whenever replanning moves the schedule (re-running
+replaces both dates on the existing item). The same call sets `Kind`
+automatically
 from the issue's labels — `type:epic` → Epic, `type:task` → Task:
 
 ```bash
