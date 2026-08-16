@@ -51,7 +51,12 @@ echo "# fixture doc" > "$FIXTURE/.github/docs/thing.md"
 # Triangle file and a workflow.
 mkdir -p "$FIXTURE/.github/workflows"
 echo "PRISTINE INSTRUCTIONS" > "$FIXTURE/.github/copilot-instructions.md"
-echo "ci: v1" > "$FIXTURE/.github/workflows/ci.yml"
+cat > "$FIXTURE/.github/workflows/ci.yml" <<'EOF'
+        run: bash .github/scripts/check-action-pins.sh
+        run: bash .github/scripts/check-workflow-permissions.sh
+        run: bash .github/scripts/check-task-ritual.sh
+        run: bash .github/scripts/tests/run-tests.sh
+EOF
 
 # run_init <target-dir> [flags...] — invoke the installer inside the target
 # with the fixture as source. A wrapper function keeps expect_rc call sites
@@ -487,6 +492,8 @@ fi
 FIXTURE2="$WORK/template2"
 cp -R "$FIXTURE" "$FIXTURE2"
 echo "echo guard v2" > "$FIXTURE2/.github/scripts/some-guard.sh"
+cp "$REPO_ROOT/.github/scripts/governance-controls.tsv" "$FIXTURE2/.github/scripts/"
+cp "$REPO_ROOT/.github/scripts/governance-drift.sh" "$FIXTURE2/.github/scripts/"
 mkdir -p "$FIXTURE2/.github/prompts" "$FIXTURE2/.github/instructions"
 echo "# new prompt" > "$FIXTURE2/.github/prompts/new.prompt.md"
 echo "# new rules" > "$FIXTURE2/.github/instructions/new.instructions.md"
@@ -568,6 +575,27 @@ if [ "$(grep -c '^\*\*Adopted:\*\* ' "$TARGET/SCAFFOLD-CHANGELOG.md")" = 2 ] \
 else
   t_fail "upgrade stacks a second Adopted: line and keeps a single marker"
 fi
+
+# --- upgrade reports drift without changing or failing the tuned workflow ----
+new_target
+run_init "$TARGET" >/dev/null 2>&1
+git -C "$TARGET" -c user.email=t@example.com -c user.name=t commit -qm "adopt old scaffold"
+old_workflow_hash="$(git -C "$TARGET" hash-object .github/workflows/ci.yml)"
+OUT_DRIFT="$WORK/upgrade-drift-out.txt"
+run_upgrade "$TARGET" --upgrade > "$OUT_DRIFT" 2>&1
+rc=$?
+new_workflow_hash="$(git -C "$TARGET" hash-object .github/workflows/ci.yml)"
+if [ "$rc" -eq 0 ] \
+   && [ "$old_workflow_hash" = "$new_workflow_hash" ] \
+   && [ "$(grep -c '^ACTIVE ' "$OUT_DRIFT")" -eq 4 ] \
+   && [ "$(grep -c '^MISSING ci-windows-launcher ' "$OUT_DRIFT")" -eq 1 ]; then
+  t_ok "upgrade succeeds, preserves the old workflow, and reports Windows drift"
+else
+  t_fail "upgrade succeeds, preserves the old workflow, and reports Windows drift (rc=$rc)"
+  sed 's/^/    # /' "$OUT_DRIFT"
+fi
+expect_rc 1 "the installed detector can explicitly enforce strict drift" \
+  bash "$TARGET/.github/scripts/governance-drift.sh" --root "$TARGET" --strict
 
 # --- upgrade --dry-run: class labels, bit-inert ------------------------------
 tune_target
