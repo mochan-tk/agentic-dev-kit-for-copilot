@@ -45,6 +45,15 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Shared code-review instructions now assign each check to a mechanism instead
+  of asking every reviewer to perform one impossible all-purpose pass. Rubber
+  Duck owns supported-surface in-loop critique; Copilot code review owns
+  generic defects and craft; the custom `reviewer` owns Task linkage,
+  acceptance evidence, CI integrity, File ownership, deviations, and
+  governance safety; humans/rulesets retain requirement interpretation,
+  exceptions, formal approval, and merge authority. The first five ordered
+  checks still map exactly to the custom reviewer's contract, while official
+  AI review remains advisory and never satisfies approval (#76).
 - The repository-wide review-model preference from #68 is retired after one
   day: official Rubber Duck already selects a contrasting model for in-loop
   critique and can improve centrally. Onboarding still records the
