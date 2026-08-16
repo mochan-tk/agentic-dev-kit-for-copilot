@@ -21,6 +21,9 @@ Keep `scaffold-init` as the sole installer for durable repository governance.
 Do not publish a public marketplace before v1.0.0. A private or disposable
 marketplace is useful for continued client probes.
 
+The no-go prototype is preserved only in pushed commit history. The disposable
+prototype tree was removed from the final PR as required by the Task brief.
+
 ## Sources
 
 - Task brief and plan:
@@ -45,15 +48,15 @@ wrong.
 
 | Artifact | Commit / pin | Purpose |
 |---|---|---|
-| SHA A plugin content | `06948d66f8ad6b6b780a08a83d4a0c2b074ffd67` | `v1` identity markers |
-| SHA A marketplace | `de5006407cd74e70016c14e8982dbf719fdda250` | pins both plugins to SHA A |
-| SHA B plugin content | `4fb3007ffac5fdb0a670ab810ee7c8cdd3cbebfd` | `v2` markers with manifest version still `0.0.1` |
-| SHA B marketplace | `1ff4fe1746e50b2188392360e133283d8ecd2569` | pins both plugins to SHA B |
+| SHA A plugin content | [`06948d66f8ad6b6b780a08a83d4a0c2b074ffd67`](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/commit/06948d66f8ad6b6b780a08a83d4a0c2b074ffd67) | `v1` identity markers |
+| SHA A marketplace | [`de5006407cd74e70016c14e8982dbf719fdda250`](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/commit/de5006407cd74e70016c14e8982dbf719fdda250) | pins both plugins to SHA A |
+| SHA B plugin content | [`4fb3007ffac5fdb0a670ab810ee7c8cdd3cbebfd`](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/commit/4fb3007ffac5fdb0a670ab810ee7c8cdd3cbebfd) | `v2` markers with manifest version still `0.0.1` |
+| SHA B marketplace | [`1ff4fe1746e50b2188392360e133283d8ecd2569`](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/commit/1ff4fe1746e50b2188392360e133283d8ecd2569) | pins both plugins to SHA B |
 
-`portable-core/` uses the Agent Plugins v1 schema and contains two skills,
-including script and reference resources. `github-compat/` uses the current
-Copilot compatibility manifest and contains the same two skills, one custom
-agent, and one command.
+The portable-core package at SHA A uses the Agent Plugins v1 schema and
+contains two skills, including script and reference resources. The
+github-compat package uses the current Copilot compatibility manifest and
+contains the same two skills, one custom agent, and one command.
 
 Keeping plugin metadata at `0.0.1` across A and B isolates content-SHA update
 behavior from manifest-version behavior.
@@ -73,22 +76,86 @@ No surface is counted as successful merely because documentation names it.
 
 ### Repository declaration
 
-The isolated Git repository declared both plugins in repository Copilot
-settings. Two marketplace source forms were tried:
+The isolated Git repository declared both plugins in its repository Copilot
+settings file. These exact configurations were exercised in sequence.
 
-1. GitHub source pinned to marketplace commit
-   `de5006407cd74e70016c14e8982dbf719fdda250`, with the nested marketplace
-   path.
-2. A local directory snapshot whose directory name contained that exact
-   marketplace SHA.
+### GitHub source at repository root
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "agentic-dev-spike": {
+      "source": {
+        "source": "github",
+        "repo": "mochan-tk/agentic-dev-kit-for-copilot",
+        "ref": "de5006407cd74e70016c14e8982dbf719fdda250"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "agentic-dev-portable-spike@agentic-dev-spike": true,
+    "agentic-dev-github-spike@agentic-dev-spike": true
+  }
+}
+```
+
+This tested the flat/default marketplace lookup at the pinned repository
+commit. It did not discover the marketplace because the manifest was nested.
+
+### GitHub source with the nested marketplace path
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "agentic-dev-spike": {
+      "source": {
+        "source": "github",
+        "repo": "mochan-tk/agentic-dev-kit-for-copilot",
+        "ref": "de5006407cd74e70016c14e8982dbf719fdda250",
+        "path": "spikes/agent-plugin/marketplace"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "agentic-dev-portable-spike@agentic-dev-spike": true,
+    "agentic-dev-github-spike@agentic-dev-spike": true
+  }
+}
+```
+
+This distinguished a missing root manifest from support for an explicit nested
+marketplace path. It also did not load either plugin.
+
+### SHA-named local marketplace snapshot
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "agentic-dev-spike": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/takashi.kawamoto/.copilot/session-state/c6ae312a-8300-4bff-8155-4f9b70ee8ccb/files/marketplace-de5006407cd74e70016c14e8982dbf719fdda250"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "agentic-dev-portable-spike@agentic-dev-spike": true,
+    "agentic-dev-github-spike@agentic-dev-spike": true
+  }
+}
+```
+
+The directory contained the verbatim marketplace manifest from commit
+`de5006407cd74e70016c14e8982dbf719fdda250`. This removed GitHub fetching and
+nested-path interpretation from the equation. It still did not load either
+plugin declaratively.
 
 `copilot -p` loaded the repository-local duplicate skill but did not install
 or discover either declared plugin. `copilot plugin list` remained unchanged,
 and no settings warning was emitted in the captured session events.
 
-Because the marketplace lives under the Task-owned
-`spikes/agent-plugin/**` path, the spike did not add a repository-root
-marketplace manifest outside File ownership merely to make the probe pass.
+The spike did not add a repository-root marketplace manifest outside File
+ownership merely to make the flat/default lookup pass.
 
 ### Explicit install
 
@@ -240,7 +307,8 @@ local precedence currently masks plugin failures.
    plugin rollback mutate governance.
 
 The CLI probe demonstrated steps 1 and 2 from SHA B back to SHA A. Production
-rollback remains trivial because this spike removes no production files.
+rollback remains trivial because the final PR retains only this result document
+and removes every disposable prototype file.
 
 ## Open questions
 
