@@ -52,7 +52,11 @@ parse_body() {
     paths=$((paths + 1))
   done < "$body"
 
-  [ "$headings" -eq 1 ] && [ "$paths" -gt 0 ] && [ "$invalid" -eq 0 ]
+  if [ "$headings" -ne 1 ] || [ "$paths" -eq 0 ] || [ "$invalid" -ne 0 ]; then
+    : > "$output"
+    return 1
+  fi
+  return 0
 }
 
 literal_prefix() {
