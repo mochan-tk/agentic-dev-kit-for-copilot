@@ -28,12 +28,21 @@ is the cap and the exit, not an invitation to grind until green.
    tests, build. Runs locally and in CI. Binary outcomes only.
 2. **Security** — secret scanning, dependency review, code scanning. Never
    ship "temporary" suppressions without a linked issue.
-3. **AI review** — Copilot code review and/or the `reviewer` agent, guided by
-   `.github/instructions/code-review.instructions.md`. Catches claim/evidence
-   gaps and silent deviations before a human spends attention. Run it on the
-   review model recorded in copilot-instructions' **Models** block: a
-   reviewer sharing the implementer's blind spot reviews less, so where the
-   two differ, the difference is the point.
+3. **AI review** — three mechanisms, with different jobs:
+   - **In-loop critique:** official Rubber Duck, on surfaces where GitHub
+     supports it, gives the working agent a contrasting-model opinion on
+     plans, designs, implementations, and tests. It is not the final Task
+     audit, and unsupported surfaces are never assumed. GitHub currently
+     documents it for Copilot CLI and the Copilot app:
+     https://docs.github.com/en/copilot/concepts/agents/copilot-cli/rubber-duck
+   - **Generic code review:** Copilot code review looks for bugs, security
+     vulnerabilities, and logic defects in a diff or PR. Its findings are
+     advisory and do not satisfy human approval.
+   - **Task-contract audit:** the custom `reviewer` checks Task linkage,
+     acceptance evidence, CI/check integrity, File ownership, silent
+     deviations, and protected-governance changes. It is required for
+     `risk:high` and governance-surface Tasks, and optional otherwise
+     (`task-routing`, Review routing).
 4. **Human review** — judgment: is this the *right* change? Protected by
    branch ruleset (required PR + required checks + human approval on
    agent-authored PRs).

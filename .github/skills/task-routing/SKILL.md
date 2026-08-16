@@ -116,10 +116,9 @@ change), but the effort tier is meaningful:
 | `fast` | Mechanical edits, renames, formatting, boilerplate | smaller/faster model |
 | `local` | Sensitive data, offline work | on-device model |
 
-Which model fills a tier is the adopter's answer, recorded in
-copilot-instructions' **Models** block — read it there rather than
-naming one here. Review is dispatched on the review model, which may
-differ from the implementation model on purpose.
+Which model fills an implementation tier is the adopter's answer,
+recorded in copilot-instructions' **Models** block — read it there rather
+than naming one here.
 
 ## Role suggestion
 
@@ -127,6 +126,19 @@ Suggest a role when a specialized definition exists in `.github/agents/`
 (e.g., `planner`, `orchestrator`, `reviewer`) or in the client's agent picker
 (e.g., security- or docs-focused agents). Leave as `default` otherwise; do not
 invent role names that no surface provides.
+
+## Review routing
+
+- On `exec:app` / `exec:cli`, use official Rubber Duck for in-loop critique
+  where the surface supports it (`verification`, layer 3). Never infer the
+  same support for `exec:cloud` or every IDE from CLI/app documentation.
+- Use the custom `reviewer` for every `risk:high` Task and every Task that
+  changes governance surfaces (agreements, `AGENTS.md`, agents/skills,
+  workflows/rulesets, CODEOWNERS, or CI guard scripts). It is optional for
+  ordinary Tasks with complete deterministic evidence.
+- When a routed surface lacks Rubber Duck and a cross-model critique matters,
+  name that independent review in the Task's Handoff notes. Choose it per
+  Task and surface; never freeze one reviewer model repository-wide.
 
 ## Re-routing
 

@@ -45,19 +45,25 @@ inherit what this one learned.
 
 ### Unreleased
 
-- Onboarding asks which model builds and which model doubts. Nothing had ever
-  asked, so every adopter ran on whatever their app defaulted to and no
-  session downstream could know otherwise — and unlike path restrictions or
-  the roadmap board, no later phase can discover it: P1 reads manifests, P3
-  runs commands, and neither learns a team's preference. P2 now asks two
-  free-text questions and P4 records the answers where `task-routing` and
-  `verification` read them. The second question carries its reason in one
-  clause — a reviewer sharing the implementer's blind spot reviews less — as
-  a recommendation, not a rule; two identical answers are complete, and so
-  are two `auto`s. **The scaffold names no model anywhere**: it holds the
-  adopter's answer and no opinion about which models exist this month. The
-  retirement condition ships with the feature (#69), because a question that
-  outlives its usefulness is how an interview gets slowly worse (#68).
+- The repository-wide review-model preference from #68 is retired after one
+  day: official Rubber Duck already selects a contrasting model for in-loop
+  critique and can improve centrally. Onboarding still records the
+  implementation model, but no longer asks for or stores a review model.
+  Review now has three explicit, non-overlapping jobs: Rubber Duck critiques
+  evolving work where supported; Copilot code review finds generic code
+  defects; the custom `reviewer` audits the Task contract, evidence,
+  ownership, deviations, and governance safety. Existing adopters may delete
+  the stale `- **Review:** ...` line and its explanatory paragraph from their
+  tuned copilot-instructions; leaving it is harmless because no skill reads it
+  anymore. This partially supersedes #68 and fulfills #69 (#74).
+- Onboarding asks which model builds. Nothing had ever asked, so every
+  adopter ran on whatever their app defaulted to and no session downstream
+  could know otherwise — and unlike path restrictions or the roadmap board,
+  no later phase can discover an implementation-model preference. P2 now asks
+  one free-text question and P4 records the answer where `task-routing` reads
+  it. `auto` is a complete answer. **The scaffold names no model anywhere**:
+  it holds the adopter's answer and no opinion about which models exist this
+  month (#68; its short-lived review-model half is superseded by #74).
 - Guard regression tests no longer spend six minutes sleeping through
   failures they deliberately created. Five ritual suites consumed 344 of the
   regression step's 361 seconds because every missing comment or broken link
