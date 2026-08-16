@@ -15,7 +15,7 @@
       "source": {
         "source": "github",
         "repo": "mochan-tk/agentic-dev-kit-for-copilot",
-        "sha": "06948d66f8ad6b6b780a08a83d4a0c2b074ffd67",
+        "sha": "4fb3007ffac5fdb0a670ab810ee7c8cdd3cbebfd",
         "path": "spikes/agent-plugin/portable-core"
       }
     },
@@ -26,7 +26,7 @@
       "source": {
         "source": "github",
         "repo": "mochan-tk/agentic-dev-kit-for-copilot",
-        "sha": "06948d66f8ad6b6b780a08a83d4a0c2b074ffd67",
+        "sha": "4fb3007ffac5fdb0a670ab810ee7c8cdd3cbebfd",
         "path": "spikes/agent-plugin/github-compat"
       }
     }
