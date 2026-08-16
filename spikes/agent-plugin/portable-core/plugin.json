@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "agentic-dev-portable-spike",
+  "version": "0.0.1",
+  "description": "Spike: portable execution skills from Agentic Development Kit.",
+  "author": {
+    "name": "Takashi Kawamoto (Mr.Mo)",
+    "url": "https://github.com/mochan-tk"
+  },
+  "repository": "https://github.com/mochan-tk/agentic-dev-kit-for-copilot",
+  "license": "MIT",
+  "keywords": ["agentic-development", "planning", "verification"]
+}
