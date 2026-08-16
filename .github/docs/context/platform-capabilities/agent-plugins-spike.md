@@ -35,8 +35,9 @@ marketplace is useful for continued client probes.
   <https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing>
 
 The official overview says CLI and cloud agent can consume `enabledPlugins`
-and `extraKnownMarketplaces` from `.github/copilot/settings.json`. The local
-CLI observation below did not reproduce that behavior. Treat this as an open
+and `extraKnownMarketplaces` from repository Copilot settings (the
+`.github/copilot/` directory and its `settings.json`). The local CLI
+observation below did not reproduce that behavior. Treat this as an open
 client/configuration contradiction, not evidence that the documentation is
 wrong.
 
@@ -62,7 +63,7 @@ behavior from manifest-version behavior.
 | Surface | Version / availability | Discovery | Invocation | Update / rollback | Result |
 |---|---|---|---|---|---|
 | Copilot CLI | `1.0.81-0` | imperative install verified; repository declaration not reproduced | skills and namespaced agent verified; command file discovered but slash invocation not verified | explicit A -> B -> A verified | partial |
-| Copilot app | local probe session created twice (initial kickoff plus immediate steering) | probe produced no turn or durable report | not exercised | not exercised | unverified; zero-turn probe failure |
+| Copilot app | app/CLI `1.0.80` reported by dedicated probe | installed portable skill discovered; no declarative activation observed | skill invoked with malformed exact marker; agent and command unavailable | not exercised | partial discovery only |
 | VS Code | `1.129.1` installed | not exercised in Copilot Chat UI | not exercised | not exercised | unverified |
 | Cloud agent | `gh agent-task` preview available | not exercised; no dedicated GitHub spike repository carried the owned settings | not exercised | not exercised | unverified |
 
@@ -72,8 +73,8 @@ No surface is counted as successful merely because documentation names it.
 
 ### Repository declaration
 
-The isolated Git repository declared both plugins in
-`.github/copilot/settings.json`. Two marketplace source forms were tried:
+The isolated Git repository declared both plugins in repository Copilot
+settings. Two marketplace source forms were tried:
 
 1. GitHub source pinned to marketplace commit
    `de5006407cd74e70016c14e8982dbf719fdda250`, with the nested marketplace
@@ -87,8 +88,7 @@ and no settings warning was emitted in the captured session events.
 
 Because the marketplace lives under the Task-owned
 `spikes/agent-plugin/**` path, the spike did not add a repository-root
-`.github/plugin/marketplace.json` outside File ownership merely to make the
-probe pass.
+marketplace manifest outside File ownership merely to make the probe pass.
 
 ### Explicit install
 
@@ -166,11 +166,19 @@ claim.
 ## Copilot app probe
 
 A dedicated local Copilot app project/session was created from the isolated
-repository after SHA A installation. The initial kickoff and one immediate
-steering message both requested only marker discovery and prohibited edits.
-The probe produced no turn, process, or report. This is a zero-turn probe
-failure, not evidence that app plugin loading succeeds or fails. The app
-surface remains unverified.
+repository after SHA A installation. The app reported version `1.0.80` and
+loaded the portable `spike-plan` skill from the user-installed plugin cache.
+It returned:
+
+```text
+PORTABLE_SKILL_OK: 1. agentic-dev-portable-spike/v1
+```
+
+The extra `1.` means the exact marker contract failed even though discovery
+and resource reading occurred. The probe did not find the namespaced custom
+agent or command, and it explicitly reported no evidence that repository
+settings performed declarative activation. Record this as partial app
+discovery only, not successful invocation.
 
 ### Command
 
