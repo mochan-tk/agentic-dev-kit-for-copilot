@@ -20,6 +20,8 @@ set -euo pipefail
 
 TITLE="" BODY="" PARENT="" EXEC="" DEPS="" READY=false
 REPO_ARGS=()
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+OWNERSHIP_VALIDATOR="$ROOT/.github/scripts/ownership-overlap.sh"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -43,7 +45,10 @@ case "$EXEC" in cloud|app|cli|ide) ;; *)
 command -v gh >/dev/null 2>&1 || { echo "error: gh CLI not found" >&2; exit 1; }
 
 LABELS="type:task,exec:${EXEC}"
-$READY && LABELS+=",ai:ready"
+if $READY; then
+  bash "$OWNERSHIP_VALIDATOR" --validate-body "$BODY"
+  LABELS+=",ai:ready"
+fi
 
 # One creation call wires parent, labels, and dependencies atomically —
 # a create-then-edit sequence could leak an unwired task into the frontier
