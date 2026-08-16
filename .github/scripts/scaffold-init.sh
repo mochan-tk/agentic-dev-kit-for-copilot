@@ -497,6 +497,18 @@ if [ -f SCAFFOLD-CHANGELOG.md ]; then
   mv "$WORK/changelog.marker" SCAFFOLD-CHANGELOG.md
 fi
 
+UPGRADED_COUNT=$(( ${#UPGRADES[@]} + ${#KEPT_TUNED[@]} + ${#KEPT_DOCS[@]} ))
+if [ "$UPGRADE" -eq 1 ] && [ "$UPGRADED_COUNT" -gt 0 ] \
+   && [ -f .github/scripts/governance-drift.sh ]; then
+  echo
+  echo "Governance control drift after preserving tuned files:"
+  drift_rc=0
+  bash .github/scripts/governance-drift.sh --root . || drift_rc=$?
+  if [ "$drift_rc" -ne 0 ]; then
+    echo "warning: governance drift report failed (exit $drift_rc); upgrade continues." >&2
+  fi
+fi
+
 status "staging installed files with git add ..."
 git add -- ${INSTALLED[@]+"${INSTALLED[@]}"}
 
@@ -504,7 +516,6 @@ git add -- ${INSTALLED[@]+"${INSTALLED[@]}"}
 # Two shapes: an upgrade that met pre-existing files gets upgrade guidance
 # (diff review, changelog port, one PR); everything else — fresh installs,
 # and --upgrade pointed at a virgin directory — gets adoption guidance.
-UPGRADED_COUNT=$(( ${#UPGRADES[@]} + ${#KEPT_TUNED[@]} + ${#KEPT_DOCS[@]} ))
 if [ "$UPGRADE" -eq 1 ] && [ "$UPGRADED_COUNT" -gt 0 ]; then
   echo
   echo "=================================================================="

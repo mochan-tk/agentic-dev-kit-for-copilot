@@ -1,0 +1,6 @@
+# Schema: control-id<TAB>target-path<TAB>line-anchored-ERE<TAB>introduced<TAB>remediation
+ci-action-pins	.github/workflows/ci.yml	^        run: bash \.github/scripts/check-action-pins\.sh$	2538d9f	.github/workflows/ci.yml
+ci-workflow-permissions	.github/workflows/ci.yml	^        run: bash \.github/scripts/check-workflow-permissions\.sh$	#26	.github/workflows/ci.yml
+ci-task-ritual	.github/workflows/ci.yml	^        run: bash \.github/scripts/check-task-ritual\.sh$	2538d9f	.github/workflows/ci.yml
+ci-guard-regression-tests	.github/workflows/ci.yml	^        run: bash \.github/scripts/tests/run-tests\.sh$	2538d9f	.github/workflows/ci.yml
+ci-windows-launcher	.github/workflows/ci.yml	^          & pwsh \.github/scripts/run\.ps1 tuning-status\.sh --quiet 2> launcher-stderr\.txt$	#52	#51
