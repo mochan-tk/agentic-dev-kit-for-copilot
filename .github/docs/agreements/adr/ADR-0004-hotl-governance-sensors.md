@@ -1,6 +1,6 @@
 # ADR-0004: Separate governance sensors from adopter and platform actuators
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-16
 - **Supersedes:** none
 
