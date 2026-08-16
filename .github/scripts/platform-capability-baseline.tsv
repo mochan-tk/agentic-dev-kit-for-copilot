@@ -1,5 +1,6 @@
-capability	official_url	baseline_title
-rubber_duck	https://docs.github.com/en/copilot/concepts/agents/copilot-cli/rubber-duck	Rubber Duck
-agent_plugins	https://github.blog/changelog/2026-08-12-agent-plugins-1-0-in-vs-code-copilot-cli-and-the-copilot-app/	Agent plugins 1.0 in VS Code, Copilot CLI, and the Copilot app
-copilot_app	https://github.com/github/app/blob/main/changelog.md	GitHub Copilot app changelog
-copilot_cli	https://github.com/github/copilot-cli/blob/main/changelog.md	GitHub Copilot CLI changelog
+capability	kind	official_url	baseline_value
+copilot_app	changelog_sha	https://raw.githubusercontent.com/github/app/main/changelog.md	0e164eb28262f4728ef02500132698640d87551973cbaea143923a813febe968
+copilot_cli	changelog_sha	https://raw.githubusercontent.com/github/copilot-cli/main/changelog.md	cfd94b6274c206ad450dc044192ff171f0b20240629a77ab7cf14a4a140097a8
+copilot_rss	rss_guid_date	https://github.blog/changelog/label/copilot/feed/	https://github.blog/changelog/2026-08-14-grok-4-6-is-now-available-in-github-copilot|Fri, 14 Aug 2026 16:17:46 +0000
+rubber_duck	docs_sha	https://raw.githubusercontent.com/github/docs/main/content/copilot/concepts/agents/copilot-cli/rubber-duck.md	a272c6b34d35aae2a72acfba7a1543e52454dbda57a538ffd6de38bc0219a494
+copilot_docs	docs_sha	https://raw.githubusercontent.com/github/docs/main/content/copilot/index.md	446d881189a3d3987267d791ee3d6ace872aa3a10cffaf521bdae6ae8246f66c

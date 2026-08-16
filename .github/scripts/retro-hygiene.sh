@@ -10,7 +10,7 @@
 #   2. Optional source-template platform capability review: only when the
 #      current repository is the source template (`sha=unknown` in
 #      SCAFFOLD-CHANGELOG.md), compare the official change checkpoints against
-#      a committed baseline and render only official URLs and titles.
+#      a committed baseline and render only official URLs and safe titles.
 #   3. Always-on budget — line counts of AGENTS.md and
 #      .github/copilot-instructions.md against the ~150-line target
 #      (retro skill, Budget rule).
@@ -68,6 +68,11 @@ normalize_title() {
    sed 's/[<>&]/ /g; s/[[:space:]]\+/ /g; s/^ //; s/ $//'
 }
 
+normalize_literal() {
+ printf '%s' "$1" | tr '\r\n\t' ' ' | tr -d '\000-\037' | \
+   sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'
+}
+
 canonical_url() {
  local url="${1%%#*}"
  url="${url%%\?*}"
@@ -82,8 +87,11 @@ source_template_gate() {
  return 1
 }
 
-fetch_official_title() {
- local url="$1" title="" effective="" tmp=""
+fetch_official_value() {
+ local url="$1"
+ local kind="${2:-title}"
+ local effective="" tmp="" output=""
+
  [ -n "$url" ] || return 1
  if ! command -v curl >/dev/null 2>&1; then
    return 1
@@ -95,28 +103,117 @@ fetch_official_title() {
    return 1
  fi
 
- if [ -z "$effective" ]; then
+ if [ -n "$effective" ] && [ "$(canonical_url "$effective")" != "$(canonical_url "$url")" ]; then
    rm -f "$tmp"
    return 1
  fi
 
- if [ "$(canonical_url "$effective")" != "$(canonical_url "$url")" ]; then
-   rm -f "$tmp"
-   return 1
- fi
+ case "$kind" in
+   title|"")
+     output="$(tr '\r' '\n' < "$tmp" | sed -n 's:.*<title[^>]*>\(.*\)</title>.*:\1:pI' | head -n 1)"
+     ;;
+   sha256|file_sha|docs_sha|changelog_sha|url_sha|sha)
+     output="$(sha256sum "$tmp" | awk '{print $1}')"
+     ;;
+   release|version|release_id)
+     output="$(python3 - "$tmp" <<'PY'
+import re, sys
+path = sys.argv[1]
+try:
+   text = open(path, 'r', encoding='utf-8', errors='replace').read()
+except Exception:
+   raise SystemExit
+for pattern in [r'^[#*\- ]*v?([0-9]+\.[0-9]+\.[0-9]+(?:[-+._a-zA-Z0-9]+)?)', r'^(?:#+)\s+([^\n]+)']:
+   match = re.search(pattern, text, re.M)
+   if match:
+       print(match.group(1).strip())
+       raise SystemExit
+print('unknown')
+PY
+)"
+     ;;
+   rss_guid)
+     output="$(python3 - "$tmp" <<'PY'
+import sys, xml.etree.ElementTree as ET
+path = sys.argv[1]
+try:
+   root = ET.fromstring(open(path, 'rb').read())
+except Exception:
+   raise SystemExit
+items = root.findall('.//item')
+if not items:
+   raise SystemExit
+item = items[0]
+text = (item.findtext('guid') or '').strip()
+print(text or 'unknown')
+PY
+)"
+     ;;
+   rss_guid_date|rss)
+     output="$(python3 - "$tmp" <<'PY'
+import sys, xml.etree.ElementTree as ET
+path = sys.argv[1]
+try:
+   root = ET.fromstring(open(path, 'rb').read())
+except Exception:
+   raise SystemExit
+items = root.findall('.//item')
+if not items:
+   raise SystemExit
+item = items[0]
+guid = (item.findtext('guid') or '').strip()
+pub = (item.findtext('pubDate') or '').strip()
+print(f'{guid}|{pub}' if guid or pub else 'unknown')
+PY
+)"
+     ;;
+   *)
+     output="$(tr '\r' '\n' < "$tmp" | sed -n 's:.*<title[^>]*>\(.*\)</title>.*:\1:pI' | head -n 1)"
+     ;;
+ esac
 
- title="$(tr '\r' '\n' < "$tmp" | sed -n 's:.*<title[^>]*>\(.*\)</title>.*:\1:pI' | head -n 1)"
  rm -f "$tmp"
-
- if [ -n "$title" ]; then
-   printf '%s\n' "$(normalize_title "$title")"
+ if [ -n "$output" ]; then
+   printf '%s\n' "$output"
    return 0
  fi
  return 1
 }
 
+render_capability_detail() {
+ local label="$1" url="$2" expected="$3" observed="$4" state="$5"
+ local safe_label safe_url safe_expected safe_observed
+
+ safe_label="$(sanitize_md_cell "$label")"
+ safe_url="$(sanitize_md_cell "$url")"
+ safe_expected="$(sanitize_md_cell "$expected")"
+ safe_observed="$(sanitize_md_cell "$observed")"
+
+ case "$state" in
+   unchanged)
+     printf -- '- %s: unchanged at %s\n' "$safe_label" "$safe_url"
+     ;;
+   changed)
+     printf -- '- %s: changed — old %s -> new %s at %s\n' "$safe_label" "$safe_expected" "$safe_observed" "$safe_url"
+     printf '  1. Does the platform now duplicate a skill, prompt, instruction, custom agent or guard in this kit?\n'
+     printf '  2. Can anything be deleted or retired rather than added?\n'
+     printf '  3. Does it close or change a known runtime limitation (#6, #43, #45, #47)?\n'
+     printf '  4. Which surface supports it (app, CLI, cloud, IDE), and is it preview or GA?\n'
+     printf '  5. Has the capability been verified in this environment rather than inferred from release prose?\n'
+     ;;
+   *)
+     printf -- '- %s: unknown — preserving baseline %s at %s\n' "$safe_label" "$safe_expected" "$safe_url"
+     ;;
+ esac
+}
+
 build_platform_capability_section() {
- local table state label url expected current observed
+ local table state label kind url expected current observed observed_norm expected_norm line detail
+ local changed_count unknown_count unchanged_count
+
+ changed_count=0
+ unknown_count=0
+ unchanged_count=0
 
  if ! source_template_gate; then
    return 0
@@ -132,29 +229,68 @@ EOF
  fi
 
  table=""
- while IFS=$'\t' read -r label url expected; do
+ detail=""
+ while IFS= read -r line || [ -n "$line" ]; do
+   [ -n "${line//[[:space:]]/}" ] || continue
+   case "$line" in
+     \#*) continue ;;
+   esac
+
+   IFS=$'\t' read -r -a cols <<< "$line"
+   case "${#cols[@]}" in
+     3)
+       label="${cols[0]}"
+       kind="title"
+       url="${cols[1]}"
+       expected="${cols[2]}"
+       ;;
+     4)
+       label="${cols[0]}"
+       kind="${cols[1]}"
+       url="${cols[2]}"
+       expected="${cols[3]}"
+       ;;
+     *)
+       continue
+       ;;
+   esac
+
    [ -n "$label" ] || continue
    case "$label" in
      capability) continue ;;
-     '') continue ;;
    esac
 
-   observed="$(fetch_official_title "$url" 2>/dev/null || true)"
+   observed="$(fetch_official_value "$url" "$kind" 2>/dev/null || true)"
    state="unknown"
    current="unknown"
+
    if [ -n "$observed" ]; then
      current="$(sanitize_md_cell "$observed")"
-     observed_norm="$(normalize_title "$observed")"
-     expected_norm="$(normalize_title "$expected")"
-     if [ "$observed_norm" = "$expected_norm" ]; then
+     observed_norm="$(normalize_literal "$observed")"
+     expected_norm="$(normalize_literal "$expected")"
+     if [ "$expected_norm" = "unknown" ] || [ "$observed_norm" = "unknown" ]; then
+       state="unknown"
+     elif [ "$observed_norm" = "$expected_norm" ]; then
        state="unchanged"
      else
        state="changed"
      fi
    fi
 
-   table="${table}| $(sanitize_md_cell "$label") | $(sanitize_md_cell "$url") | $(sanitize_md_cell "$expected") | ${current} | $(sanitize_md_cell "$state") |
-"
+   case "$state" in
+     changed)
+       changed_count=$((changed_count + 1))
+       ;;
+     unknown)
+       unknown_count=$((unknown_count + 1))
+       ;;
+     unchanged)
+       unchanged_count=$((unchanged_count + 1))
+       ;;
+   esac
+
+   table="${table}| $(sanitize_md_cell "$label") | $(sanitize_md_cell "$url") | $(sanitize_md_cell "$expected") | ${current} | $(sanitize_md_cell "$state") |\n"
+   detail="${detail}$(render_capability_detail "$label" "$url" "$expected" "$current" "$state")"
  done < "$BASELINE_FILE"
 
  if [ -z "$table" ]; then
@@ -166,17 +302,29 @@ EOF
    return 0
  fi
 
+ if [ "$changed_count" -eq 0 ] && [ "$unknown_count" -eq 0 ]; then
+   cat <<'EOF'
+## Platform capability checkpoints
+
+No official Copilot capability changes detected against the committed source-template baseline.
+EOF
+   return 0
+ fi
+
  cat <<EOF
 ## Platform capability checkpoints
 
 This review is source-template-only: it runs only when the repository is the
-source template (the scaffold marker reads "sha=unknown"), and it renders only
-official URLs and titles. Upstream titles and content are never evaluated or
-interpolated into shell commands.
+source template (the scaffold marker reads "sha=unknown"), it renders only
+official URLs, and it keeps upstream content as untrusted data rather than as a
+source of truth or shell input. Baseline advances are PR-only and record one
+line per changed source with the outcome: adopt, retire local mechanism,
+watch, or not relevant.
 
-| Capability | Official URL | Baseline title | Observed title | Status |
+| Capability | Official URL | Baseline | Observed | Status |
 |---|---|---|---|---|
 ${table}
+${detail}
 EOF
 }
 
@@ -242,17 +390,13 @@ build_report() {
      overdue=$((overdue + 1))
    fi
    title="${title//|/\\|}"
-   table="${table}| #${num} | ${title} | ${count} | ${age} | ${status} |
-"
+   table="${table}| #${num} | ${title} | ${count} | ${age} | ${status} |\n"
  done <<< "$tsv"
 
  if [ "$total" -eq 0 ]; then
    candidates_section="No open \`retro:candidate\` issues — the ledger is clean."
  else
-   candidates_section="| Issue | Title | Occurrences | Age (days) | Status |
-|---|---|---|---|---|
-${table}
-${total} open candidate(s), ${overdue} at or over the promotion threshold (>= 2 occurrences)."
+   candidates_section="| Issue | Title | Occurrences | Age (days) | Status |\n|---|---|---|---|---|\n${table}${total} open candidate(s), ${overdue} at or over the promotion threshold (>= 2 occurrences)."
  fi
 
  budget_rows="$(budget_row "AGENTS.md")
@@ -265,7 +409,9 @@ $(budget_row ".github/copilot-instructions.md")"
 Deterministic retro-loop snapshot for \`${REPO}\` (retro skill, "Scheduled
 hygiene" trigger). Occurrence count = 1 (the filing) + N (occurrence
 comments); candidates reaching 2 occurrences are due for promotion to a
-\`retro:\` PR.
+\`retro:\` PR. Seed occurrence: the initial Rubber Duck/#68 review-model
+question is the first ledger item; #69 retired the review-model variant, and
+this official capability ledger is the engine-class follow-up.
 
 ## Open retro candidates
 

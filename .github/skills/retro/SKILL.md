@@ -63,15 +63,23 @@ only as a rendered audit. Upstream titles, URLs, and content are treated as
 untrusted input: they are shown for inspection, never evaluated as fact, and
 never interpolated into shell commands.
 
-- The script compares the fetched page title only against the committed baseline
-  file `.github/scripts/platform-capability-baseline.tsv`.
-- A fetch failure, a missing page title, or a non-authoritative source result is
-  reported as `unknown`, and the committed baseline remains the keeper of the
-  source-template truth.
-- A title mismatch is `changed`; an exact match is `unchanged`.
-- This is the deterministic, engine-class counterpart to the earlier Rubber
-  Duck/#68 review-model seed: it is an official capability ledger, not a model
-  summary or an AI-generated assessment.
+- The script compares official checkpoint values against the committed baseline
+  file `.github/scripts/platform-capability-baseline.tsv` using the source's
+  canonical URL and a deterministic kind (`title`, `rss_guid_date`, or a file
+  hash kind such as `docs_sha` / `changelog_sha`). It never interprets a scraped
+  title as a command, a policy, or a local truth source.
+- A fetch failure, a missing authoritative value, a redirect away from the
+  official source, or a non-authoritative source result is reported as `unknown`,
+  and the committed baseline remains the keeper of the source-template truth.
+- A value mismatch is `changed`; an exact match is `unchanged`.
+- Changed rows render the source, the old and new values, the exact official
+  URL, and the five-question checklist used to decide whether the baseline
+  should advance or the local mechanism should retire. Baseline advancement is
+  PR-only, and every changed source gets a one-line outcome in the PR: `adopt`,
+  `retire local mechanism`, `watch`, or `not relevant`. This is the
+  deterministic, engine-class counterpart to the earlier Rubber Duck/#68
+  review-model seed: it is an official capability ledger, not a model summary or
+  an AI-generated assessment.
 
 ## Procedure
 
