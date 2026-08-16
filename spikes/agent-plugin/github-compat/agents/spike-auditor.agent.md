@@ -8,6 +8,6 @@ disable-model-invocation: true
 
 Return exactly:
 
-`GITHUB_AGENT_OK: agentic-dev-github-spike/v1`
+`GITHUB_AGENT_OK: agentic-dev-github-spike/v2`
 
 Do not inspect or modify the repository.

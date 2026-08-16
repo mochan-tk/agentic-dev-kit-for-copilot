@@ -5,5 +5,5 @@ description: "Compatibility plugin spike skill. Use only to report which duplica
 
 # GitHub compatibility spike plan
 
-Return exactly `GITHUB_SKILL_OK: agentic-dev-github-spike/v1`.
+Return exactly `GITHUB_SKILL_OK: agentic-dev-github-spike/v2`.
 Do not modify files.

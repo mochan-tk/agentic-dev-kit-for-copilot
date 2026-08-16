@@ -1,1 +1,1 @@
-agentic-dev-portable-spike/v1
+agentic-dev-portable-spike/v2
