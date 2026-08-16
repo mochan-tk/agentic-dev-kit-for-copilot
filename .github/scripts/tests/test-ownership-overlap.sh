@@ -89,6 +89,7 @@ fixture 8 "- src/other.sh"
 fixture 74 "- SCAFFOLD-CHANGELOG.md"
 fixture 76 "- SCAFFOLD-CHANGELOG.md"
 printf '%s\n' "## File ownership" "prose" > "$GH_FIXTURES/72.body"
+fixture 73 "- src/auth/token.sh" "malformed trailing prose"
 
 : > "$GH_CALLS"
 expect_rc_grep 1 '#1 .*src/auth/token\.sh.*#2 .*src/auth/token\.sh' \
@@ -118,6 +119,18 @@ if [ "$rc" -eq 3 ] \
   t_ok "UNCHECKABLE takes precedence after parseable overlaps are reported"
 else
   t_fail "UNCHECKABLE takes precedence after parseable overlaps are reported (rc=$rc)"
+  printf '%s\n' "$out" | sed 's/^/    # /'
+fi
+out="$(bash "$SENSOR" -R o/r 1 2 73 2>&1)"
+rc=$?
+if [ "$rc" -eq 3 ] \
+   && printf '%s\n' "$out" | grep -q '^UNCHECKABLE #73' \
+   && ! printf '%s\n' "$out" | grep -q '^OVERLAP .*#73 ' \
+   && printf '%s\n' "$out" \
+      | grep -q '^SUMMARY overlaps=1 tasks=2 declarations=2 pairs=1 uncheckable=1$'; then
+  t_ok "UNCHECKABLE Task partial paths never enter live comparisons"
+else
+  t_fail "UNCHECKABLE Task partial paths never enter live comparisons (rc=$rc)"
   printf '%s\n' "$out" | sed 's/^/    # /'
 fi
 
