@@ -35,6 +35,7 @@ path=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -H) shift 2 ;;
+    --paginate) shift ;;
     *) path="$1"; shift ;;
   esac
 done
@@ -124,6 +125,7 @@ chk() { if printf '%s\n' "$out" | grep -Eq "$2"; then t_ok "$1"; else t_fail "$1
 baseline
 run -R o/r --profile solo
 rce "solo baseline is healthy" 0
+if grep -q -- '--paginate repos/o/r/commits/main/check-runs?filter=latest&per_page=100' "$GH_CALLS"; then t_ok "check-run evidence is paginated and latest-filtered"; else t_fail "check-run evidence is paginated and latest-filtered"; fi
 chk "default branch discovered" "^repository\.default_branch${T}ACTIVE${T}main$"
 chk "declared profile echoed" "^governance\.profile${T}ACTIVE${T}solo$"
 chk "approval count bypass-qualified" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=1 bypass=RepositoryRole:5:pull_request$"
@@ -197,6 +199,19 @@ mk_runs quality:15368 quality:222 task-ritual:15368 scaffold-self-check:15368 co
 run -R o/r --profile team
 rce "ambiguous issuers exit 3" 3
 chk "multiple app ids are UNCHECKABLE" "^required_check_source\.quality${T}UNCHECKABLE${T}multiple issuing app ids: 222,15368$"
+
+team_green
+printf '%s\n%s\n' \
+  '{"check_runs":[{"name":"task-ritual","app":{"id":15368}},{"name":"scaffold-self-check","app":{"id":15368}},{"name":"copilot-surface","app":{"id":15368}}]}' \
+  '{"check_runs":[{"name":"quality","app":{"id":15368}}]}' > "$GS_FIX/checkruns.json"
+run -R o/r --profile team
+rce "paginated check-run evidence stays healthy" 0
+chk "runs found only on a later page are observed" "^required_check_source\.quality${T}ACTIVE${T}configured=15368 observed=15368$"
+printf '%s\n%s\n' '{"check_runs":[{"name":"quality","app":{"id":15368}}]}' \
+  '{"check_runs":[{"name":"quality","app":{"id":222}}]}' > "$GS_FIX/checkruns.json"
+run -R o/r --profile team
+rce "cross-page issuer conflict exits 3" 3
+chk "app ids union across pages before the source ruling" "^required_check_source\.quality${T}UNCHECKABLE${T}multiple issuing app ids: 222,15368$"
 
 baseline
 run -R o/r --profile solo --checks quality,ghost

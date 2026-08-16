@@ -47,13 +47,15 @@ BASE=0 TEAM=0 UNMET=0 MISSING=0
 [ -z "$PROFILE" ] || BASE=1
 [ "$PROFILE" != team ] || TEAM=1
 
-# fetch <name> <path> [raw] — read-only GET; records ok|404|fail in
-# $WORK/<name>.rc. The only gh invocation shape this sensor ever uses.
+# fetch <name> <path> [raw|page] — read-only GET; records ok|404|fail in
+# $WORK/<name>.rc. The only gh invocation shapes this sensor ever uses.
 fetch() {
   local name="$1" path="$2" rc=0
   if [ "${3:-}" = raw ]; then
     gh api -H "Accept: application/vnd.github.raw" "$path" \
       > "$WORK/$name.json" 2> "$WORK/$name.err" || rc=$?
+  elif [ "${3:-}" = page ]; then
+    gh api --paginate "$path" > "$WORK/$name.json" 2> "$WORK/$name.err" || rc=$?
   else
     gh api "$path" > "$WORK/$name.json" 2> "$WORK/$name.err" || rc=$?
   fi
@@ -85,7 +87,7 @@ fi
 if [ -n "$DEFB" ]; then
   fetch rules "repos/$REPO/rules/branches/$DEFB"
   fetch wf "repos/$REPO/actions/permissions/workflow"
-  fetch runs "repos/$REPO/commits/$DEFB/check-runs?per_page=100"
+  fetch runs "repos/$REPO/commits/$DEFB/check-runs?filter=latest&per_page=100" page
   fetch clog "repos/$REPO/contents/SCAFFOLD-CHANGELOG.md?ref=$DEFB" raw
 else
   for name in rules wf runs clog; do echo fail > "$WORK/$name.rc"; done
@@ -207,7 +209,8 @@ $(jq -r --arg c "$ctx" '[.[]|select(.type=="required_status_checks")
 EOF
   fi
   if [ "$(st runs)" = ok ]; then
-    obs="$(jq -r --arg c "$ctx" '[.check_runs[]|select(.name==$c)|.app.id // "none"]
+    # -n + inputs unions runs across all --paginate page documents.
+    obs="$(jq -rn --arg c "$ctx" '[inputs.check_runs[]?|select(.name==$c)|.app.id // "none"]
       | unique|map(tostring)|join(",") | if . == "" then "none" else . end' "$WORK/runs.json")"
   fi
   if [ "$pres" = unknown ]; then emit "required_checks.context.$ctx" UNKNOWN "effective rules unavailable" "$BASE"
