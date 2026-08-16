@@ -207,7 +207,12 @@ fi
 setup_repo "$WORK/adopted"
 make_fake_gh "$WORK/adopted"
 make_fake_curl "$WORK/adopted"
-sed -i '' 's/sha=unknown/sha=deadbeef/' "$WORK/adopted/SCAFFOLD-CHANGELOG.md"
+python3 - "$WORK/adopted/SCAFFOLD-CHANGELOG.md" <<'PY'
+from pathlib import Path
+path = Path(__import__('sys').argv[1])
+text = path.read_text()
+path.write_text(text.replace('sha=unknown', 'sha=deadbeef', 1))
+PY
 out=$(bash "$WORK/adopted/.github/scripts/retro-hygiene.sh" -R mochan-tk/agentic-dev-kit-for-copilot 2>&1) || rc=$?
 rc=${rc:-0}
 if [ "$rc" -eq 0 ] && ! printf '%s\n' "$out" | grep -Eq '## Platform capability checkpoints'; then
