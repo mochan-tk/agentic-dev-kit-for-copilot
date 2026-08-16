@@ -54,6 +54,25 @@ Prefer the **most deterministic** asset that can host the fix: a CI check
 beats an instruction line, because instructions are advice and checks are
 walls.
 
+## Source-template-only platform review
+
+This repository is the source template for adoption. When the scaffold marker
+reads `sha=unknown`, the monthly hygiene job may compare the kit's committed
+checkpoint baseline against official Copilot platform URLs, but it must do so
+only as a rendered audit. Upstream titles, URLs, and content are treated as
+untrusted input: they are shown for inspection, never evaluated as fact, and
+never interpolated into shell commands.
+
+- The script compares the fetched page title only against the committed baseline
+  file `.github/scripts/platform-capability-baseline.tsv`.
+- A fetch failure, a missing page title, or a non-authoritative source result is
+  reported as `unknown`, and the committed baseline remains the keeper of the
+  source-template truth.
+- A title mismatch is `changed`; an exact match is `unchanged`.
+- This is the deterministic, engine-class counterpart to the earlier Rubber
+  Duck/#68 review-model seed: it is an official capability ledger, not a model
+  summary or an AI-generated assessment.
+
 ## Procedure
 
 1. Gather the evidence: links to the ≥2 occurrences (PR review threads,

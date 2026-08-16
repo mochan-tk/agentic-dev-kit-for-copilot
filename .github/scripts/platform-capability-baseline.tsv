@@ -1,0 +1,5 @@
+capability	official_url	baseline_title
+rubber_duck	https://docs.github.com/en/copilot/concepts/agents/copilot-cli/rubber-duck	Rubber Duck
+agent_plugins	https://github.blog/changelog/2026-08-12-agent-plugins-1-0-in-vs-code-copilot-cli-and-the-copilot-app/	Agent plugins 1.0 in VS Code, Copilot CLI, and the Copilot app
+copilot_app	https://github.com/github/app/blob/main/changelog.md	GitHub Copilot app changelog
+copilot_cli	https://github.com/github/copilot-cli/blob/main/changelog.md	GitHub Copilot CLI changelog

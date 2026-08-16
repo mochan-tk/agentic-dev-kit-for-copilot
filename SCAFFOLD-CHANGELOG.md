@@ -65,6 +65,13 @@ inherit what this one learned.
   the stale `- **Review:** ...` line and its explanatory paragraph from their
   tuned copilot-instructions; leaving it is harmless because no skill reads it
   anymore. This partially supersedes #68 and fulfills #69 (#74).
+- The monthly retro hygiene review now keeps a source-template-only, deterministic
+  official capability ledger in `.github/scripts/platform-capability-baseline.tsv`.
+  It compares the committed baseline against official Copilot checkpoints,
+  renders only official URLs and titles, and keeps `unknown` when a fetch fails
+  or a source looks hostile or malformed. That baseline is the engine-class
+  follow-up to the initial Rubber Duck/#68 review-model seed and prevents adopted
+  repositories from pretending to be authoritative sources (#73). 
 - Onboarding asks which model builds. Nothing had ever asked, so every
   adopter ran on whatever their app defaulted to and no session downstream
   could know otherwise — and unlike path restrictions or the roadmap board,
