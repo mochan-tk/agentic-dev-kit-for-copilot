@@ -90,7 +90,7 @@ routing first needs it (`exec:ide`), not interviewed up front.
 
 The interview covers what the repository cannot answer for itself: **how
 specification and design material reaches the scaffold**, and **which
-models run the work**. Everything else about the repository is
+model runs implementation work**. Everything else about the repository is
 discovered by P1/P3 or when work first needs it — path restrictions are
 declared per task in File ownership at decomposition time, secrets
 specifics surface when work first touches them (baseline guardrails
@@ -131,18 +131,14 @@ Ask in sequence, second step branching on the first answer:
 3. **Implementation model.** *"Which model should agents use for
    implementation work? Type a model name if you have a preference;
    `auto` is a safe answer and means the app decides."*
-4. **Review model.** *"And for reviewing that work? A different model
-   catches blind spots the implementing one shares. The same answer is
-   fine, and `auto` again means the app decides."*
 
-   These two are here because no later step can ask them: P1 reads
+   This answer is here because no later step can ask it: P1 reads
    manifests, P3 runs commands, and neither can learn a team's
-   preference. Take the answers as typed and **never suggest a model
-   name** — not in the question, not as an example, not as a default.
-   Naming one dates this skill to the month it was written, and the
-   adopter knows today's names better than it does. The reason in the
-   second question is a recommendation, not a rule; two identical
-   answers, or two `auto`s, are complete.
+   implementation preference. Take it as typed and **never suggest a
+   model name** — not in the question, not as an example, not as a
+   default. Naming one dates this skill to the month it was written, and
+   the adopter knows today's names better than it does. `auto` is a
+   complete answer.
 
 **Close P2 before starting P3** — verification is the long stretch, so
 give the adopter something to review during it:
@@ -221,9 +217,9 @@ unrun command.
   Repo-resident documents are **not** copied into `.github/docs/context/` — they
   stay in place and are read where they live. Do **not**
   write agreements — distillation is a separate, human-gated phase.
-- Record the P2 model answers verbatim in copilot-instructions' **Models**
-  block. Two unanswered questions are two `auto`s, which is a complete
-  answer and not a gap.
+- Record the P2 implementation-model answer verbatim in
+  copilot-instructions' **Models** block. An unanswered question is
+  `auto`, which is a complete answer and not a gap.
 - Do **not** touch `AGENTS.md` (Budget rule; behavior is project-independent).
 
 ### P5 — Prove

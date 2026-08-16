@@ -72,11 +72,9 @@ execution-plane surface: frontmatter, ceilings, English-only.
 Recorded during onboarding (P2); `auto` means the app decides.
 
 - **Implementation:** `auto`
-- **Review:** `auto`
 
-Dispatch implementation work on the first, layer-3 review on the second
-(`task-routing`, `verification`). When they differ, that is deliberate: a
-reviewer sharing the implementer's blind spot reviews less.
+Use it when dispatching implementation work. Review behavior is selected
+per Task and surface (`task-routing`, `verification`), not frozen here.
 
 ## Working a Task issue
 
