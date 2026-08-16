@@ -60,17 +60,17 @@ usage_error() {
 
 sanitize_md_cell() {
  printf '%s' "$1" | tr '\r\n\t' ' ' | tr -d '\000-\037' | \
-   sed 's/[<>&]/ /g; s/|/\\|/g; s/[[:space:]]\+/ /g; s/[[:space:]]\+$//; s/^[[:space:]]\+//'
+   sed 's/[<>&]/ /g; s/|/\\|/g; s/[[:space:]]\{1,\}/ /g; s/[[:space:]]*$//; s/^[[:space:]]*//'
 }
 
 normalize_title() {
  printf '%s' "$1" | tr '\r\n\t' ' ' | tr -d '\000-\037' | \
-   sed 's/[<>&]/ /g; s/[[:space:]]\+/ /g; s/^ //; s/ $//'
+   sed 's/[<>&]/ /g; s/[[:space:]]\{1,\}/ /g; s/^ //; s/ $//'
 }
 
 normalize_literal() {
  printf '%s' "$1" | tr '\r\n\t' ' ' | tr -d '\000-\037' | \
-   sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//'
+   sed 's/[[:space:]]\{1,\}/ /g; s/^ //; s/ $//'
 }
 
 canonical_url() {
@@ -289,8 +289,8 @@ EOF
        ;;
    esac
 
-   table="${table}| $(sanitize_md_cell "$label") | $(sanitize_md_cell "$url") | $(sanitize_md_cell "$expected") | ${current} | $(sanitize_md_cell "$state") |\n"
-   detail="${detail}$(render_capability_detail "$label" "$url" "$expected" "$current" "$state")"
+   table="${table}| $(sanitize_md_cell "$label") | $(sanitize_md_cell "$url") | $(sanitize_md_cell "$expected") | ${current} | $(sanitize_md_cell "$state") |"$'\n'
+   detail="${detail}$(render_capability_detail "$label" "$url" "$expected" "$observed" "$state")"$'\n'
  done < "$BASELINE_FILE"
 
  if [ -z "$table" ]; then
@@ -390,13 +390,13 @@ build_report() {
      overdue=$((overdue + 1))
    fi
    title="${title//|/\\|}"
-   table="${table}| #${num} | ${title} | ${count} | ${age} | ${status} |\n"
+   table="${table}| #${num} | ${title} | ${count} | ${age} | ${status} |"$'\n'
  done <<< "$tsv"
 
  if [ "$total" -eq 0 ]; then
    candidates_section="No open \`retro:candidate\` issues — the ledger is clean."
  else
-   candidates_section="| Issue | Title | Occurrences | Age (days) | Status |\n|---|---|---|---|---|\n${table}${total} open candidate(s), ${overdue} at or over the promotion threshold (>= 2 occurrences)."
+   candidates_section="| Issue | Title | Occurrences | Age (days) | Status |"$'\n'"|---|---|---|---|---|"$'\n'"${table}${total} open candidate(s), ${overdue} at or over the promotion threshold (>= 2 occurrences)."
  fi
 
  budget_rows="$(budget_row "AGENTS.md")

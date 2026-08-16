@@ -446,4 +446,40 @@ else
 ' "$out" | sed 's/^/    # /'
 fi
 
+# --- rendered markdown keeps real line breaks instead of literal \n escapes
+setup_repo "$WORK/rendered-markdown"
+write_baseline "$WORK/rendered-markdown" current
+make_fake_gh "$WORK/rendered-markdown"
+make_fake_curl "$WORK/rendered-markdown"
+out=$(bash "$WORK/rendered-markdown/.github/scripts/retro-hygiene.sh" -R mochan-tk/agentic-dev-kit-for-copilot 2>&1) || rc=$?
+rc=${rc:-0}
+if [ "$rc" -eq 0 ] && ! printf '%s
+' "$out" | grep -F '\\n' >/dev/null && printf '%s
+' "$out" | grep -Eq '^\| Issue \| Title \| Occurrences \| Age \(days\) \| Status \|$'; then
+  t_ok "report tables render with real Markdown line breaks"
+else
+  t_fail "report tables render with real Markdown line breaks"
+  printf '%s
+' "$out" | sed 's/^/    # /'
+fi
+
+# --- multiple changed rows render as separate bullets rather than being glued together
+setup_repo "$WORK/multi-change"
+write_baseline "$WORK/multi-change" current
+make_fake_gh "$WORK/multi-change"
+export RETRO_HYGIENE_MODE=changed_docs
+make_fake_curl "$WORK/multi-change"
+out=$(bash "$WORK/multi-change/.github/scripts/retro-hygiene.sh" -R mochan-tk/agentic-dev-kit-for-copilot 2>&1) || rc=$?
+rc=${rc:-0}
+unset RETRO_HYGIENE_MODE
+if [ "$rc" -eq 0 ] && printf '%s
+' "$out" | grep -Eq '^- rubber_duck: changed' && printf '%s
+' "$out" | grep -Eq '^- copilot_docs: changed'; then
+  t_ok "multiple changed rows render as distinct bullets"
+else
+  t_fail "multiple changed rows render as distinct bullets"
+  printf '%s
+' "$out" | sed 's/^/    # /'
+fi
+
 t_summary
