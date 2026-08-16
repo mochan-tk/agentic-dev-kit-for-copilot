@@ -1,0 +1,34 @@
+{
+  "name": "agentic-dev-spike",
+  "owner": {
+    "name": "Takashi Kawamoto (Mr.Mo)"
+  },
+  "metadata": {
+    "description": "Disposable marketplace for Task #75 Agent Plugins feasibility testing.",
+    "version": "0.0.1"
+  },
+  "plugins": [
+    {
+      "name": "agentic-dev-portable-spike",
+      "description": "Portable Agent Plugins v1 skill package.",
+      "version": "0.0.1",
+      "source": {
+        "source": "github",
+        "repo": "mochan-tk/agentic-dev-kit-for-copilot",
+        "sha": "06948d66f8ad6b6b780a08a83d4a0c2b074ffd67",
+        "path": "spikes/agent-plugin/portable-core"
+      }
+    },
+    {
+      "name": "agentic-dev-github-spike",
+      "description": "GitHub Copilot compatibility package with skills, agent, and command.",
+      "version": "0.0.1",
+      "source": {
+        "source": "github",
+        "repo": "mochan-tk/agentic-dev-kit-for-copilot",
+        "sha": "06948d66f8ad6b6b780a08a83d4a0c2b074ffd67",
+        "path": "spikes/agent-plugin/github-compat"
+      }
+    }
+  ]
+}
