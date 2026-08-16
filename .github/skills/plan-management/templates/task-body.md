@@ -39,10 +39,12 @@
 
 ## File ownership
 
-<!-- Paths (globs allowed) this task may modify. The diff must stay inside
-     them (AGENTS.md §5). Parallel tasks must not overlap. -->
+<!-- Exactly one plain or code-span repository-relative path per bullet
+     (globs allowed); no qualifiers, nested bullets, or multi-value bullets.
+     The diff must stay inside them (AGENTS.md §5). Parallel tasks must not
+     overlap. This grammar is enforced before adding ai:ready. -->
 
--
+- path/to/owned-area/**
 
 ## Verification
 
