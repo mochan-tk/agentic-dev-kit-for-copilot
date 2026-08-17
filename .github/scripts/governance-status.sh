@@ -42,9 +42,8 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/governance-status.XXXXXX")" || exit 2
 trap 'rm -rf "$WORK"' EXIT
 TAB="$(printf '\t')"
 
-BASE=0 TEAM=0 UNMET=0 MISSING=0
-[ -z "$PROFILE" ] || BASE=1
-[ "$PROFILE" != team ] || TEAM=1
+BASE=0 TEAM=0 UNMET=0 MISSING=0 PROFILE_ACTIVE=0
+[ -z "$PROFILE" ] || PROFILE_ACTIVE=1
 
 # fetch <name> <path> [raw|page] — read-only GET; records ok|404|fail in
 # $WORK/<name>.rc. The only gh invocation shapes this sensor ever uses.
@@ -65,6 +64,21 @@ fetch() {
 }
 st() { cat "$WORK/$1.rc" 2>/dev/null || echo fail; }
 jqr() { jq -r "$1" "$WORK/$2.json"; }
+
+# An explicit profile is a one-shot override. Otherwise, consume only the
+# exact persisted string; invalid or unreadable evidence remains unknown.
+if [ "$PROFILE_ACTIVE" = 0 ]; then
+  fetch profile "repos/$REPO/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
+  if [ "$(st profile)" = ok ] &&
+     jq -e '.value | type == "string" and (. == "solo" or . == "team")' \
+       "$WORK/profile.json" >/dev/null 2>&1 &&
+     jq -r '.value' "$WORK/profile.json" > "$WORK/profile.value" 2>/dev/null &&
+     IFS= read -r PROFILE < "$WORK/profile.value"; then
+    PROFILE_ACTIVE=1
+  fi
+fi
+[ "$PROFILE_ACTIVE" != 1 ] || BASE=1
+[ "$PROFILE" != team ] || TEAM=1
 
 # emit <key> <state> <detail> <required-flag> — required OFF counts toward
 # exit 1; required UNKNOWN/UNCHECKABLE counts toward exit 3 (which outranks).
@@ -164,8 +178,8 @@ qual_for "$MQSRC"; MQQ="$QUAL"
 
 if [ -n "$DEFB" ]; then emit repository.default_branch ACTIVE "$DEFB" "$BASE"
 else emit repository.default_branch UNKNOWN "repository metadata unavailable" "$BASE"; fi
-if [ -n "$PROFILE" ]; then emit governance.profile ACTIVE "$PROFILE" 1
-else emit governance.profile UNKNOWN "no profile declared; pass --profile solo|team" 1; fi
+if [ "$PROFILE_ACTIVE" = 1 ]; then emit governance.profile ACTIVE "$PROFILE" 1
+else emit governance.profile UNKNOWN "persisted profile unavailable or invalid; expected exact solo|team" 1; fi
 if [ "$RULES" != 1 ]; then
   emit pull_request.required_approving_review_count UNKNOWN "effective rules unavailable" "$BASE"
 elif [ "$PRN" = 0 ] || [ "$APPR" -lt 1 ]; then
