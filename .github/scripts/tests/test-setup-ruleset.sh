@@ -185,6 +185,15 @@ assert_team_put() {
   fi
 }
 
+team_refresh_case() {
+  local run_name="$1" body_name="$2" old_enforcement="$3"
+  local old_app="$4" requested_enforcement="$5"
+  existing_profile_fixtures team "$old_enforcement" "$old_app"
+  expect_rc 0 "$run_name" run_script -R acme/widget --profile team \
+    --enforcement "$requested_enforcement"
+  assert_team_put "$body_name" "$requested_enforcement" 15368
+}
+
 variable_write_fails_closed() {
   local name="$1" endpoint="$2" profile="${3:-team}" rc=0 out
   out="$(run_script -R acme/widget --profile "$profile" 2>&1)" || rc=$?
@@ -383,10 +392,12 @@ else
   t_fail "team upgrade completes every read and persists intent before ruleset PUT"
 fi
 
-existing_profile_fixtures team disabled 77
-expect_rc 0 "canonical team refreshes changed source and enforcement" \
-  run_script -R acme/widget --profile team --enforcement active
-assert_team_put "team refresh uses observed source and requested enforcement" active 15368
+team_refresh_case "canonical team refreshes changed source and enforcement" \
+  "team refresh uses observed source and requested enforcement" disabled 77 active
+team_refresh_case "team refreshes when only the observed source differs" \
+  "source-only refresh full-PUTs the newly observed App ID" active 77 active
+team_refresh_case "team refreshes when only requested enforcement differs" \
+  "enforcement-only refresh full-PUTs requested enforcement" disabled 15368 active
 
 existing_profile_fixtures team active
 expect_rc 0 "exact canonical team match is idempotent" \
@@ -417,6 +428,16 @@ if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
   t_ok "solo persists intent without rewriting canonical team controls"
 else
   t_fail "solo persists intent without rewriting canonical team controls"
+fi
+
+existing_profile_fixtures team active 77
+expect_rc 0 "explicit solo ignores canonical team source drift" \
+  run_script -R acme/widget --profile solo --enforcement active
+if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
+   && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
+  t_ok "solo source drift persists solo intent with zero ruleset writes"
+else
+  t_fail "solo source drift persists solo intent with zero ruleset writes"
 fi
 
 existing_profile_fixtures team disabled
