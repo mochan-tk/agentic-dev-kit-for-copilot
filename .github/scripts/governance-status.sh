@@ -37,8 +37,7 @@ done
 case "$REPO" in */*) ;; *) usage ;; esac
 CHECKS="$(printf '%s' "$CHECKS" | tr -d ' ' | tr -s ',' | sed 's/^,//;s/,$//')"
 [ -n "$CHECKS" ] || usage
-command -v gh >/dev/null 2>&1 || { echo "error: gh CLI not found" >&2; exit 2; }
-command -v jq >/dev/null 2>&1 || { echo "error: jq not found" >&2; exit 2; }
+for t in gh jq; do command -v "$t" >/dev/null 2>&1 || { echo "error: $t not found" >&2; exit 2; }; done
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/governance-status.XXXXXX")" || exit 2
 trap 'rm -rf "$WORK"' EXIT
 TAB="$(printf '\t')"
@@ -81,8 +80,7 @@ emit() {
 fetch repo "repos/$REPO"
 DEFB="" OWNER=""
 if [ "$(st repo)" = ok ]; then
-  DEFB="$(jqr '.default_branch // empty' repo)"
-  OWNER="$(jqr '.owner.type // empty' repo)"
+  DEFB="$(jqr '.default_branch // empty' repo)"; OWNER="$(jqr '.owner.type // empty' repo)"
 fi
 if [ -n "$DEFB" ]; then
   fetch rules "repos/$REPO/rules/branches/$DEFB"
@@ -90,8 +88,7 @@ if [ -n "$DEFB" ]; then
   fetch runs "repos/$REPO/commits/$DEFB/check-runs?filter=latest&per_page=100" page
   fetch clog "repos/$REPO/contents/SCAFFOLD-CHANGELOG.md?ref=$DEFB" raw
 else
-  for name in rules wf runs clog; do echo fail > "$WORK/$name.rc"; done
-fi
+  for name in rules wf runs clog; do echo fail > "$WORK/$name.rc"; done; fi
 RULES=0
 [ "$(st rules)" != ok ] || RULES=1
 
@@ -264,43 +261,50 @@ fi
 
 if [ "$(st repo)" != ok ]; then emit merge_queue.applicability UNKNOWN "repository metadata unavailable" "$BASE"
 elif [ "$OWNER" = User ]; then emit merge_queue.applicability N/A "owner_type=User; merge queue not applicable" 0
-elif [ "$RULES" = 1 ] && [ "$MQN" -gt 0 ]; then
-  # A merge_queue rule is ACTIVE only with observed merge_group workflow
-  # coverage; incomplete evidence stays UNKNOWN/UNCHECKABLE and gates.
-  MQCOV=0
-  fetch wfd "repos/$REPO/contents/.github/workflows?ref=$DEFB"
-  if [ "$(st wfd)" = fail ]; then MQCOV=unknown
-  elif [ "$(st wfd)" = ok ]; then
-    while IFS= read -r wfn; do
-      [ -n "$wfn" ] || continue
-      fetch wff "repos/$REPO/contents/.github/workflows/$wfn?ref=$DEFB" raw
-      if [ "$(st wff)" != ok ]; then MQCOV=unknown; break; fi
-      ! sed 's/#.*//' "$WORK/wff.json" | grep -qw merge_group || MQCOV=$((MQCOV + 1))
-    done <<EOF
+else
+  # Public repositories are eligible by repository evidence alone; private
+  # ones need plan proof via GET /orgs/{owner}, failing closed, and a free
+  # plan is ineligible before any rule or coverage evidence is consulted.
+  PRIV="$(jqr '.private' repo)" OPLAN=eligible
+  if [ "$PRIV" = true ]; then
+    fetch orgp "orgs/${REPO%%/*}"
+    OPLAN=""; [ "$(st orgp)" != ok ] || OPLAN="$(jqr '.plan.name // empty' orgp)"
+  fi
+  if [ -z "$OPLAN" ]; then emit merge_queue.applicability UNKNOWN "organization plan evidence unavailable" "$BASE"
+  elif [ "$PRIV" = true ] && [ "$OPLAN" = free ]; then emit merge_queue.applicability N/A "private repository on free plan is ineligible" 0
+  elif [ "$RULES" != 1 ]; then emit merge_queue.applicability UNKNOWN "effective rules unavailable" "$BASE"
+  elif [ "$MQN" -gt 0 ]; then
+    MQCOV=0
+    fetch wfd "repos/$REPO/contents/.github/workflows?ref=$DEFB"
+    if [ "$(st wfd)" = fail ]; then MQCOV=unknown
+    elif [ "$(st wfd)" = ok ]; then
+      while IFS= read -r wfn; do
+        [ -n "$wfn" ] || continue
+        fetch wff "repos/$REPO/contents/.github/workflows/$wfn?ref=$DEFB" raw
+        if [ "$(st wff)" != ok ]; then MQCOV=unknown; break; fi
+        # Coverage means a genuine merge_group trigger under a top-level on:
+        # block; comments, quotes, script strings, and scalars never count.
+        if sed 's/#.*//; s/["'\'']//g' "$WORK/wff.json" | awk '
+          /^[^[:blank:]]/ { b = /^on[[:blank:]]*:/; if (b && /[[,[:blank:]]merge_group([],[:blank:]]|$)/) f=1; next }
+          b && /^[[:blank:]]+(-[[:blank:]]*)?merge_group[[:blank:]]*(:|$)/ { f=1 }
+          END { exit !f }'; then MQCOV=$((MQCOV + 1)); fi
+      done <<EOF
 $(jqr '.[]? | select(.type == "file") | .name' wfd)
 EOF
-  fi
-  if [ "$MQCOV" = unknown ]; then
-    emit merge_queue.applicability UNKNOWN "merge_group workflow coverage evidence unavailable" "$BASE"
-  elif [ "$MQCOV" -gt 0 ]; then
-    emit merge_queue.applicability ACTIVE "merge_queue rule active$MQQ; merge_group coverage in $MQCOV workflow(s)" 0
-  else
-    emit merge_queue.applicability UNCHECKABLE "merge_queue rule active without observed merge_group workflow coverage" "$BASE"
-  fi
-elif [ "$(jqr '.private' repo)" = true ] && [ "$(jqr '.plan.name // empty' repo)" = free ]; then
-  emit merge_queue.applicability N/A "private repository on free plan is ineligible" 0
-elif [ "$RULES" != 1 ]; then emit merge_queue.applicability UNKNOWN "effective rules unavailable" "$BASE"
-else emit merge_queue.applicability UNCHECKABLE "organization repository without plan, eligibility, rule, or merge_group evidence" "$BASE"; fi
+    fi
+    if [ "$MQCOV" = unknown ]; then emit merge_queue.applicability UNKNOWN "merge_group workflow coverage evidence unavailable" "$BASE"
+    elif [ "$MQCOV" -gt 0 ]; then emit merge_queue.applicability ACTIVE "merge_queue rule active$MQQ; merge_group coverage in $MQCOV workflow(s)" 0
+    else emit merge_queue.applicability UNCHECKABLE "merge_queue rule active without observed merge_group workflow coverage" "$BASE"; fi
+  else emit merge_queue.applicability UNCHECKABLE "eligible repository without a merge_queue rule" "$BASE"; fi
+fi
 
 while IFS="$TAB" read -r rid rtyp rsrc; do
   [ -n "$rid" ] || continue
   if [ "$(st "rs$rid")" = ok ]; then
     n="$(wc -l < "$WORK/actors.$rid" | tr -d ' ')"
     emit "bypass.ruleset.$rid" ACTIVE "source=$rtyp:$rsrc actors=$n" "$BASE"
-    i=0
-    while IFS= read -r actor; do
-      i=$((i + 1))
-      emit "bypass.ruleset.$rid.actor.$i" ACTIVE "$actor" 0
+    i=0; while IFS= read -r actor; do
+      i=$((i + 1)); emit "bypass.ruleset.$rid.actor.$i" ACTIVE "$actor" 0
     done < "$WORK/actors.$rid"
   else
     emit "bypass.ruleset.$rid" UNKNOWN "ruleset detail unavailable ($rtyp:$rsrc)" "$BASE"
