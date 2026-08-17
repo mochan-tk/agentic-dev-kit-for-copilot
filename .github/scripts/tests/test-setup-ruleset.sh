@@ -148,7 +148,7 @@ existing_profile_fixtures() {
 detail_fails_closed() {
   local name="$1" profile="$2" rc=0 out
   shift 2
-  out="$(run_script -R acme/widget --profile "$profile" "$@" 2>&1)" || rc=$?
+  out="$(run_script -R acme/widget --profile "$profile" --reconcile "$@" 2>&1)" || rc=$?
   if [ "$rc" -eq 1 ] \
      && printf '%s\n' "$out" | grep -Eqi 'canonical|custom|detail|malformed' \
      && grep -q 'api repos/acme/widget/rulesets/42' "$GH_CALLS" \
@@ -190,14 +190,14 @@ team_refresh_case() {
   local run_name="$1" body_name="$2" old_enforcement="$3"
   local old_app="$4" requested_enforcement="$5"
   existing_profile_fixtures team "$old_enforcement" "$old_app"
-  expect_rc 0 "$run_name" run_script -R acme/widget --profile team \
+  expect_rc 0 "$run_name" run_script -R acme/widget --profile team --reconcile \
     --enforcement "$requested_enforcement"
   assert_team_put "$body_name" "$requested_enforcement" 15368
 }
 
 variable_write_fails_closed() {
-  local name="$1" endpoint="$2" profile="${3:-team}" rc=0 out
-  out="$(run_script -R acme/widget --profile "$profile" 2>&1)" || rc=$?
+  local name="$1" endpoint="$2" profile="${3:-team}" rc=0 out reconcile="${3:+--reconcile}"
+  out="$(run_script -R acme/widget --profile "$profile" ${reconcile:+"$reconcile"} 2>&1)" || rc=$?
   if [ "$rc" -eq 1 ] \
      && printf '%s\n' "$out" | grep -Eqi 'could not (create|update).*variable' \
      && [ "$(grep -c -- "$endpoint" "$GH_CALLS")" -eq 1 ] \
@@ -385,7 +385,7 @@ fi
 
 existing_profile_fixtures solo
 expect_rc 0 "canonical solo upgrades in place to explicit team" \
-  run_script -R acme/widget --profile team
+  run_script -R acme/widget --profile team --reconcile
 assert_team_put "team upgrade writes the complete canonical team body" disabled 15368
 if [ "$(grep -nE 'rulesets/42|repos/acme/widget$|check-runs|actions/variables|--method PUT' \
           "$GH_CALLS" | cut -d: -f2-)" = "$(printf '%s\n' \
@@ -409,7 +409,7 @@ team_refresh_case "team refreshes when only requested enforcement differs" \
 
 existing_profile_fixtures team active
 expect_rc 0 "exact canonical team match is idempotent" \
-  run_script -R acme/widget --profile team --enforcement active
+  run_script -R acme/widget --profile team --enforcement active --reconcile
 if jq -e '.value == "team"' "$GH_FIXTURES/variable-written.json" >/dev/null \
    && grep -q 'rulesets/42' "$GH_CALLS" \
    && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
@@ -420,7 +420,7 @@ fi
 
 existing_profile_fixtures solo active
 expect_rc 0 "exact canonical solo match is idempotent" \
-  run_script -R acme/widget --profile solo --enforcement active
+  run_script -R acme/widget --profile solo --enforcement active --reconcile
 if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
    && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
   t_ok "exact solo match persists solo intent and performs no ruleset write"
@@ -430,7 +430,7 @@ fi
 
 existing_profile_fixtures team active
 expect_rc 0 "explicit solo accepts canonical team without downgrade" \
-  run_script -R acme/widget --profile solo --enforcement active
+  run_script -R acme/widget --profile solo --enforcement active --reconcile
 if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
    && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
   t_ok "solo persists intent without rewriting canonical team controls"
@@ -440,7 +440,7 @@ fi
 
 existing_profile_fixtures team active 77
 expect_rc 0 "explicit solo ignores canonical team source drift" \
-  run_script -R acme/widget --profile solo --enforcement active
+  run_script -R acme/widget --profile solo --enforcement active --reconcile
 if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
    && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
   t_ok "solo source drift persists solo intent with zero ruleset writes"
@@ -450,7 +450,7 @@ fi
 
 existing_profile_fixtures team disabled
 expect_rc 0 "solo may update only enforcement on canonical team" \
-  run_script -R acme/widget --profile solo --enforcement active
+  run_script -R acme/widget --profile solo --enforcement active --reconcile
 if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
    && [ "$(grep -E 'rulesets/42|actions/variables|--method PUT' "$GH_CALLS")" \
         = "$(printf '%s\n' \
@@ -467,7 +467,7 @@ fi
 
 existing_profile_fixtures team
 expect_rc 0 "existing canonical team dry-run validates with GET calls only" \
-  run_script -R acme/widget --profile team --dry-run
+  run_script -R acme/widget --profile team --dry-run --reconcile
 if grep -q 'api repos/acme/widget/rulesets/42' "$GH_CALLS" \
    && no_profile_writes; then
   t_ok "existing-profile dry-run reads detail without mutation"
@@ -491,7 +491,7 @@ existing_profile_fixtures solo
 jq '.target = "tag"' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp"
 mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
 detail_fails_closed "noncanonical solo dry-run fails closed after detail GET" \
-  solo --reconcile --dry-run
+  solo --dry-run
 
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
@@ -530,7 +530,7 @@ printf '%s\n' \
   > "$GH_FIXTURES/rulesets.json"
 expect_rc_grep 1 'multiple|duplicate|exactly one' \
   "multiple same-name rulesets fail closed" \
-  run_script -R acme/widget --profile team
+  run_script -R acme/widget --profile team --reconcile
 if no_profile_writes; then
   t_ok "multiple same-name rulesets cause zero writes"
 else
