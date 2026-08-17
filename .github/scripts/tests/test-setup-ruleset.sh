@@ -103,6 +103,19 @@ team_fails_closed() {
   fi
 }
 
+variable_write_fails_closed() {
+  local name="$1" endpoint="$2" rc=0 out
+  out="$(run_script -R acme/widget --profile team 2>&1)" || rc=$?
+  if [ "$rc" -eq 1 ] \
+     && printf '%s\n' "$out" | grep -Eqi 'could not (create|update).*variable' \
+     && [ "$(grep -c -- "$endpoint" "$GH_CALLS")" -eq 1 ] \
+     && ! grep -Eq -- '--method (POST|PUT|PATCH|DELETE).*rulesets|probe' "$GH_CALLS"; then
+    t_ok "$name"
+  else
+    t_fail "$name (variable write must fail before any ruleset mutation)"
+  fi
+}
+
 # --- usage ----------------------------------------------------------------
 
 expect_rc_grep 0 'Usage: setup-ruleset\.sh' "--help prints usage" \
@@ -327,7 +340,8 @@ team_fails_closed "Actions-disabled target blocks ruleset creation" \
 
 profile_fixtures
 export GH_FAIL_EXACT='api --method POST repos/acme/widget/actions/variables --input -'
-team_fails_closed "variable create failure blocks ruleset creation" 'variable'
+variable_write_fails_closed "variable create failure blocks ruleset creation" \
+  '--method POST repos/acme/widget/actions/variables'
 
 profile_fixtures
 export GH_VARIABLE=present
@@ -349,7 +363,8 @@ export GH_VARIABLE=present
 echo '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"solo"}' \
   > "$GH_FIXTURES/variable.json"
 export GH_FAIL_EXACT='api --method PATCH repos/acme/widget/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE --input -'
-team_fails_closed "variable update failure blocks ruleset creation" 'variable'
+variable_write_fails_closed "variable update failure blocks ruleset creation" \
+  '--method PATCH repos/acme/widget/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE'
 
 profile_fixtures
 export GH_FAIL_EXACT='api --method POST repos/acme/widget/rulesets --input -'
