@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # governance-status.sh — read-only default-branch governance sensor
 # (ADR-0004 decisions 1, 2, 4, 5). Compares effective branch rules, Actions
-# posture, CODEOWNERS tuning, and merge-queue applicability against an
-# explicitly declared solo or team intent (solo = the setup-ruleset.sh
-# minimum; stronger observed settings never make solo unhealthy). Aggregates
-# every active rule source including parent rulesets, qualifies
-# ruleset-derived controls with their bypass actors, and reports missing
-# evidence as UNKNOWN or UNCHECKABLE — never as safe. GET-only; nothing is
-# mutated and no profile is persisted.
+# posture, CODEOWNERS tuning, and merge-queue applicability against a solo
+# or team intent (solo = the setup-ruleset.sh minimum; stronger observed
+# settings never make solo unhealthy). When --profile is omitted, intent is
+# read from the persisted repository Actions variable
+# SCAFFOLD_GOVERNANCE_PROFILE (written by setup-ruleset.sh); only the exact
+# value solo or team is accepted, and explicit --profile is a one-shot
+# override that never reads that variable. Aggregates every active rule
+# source including parent rulesets, qualifies ruleset-derived controls with
+# their bypass actors, and reports missing evidence as UNKNOWN or
+# UNCHECKABLE — never as safe. GET-only; nothing is mutated and no profile
+# is persisted.
 #
 # Output: deterministic `key<TAB>state<TAB>detail` lines.
 # Exit: 0 healthy with complete evidence; 1 required control OFF;
@@ -43,8 +47,6 @@ trap 'rm -rf "$WORK"' EXIT
 TAB="$(printf '\t')"
 
 BASE=0 TEAM=0 UNMET=0 MISSING=0
-[ -z "$PROFILE" ] || BASE=1
-[ "$PROFILE" != team ] || TEAM=1
 
 # fetch <name> <path> [raw|page] — read-only GET; records ok|404|fail in
 # $WORK/<name>.rc. The only gh invocation shapes this sensor ever uses.
@@ -65,6 +67,24 @@ fetch() {
 }
 st() { cat "$WORK/$1.rc" 2>/dev/null || echo fail; }
 jqr() { jq -r "$1" "$WORK/$2.json"; }
+
+# Persisted governance intent: consulted only when no explicit --profile was
+# given, so an override never reads this endpoint. Only the exact value
+# solo or team is accepted — never trimmed, never case-folded — so a
+# missing variable, an Actions-disabled target, an API/authorization
+# failure, a malformed response, an empty value, a whitespace or case
+# variant, or any other value all leave PROFILE unset, which the existing
+# UNKNOWN/exit-3 path below already reports faithfully; no default is
+# guessed.
+if [ -z "$PROFILE" ]; then
+  fetch govvar "repos/$REPO/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
+  if [ "$(st govvar)" = ok ]; then
+    GV="$(jqr '.value // empty' govvar)"
+    case "$GV" in solo|team) PROFILE="$GV" ;; esac
+  fi
+fi
+[ -z "$PROFILE" ] || BASE=1
+[ "$PROFILE" != team ] || TEAM=1
 
 # emit <key> <state> <detail> <required-flag> — required OFF counts toward
 # exit 1; required UNKNOWN/UNCHECKABLE counts toward exit 3 (which outranks).
