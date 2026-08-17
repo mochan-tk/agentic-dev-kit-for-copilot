@@ -17,8 +17,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 # Recording stub: every invocation lands in $GH_CALLS (one line of argv per
-# call); list responses come from $GH_FIXTURES/rulesets.json (absent file
-# models a failed list); a POST body is captured to $GH_FIXTURES/posted.json.
+# call); responses come from fixed files under $GH_FIXTURES; request bodies
+# are captured so reconciliation shape and write ordering stay observable.
 export GH_FIXTURES="$WORK/fixtures"
 export GH_CALLS="$WORK/gh-calls.log"
 export GH_ALL_CALLS="$WORK/gh-all-calls.log"
@@ -48,9 +48,14 @@ case "$*" in
     cat > "$GH_FIXTURES/variable-written.json"; echo '{}' ;;
   "api --method PATCH repos/"*"/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE --input -")
     cat > "$GH_FIXTURES/variable-written.json"; echo '{}' ;;
+  "api --method PUT repos/"*"/rulesets/"*" --input -")
+    cat > "$GH_FIXTURES/put.json"; echo '{"id":42}' ;;
   "api repos/"*"/rulesets")
     [ -f "$GH_FIXTURES/rulesets.json" ] || exit 1
     cat "$GH_FIXTURES/rulesets.json" ;;
+  "api repos/"*"/rulesets/"*)
+    [ -f "$GH_FIXTURES/ruleset-detail.json" ] || exit 1
+    cat "$GH_FIXTURES/ruleset-detail.json" ;;
   "api --method PUT repos/"*"/rulesets/"*) echo '{}' ;;
   "api --method POST repos/"*"/rulesets --input -")
     cat > "$GH_FIXTURES/posted.json"; echo '{"id": 999}' ;;
@@ -68,7 +73,7 @@ reset_calls() { : > "$GH_CALLS"; }
 run_script() { bash "$SCRIPT" "$@" < /dev/null; }
 
 no_profile_writes() {
-  ! grep -Eq -- '--method (POST|PUT|PATCH).*(actions/variables|rulesets)' "$GH_CALLS"
+  ! grep -Eq -- '--method (POST|PUT|PATCH|DELETE).*(actions/variables|rulesets)' "$GH_CALLS"
 }
 
 profile_fixtures() {
@@ -76,7 +81,8 @@ profile_fixtures() {
   unset GH_FAIL GH_FAIL_EXACT GH_FAIL_MESSAGE
   export GH_VARIABLE=missing
   rm -f "$GH_FIXTURES/variable.json" "$GH_FIXTURES/variable-written.json" \
-    "$GH_FIXTURES/posted.json"
+    "$GH_FIXTURES/posted.json" "$GH_FIXTURES/put.json" \
+    "$GH_FIXTURES/ruleset-detail.json"
   echo '[]' > "$GH_FIXTURES/rulesets.json"
   echo '{"default_branch":"trunk"}' > "$GH_FIXTURES/repo.json"
   cat > "$GH_FIXTURES/checkruns.json" <<'JSON'
@@ -100,6 +106,72 @@ team_fails_closed() {
     t_fail "$name (rc=$rc; expected failure before writes)"
     printf '%s\n' "$out" | sed 's/^/    # /'
     sed 's/^/    # call: /' "$GH_CALLS"
+  fi
+}
+
+canonical_detail() {
+  local profile="$1" enforcement="${2:-disabled}" app="${3:-15368}"
+  jq -n --arg profile "$profile" --arg enforcement "$enforcement" \
+    --argjson app "$app" '{
+      id: 42, name: "scaffold-branch-protection", target: "branch",
+      enforcement: $enforcement,
+      bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole",
+                       bypass_mode: "pull_request"}],
+      conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
+      rules: [
+        {type: "pull_request", parameters: {
+          required_approving_review_count: 1,
+          dismiss_stale_reviews_on_push: ($profile == "team"),
+          require_code_owner_review: ($profile == "team"),
+          require_last_push_approval: ($profile == "team"),
+          required_review_thread_resolution: ($profile == "team")}},
+        {type: "required_status_checks", parameters: {
+          strict_required_status_checks_policy: ($profile == "team"),
+          required_status_checks:
+            (["quality","task-ritual","scaffold-self-check","copilot-surface"]
+             | map({context: .})
+             | if $profile == "team"
+               then map(. + {integration_id: $app}) else . end)}}
+      ]
+    }'
+}
+
+existing_profile_fixtures() {
+  local profile="$1" enforcement="${2:-disabled}" app="${3:-15368}"
+  profile_fixtures
+  printf '[{"id":42,"name":"scaffold-branch-protection","enforcement":"%s"}]\n' \
+    "$enforcement" > "$GH_FIXTURES/rulesets.json"
+  canonical_detail "$profile" "$enforcement" "$app" \
+    > "$GH_FIXTURES/ruleset-detail.json"
+}
+
+detail_fails_closed() {
+  local name="$1" rc=0 out
+  out="$(run_script -R acme/widget --profile team 2>&1)" || rc=$?
+  if [ "$rc" -eq 1 ] \
+     && printf '%s\n' "$out" | grep -Eqi 'canonical|custom|detail|malformed' \
+     && grep -q 'api repos/acme/widget/rulesets/42' "$GH_CALLS" \
+     && no_profile_writes; then
+    t_ok "$name"
+  else
+    t_fail "$name (detail must be read and rejected before writes)"
+  fi
+}
+
+assert_team_put() {
+  local name="$1" enforcement="$2" app="$3"
+  if jq -e --arg enforcement "$enforcement" --argjson app "$app" '
+       .id == null and .enforcement == $enforcement
+       and all(.rules[] | select(.type == "pull_request").parameters;
+         .dismiss_stale_reviews_on_push and .require_code_owner_review
+         and .require_last_push_approval and .required_review_thread_resolution)
+       and all(.rules[] | select(.type == "required_status_checks").parameters;
+         .strict_required_status_checks_policy
+         and all(.required_status_checks[]; .integration_id == $app))
+     ' "$GH_FIXTURES/put.json" >/dev/null; then
+    t_ok "$name"
+  else
+    t_fail "$name"
   fi
 }
 
@@ -282,20 +354,123 @@ else
   t_fail "team payload binds every context and persists exact team intent"
 fi
 
-# --- explicit profiles: refusal, discovery, and persistence failures --------
+# --- explicit profiles: existing canonical reconciliation -------------------
 
-profile_fixtures
-echo '[{"id":42,"name":"scaffold-branch-protection","enforcement":"disabled"}]' \
-  > "$GH_FIXTURES/rulesets.json"
-expect_rc_grep 1 'reconciliation|required.*existing' \
-  "explicit profile refuses an existing same-name ruleset" \
-  run_script -R acme/widget --profile solo
-if grep -q -- 'api repos/acme/widget/rulesets' "$GH_CALLS" \
-   && no_profile_writes; then
-  t_ok "same-name refusal happens before all profile writes"
+existing_profile_fixtures solo
+expect_rc 0 "canonical solo upgrades in place to explicit team" \
+  run_script -R acme/widget --profile team
+assert_team_put "team upgrade writes the complete canonical team body" disabled 15368
+if [ "$(grep -nE 'rulesets/42|repos/acme/widget$|check-runs|actions/variables|--method PUT' \
+          "$GH_CALLS" | cut -d: -f2-)" = "$(printf '%s\n' \
+     'api repos/acme/widget/rulesets/42' \
+     'api repos/acme/widget' \
+     'api repos/acme/widget/commits/trunk/check-runs?filter=latest&per_page=100 --paginate' \
+     'api repos/acme/widget/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE' \
+     'api --method POST repos/acme/widget/actions/variables --input -' \
+     'api --method PUT repos/acme/widget/rulesets/42 --input -')" ]; then
+  t_ok "team upgrade completes every read and persists intent before ruleset PUT"
 else
-  t_fail "same-name refusal happens before all profile writes"
+  t_fail "team upgrade completes every read and persists intent before ruleset PUT"
 fi
+
+existing_profile_fixtures team disabled 77
+expect_rc 0 "canonical team refreshes changed source and enforcement" \
+  run_script -R acme/widget --profile team --enforcement active
+assert_team_put "team refresh uses observed source and requested enforcement" active 15368
+
+existing_profile_fixtures team active
+expect_rc 0 "exact canonical team match is idempotent" \
+  run_script -R acme/widget --profile team --enforcement active
+if grep -q 'rulesets/42' "$GH_CALLS" \
+   && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
+  t_ok "exact team match reads detail and performs no ruleset write"
+else
+  t_fail "exact team match reads detail and performs no ruleset write"
+fi
+
+existing_profile_fixtures team active
+expect_rc 0 "explicit solo accepts canonical team without downgrade" \
+  run_script -R acme/widget --profile solo --enforcement active
+if jq -e '.value == "solo"' "$GH_FIXTURES/variable-written.json" >/dev/null \
+   && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
+  t_ok "solo persists intent without rewriting canonical team controls"
+else
+  t_fail "solo persists intent without rewriting canonical team controls"
+fi
+
+existing_profile_fixtures team disabled
+expect_rc 0 "solo may update only enforcement on canonical team" \
+  run_script -R acme/widget --profile solo --enforcement active
+if grep -q -- '--method PUT repos/acme/widget/rulesets/42 -f enforcement=active' \
+     "$GH_CALLS" \
+   && ! grep -q -- '--method PUT repos/acme/widget/rulesets/42 --input -' \
+     "$GH_CALLS"; then
+  t_ok "solo enforcement change never submits rules or drops team hardening"
+else
+  t_fail "solo enforcement change never submits rules or drops team hardening"
+fi
+
+existing_profile_fixtures team
+expect_rc 0 "existing canonical team dry-run validates with GET calls only" \
+  run_script -R acme/widget --profile team --dry-run
+if grep -q 'api repos/acme/widget/rulesets/42' "$GH_CALLS" \
+   && no_profile_writes; then
+  t_ok "existing-profile dry-run reads detail without mutation"
+else
+  t_fail "existing-profile dry-run reads detail without mutation"
+fi
+
+# Exact shape: each single mutation is adopter-owned and must fail closed.
+while IFS='|' read -r name base filter; do
+  existing_profile_fixtures "$base"
+  jq "$filter" "$GH_FIXTURES/ruleset-detail.json" \
+    > "$GH_FIXTURES/detail.tmp"
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+  detail_fails_closed "$name"
+done <<'NONCANONICAL'
+tag target is noncanonical|solo|.target = "tag"
+changed include is noncanonical|solo|.conditions.ref_name.include = ["refs/heads/main"]
+extra exclude is noncanonical|solo|.conditions.ref_name.exclude = ["refs/heads/dev"]
+extra bypass is noncanonical|solo|.bypass_actors += [{actor_id:4,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+changed bypass mode is noncanonical|solo|.bypass_actors[0].bypass_mode = "always"
+extra rule is noncanonical|solo|.rules += [{type:"deletion"}]
+duplicate rule is noncanonical|solo|.rules += [.rules[0]]
+missing rule is noncanonical|solo|.rules |= map(select(.type != "pull_request"))
+extra context is noncanonical|solo|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks) += [{context:"extra"}]
+renamed context is noncanonical|solo|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].context) = "renamed"
+duplicate context is noncanonical|solo|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks) |= . + [.[0]]
+mixed review controls are noncanonical|solo|(.rules[]|select(.type=="pull_request").parameters.dismiss_stale_reviews_on_push) = true
+mixed strictness is noncanonical|solo|(.rules[]|select(.type=="required_status_checks").parameters.strict_required_status_checks_policy) = true
+solo source binding is noncanonical|solo|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = 15368
+team missing source is noncanonical|team|del(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id)
+team mixed source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = 42
+NONCANONICAL
+
+# Zero matches intentionally remains the #95 fresh-create path tested above.
+profile_fixtures
+printf '%s\n' \
+  '[{"id":42,"name":"scaffold-branch-protection","enforcement":"disabled"},' \
+  '{"id":43,"name":"scaffold-branch-protection","enforcement":"disabled"}]' \
+  > "$GH_FIXTURES/rulesets.json"
+expect_rc_grep 1 'multiple|duplicate|exactly one' \
+  "multiple same-name rulesets fail closed" \
+  run_script -R acme/widget --profile team
+if no_profile_writes; then
+  t_ok "multiple same-name rulesets cause zero writes"
+else
+  t_fail "multiple same-name rulesets cause zero writes"
+fi
+
+existing_profile_fixtures team
+rm -f "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "failed ruleset detail read blocks all writes"
+
+existing_profile_fixtures team
+printf '%s\n' '{"id":42,"name":"scaffold-branch-protection"}' \
+  > "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "malformed ruleset detail blocks all writes"
+
+# --- explicit profiles: discovery and persistence failures ------------------
 
 profile_fixtures
 export GH_FAIL_EXACT='api repos/acme/widget'
