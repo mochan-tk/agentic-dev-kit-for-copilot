@@ -55,6 +55,9 @@ Options:
                            the ruleset never blocks merges until a human
                            reviews it and enables it.
   --name <name>            Ruleset name. Default: scaffold-branch-protection.
+  --profile <solo|team>    Persist explicit governance intent and create a
+                           fresh profile ruleset. Existing rulesets require
+                           separate reconciliation.
   --dry-run                Print the request JSON body to stdout and exit
                            without making any API call.
   -h, --help               Show this help and exit.
@@ -75,6 +78,7 @@ CHECKS="quality,task-ritual,scaffold-self-check,copilot-surface"
 ENFORCEMENT="disabled"
 NAME="scaffold-branch-protection"
 DRY_RUN="false"
+PROFILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -93,6 +97,12 @@ while [[ $# -gt 0 ]]; do
     --name)
       [[ -n "${2:-}" ]] || { echo "error: --name requires a value" >&2; exit 2; }
       NAME="$2"; shift 2 ;;
+    --profile)
+      case "${2:-}" in
+        solo|team) PROFILE="$2" ;;
+        *) echo "error: --profile must be 'solo' or 'team'" >&2; exit 2 ;;
+      esac
+      shift 2 ;;
     --dry-run)
       DRY_RUN="true"; shift ;;
     -h|--help)
@@ -149,6 +159,133 @@ PAYLOAD="$(jq -n \
       }
     ]
   }')"
+
+if [[ -n "$PROFILE" ]]; then
+  if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" ]]; then
+    echo "dry-run: explicit solo candidate; no API call made." >&2
+    printf '%s\n' "$PAYLOAD"
+    exit 0
+  fi
+
+  command -v gh >/dev/null 2>&1 \
+    || { echo "error: gh CLI not found on PATH" >&2; exit 1; }
+  if [[ -z "$REPO" ]]; then
+    REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+  fi
+  [[ "$REPO" == */* ]] \
+    || { echo "error: repository must be owner/repo, got: $REPO" >&2; exit 2; }
+
+  if [[ "$DRY_RUN" != "true" ]]; then
+    gh api user --jq .login >/dev/null 2>&1 \
+      || { echo "error: gh is not authenticated" >&2; exit 1; }
+    if ! RULESETS_JSON="$(gh api "repos/$REPO/rulesets")"; then
+      echo "error: could not list rulesets for $REPO; aborting before writes." >&2
+      exit 1
+    fi
+    EXISTING_ID="$(printf '%s' "$RULESETS_JSON" \
+      | jq -r --arg name "$NAME" '[.[] | select(.name == $name)][0].id // empty')"
+    if [[ -n "$EXISTING_ID" ]]; then
+      echo "error: ruleset '$NAME' already exists; explicit-profile reconciliation required." >&2
+      exit 1
+    fi
+  fi
+
+  if [[ "$PROFILE" == "team" ]]; then
+    if ! REPO_JSON="$(gh api "repos/$REPO")"; then
+      echo "error: repository metadata unavailable for team profile." >&2
+      exit 1
+    fi
+    DEFAULT_BRANCH="$(printf '%s' "$REPO_JSON" | jq -r '.default_branch // empty')"
+    if [[ -z "$DEFAULT_BRANCH" ]]; then
+      echo "error: repository metadata has no default branch." >&2
+      exit 1
+    fi
+    if ! CHECK_RUNS="$(gh api \
+      "repos/$REPO/commits/$DEFAULT_BRANCH/check-runs?filter=latest&per_page=100" \
+      --paginate)"; then
+      echo "error: check-run evidence unavailable for team profile." >&2
+      exit 1
+    fi
+
+    CONTEXTS="$(jq -nr --arg checks "$CHECKS" \
+      '$checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
+       | map(select(length > 0)) | .[]')"
+    [[ -n "$CONTEXTS" ]] \
+      || { echo "error: team profile requires at least one check context." >&2; exit 1; }
+    COMMON_ID=""
+    while IFS= read -r context; do
+      IDS="$(printf '%s' "$CHECK_RUNS" | jq -s -c --arg context "$context" \
+        '[.[].check_runs[] | select(.name == $context) | .app.id]')"
+      if ! printf '%s' "$IDS" | jq -e '
+        length > 0
+        and all(.[]; type == "number" and . >= 0 and floor == .)
+        and (unique | length == 1)
+      ' >/dev/null; then
+        echo "error: invalid or ambiguous issuer evidence for context '$context'." >&2
+        exit 1
+      fi
+      CONTEXT_ID="$(printf '%s' "$IDS" | jq -r 'unique[0]')"
+      if [[ -n "$COMMON_ID" && "$COMMON_ID" != "$CONTEXT_ID" ]]; then
+        echo "error: requested check contexts have different issuers." >&2
+        exit 1
+      fi
+      COMMON_ID="$CONTEXT_ID"
+    done <<EOF
+$CONTEXTS
+EOF
+
+    PAYLOAD="$(printf '%s' "$PAYLOAD" | jq --argjson app "$COMMON_ID" '
+      (.rules[] | select(.type == "pull_request").parameters) |=
+        (.dismiss_stale_reviews_on_push = true
+         | .require_last_push_approval = true
+         | .require_code_owner_review = true
+         | .required_review_thread_resolution = true)
+      | (.rules[] | select(.type == "required_status_checks").parameters) |=
+        (.strict_required_status_checks_policy = true
+         | .required_status_checks |= map(. + {integration_id: $app}))
+    ')"
+  fi
+
+  if [[ "$DRY_RUN" == "true" ]]; then
+    echo "dry-run: explicit team candidate from GET-only evidence; no mutation made." >&2
+    printf '%s\n' "$PAYLOAD"
+    exit 0
+  fi
+
+  VARIABLE_PATH="repos/$REPO/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
+  VARIABLE_EXISTS="true"
+  VARIABLE_RESULT=""
+  if ! VARIABLE_RESULT="$(gh api "$VARIABLE_PATH" 2>&1)"; then
+    case "$VARIABLE_RESULT" in
+      *"HTTP 404"*) VARIABLE_EXISTS="false" ;;
+      *) echo "error: governance profile variable is unreadable: $VARIABLE_RESULT" >&2; exit 1 ;;
+    esac
+  fi
+  VARIABLE_BODY="$(jq -n --arg value "$PROFILE" \
+    '{name: "SCAFFOLD_GOVERNANCE_PROFILE", value: $value}')"
+  if [[ "$VARIABLE_EXISTS" == "true" ]]; then
+    if ! printf '%s' "$VARIABLE_BODY" | gh api --method PATCH "$VARIABLE_PATH" --input - >/dev/null; then
+      echo "error: could not update governance profile variable." >&2
+      exit 1
+    fi
+  else
+    if ! printf '%s' "$VARIABLE_BODY" \
+      | gh api --method POST "repos/$REPO/actions/variables" --input - >/dev/null; then
+      echo "error: could not create governance profile variable." >&2
+      exit 1
+    fi
+  fi
+
+  if ! RESPONSE="$(printf '%s' "$PAYLOAD" \
+    | gh api --method POST "repos/$REPO/rulesets" --input -)"; then
+    echo "error: governance intent persisted, but ruleset creation failed." >&2
+    exit 1
+  fi
+  RULESET_ID="$(printf '%s' "$RESPONSE" | jq -r '.id')"
+  echo "Created ruleset '$NAME' (id: $RULESET_ID, enforcement: $ENFORCEMENT) on $REPO."
+  echo "Recorded governance profile: $PROFILE."
+  exit 0
+fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   # stdout carries only the JSON body (pipeable to jq); notes go to stderr.
