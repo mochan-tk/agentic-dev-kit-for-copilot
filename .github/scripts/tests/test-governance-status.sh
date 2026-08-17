@@ -43,6 +43,13 @@ for frag in ${GS_FAIL:-}; do
   case "$path" in *"$frag"*) echo "gh: HTTP 500 (simulated)" >&2; exit 1 ;; esac
 done
 case "$path" in
+  repos/*/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE)
+    case "${GS_VAR_ERROR:-}" in
+      actions-disabled) echo "gh: Actions are disabled (HTTP 403)" >&2; exit 1 ;;
+      unauthorized) echo "gh: Resource not accessible (HTTP 403)" >&2; exit 1 ;;
+      api-failure) echo "gh: HTTP 500 (simulated)" >&2; exit 1 ;;
+    esac
+    f=variable.json ;;
   repos/*/rules/branches/*) f=rules.json ;;
   repos/*/rulesets/*) f="rs-repo-${path##*/}.json" ;;
   orgs/*/rulesets/*) f="rs-org-${path##*/}.json" ;;
@@ -103,6 +110,7 @@ mk_marker() { printf '# log\n<!-- scaffold-version: repo=o/r sha=%s date=x -->\n
 mk_co() { printf '%s\n/.github/docs/agreements/ @owner\n' "$1" > "$GS_FIX/codeowners.raw"; }
 mk_wfdir() { local out="" sep="" n; for n in "$@"; do out="$out$sep{\"name\":\"$n\",\"type\":\"file\"}"; sep=","; done; printf '[%s]\n' "$out" > "$GS_FIX/wfdir.json"; }
 mk_wff() { printf '%s\n' "$2" > "$GS_FIX/wff-$1"; }
+mk_var() { printf '%s\n' "$1" > "$GS_FIX/variable.json"; }
 
 RRB='[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"pull_request"}]'
 baseline() { # live-like template repository on the solo minimum
@@ -121,8 +129,24 @@ team_green() { # hardened adopted fixtures that satisfy team intent end to end
 
 run() { rc=0; out="$(bash "$SENSOR" "$@" 2>&1)" || rc=$?; }
 runf() { local f="$1"; shift; rc=0; out="$(GS_FAIL="$f" bash "$SENSOR" "$@" 2>&1)" || rc=$?; }
+runv() { local e="$1"; shift; rc=0; out="$(GS_VAR_ERROR="$e" bash "$SENSOR" "$@" 2>&1)" || rc=$?; }
 rce() { if [ "$rc" -eq "$2" ]; then t_ok "$1"; else t_fail "$1 (rc=$rc)"; printf '%s\n' "$out" | sed 's/^/    # /'; fi; }
 chk() { if printf '%s\n' "$out" | grep -Eq "$2"; then t_ok "$1"; else t_fail "$1 (missing: $2)"; printf '%s\n' "$out" | sed 's/^/    # /'; fi; }
+persisted_unknown() {
+  local label="$1" value="${2:-}" mode="${3:-}"
+  baseline
+  [ -z "$value" ] || mk_var "$value"
+  runv "$mode" -R o/r
+  if [ "$rc" -eq 3 ] &&
+     printf '%s\n' "$out" | grep -Eq "^governance\.profile${T}UNKNOWN${T}" &&
+     [ "$(printf '%s\n' "$out" | head -n 2 | cut -f1 | tr '\n' ' ')" = \
+       "repository.default_branch governance.profile " ]; then
+    t_ok "$label"
+  else
+    t_fail "$label (rc=$rc)"
+    printf '%s\n' "$out" | sed 's/^/    # /'
+  fi
+}
 
 baseline
 run -R o/r --profile solo
@@ -150,6 +174,72 @@ run -R o/r
 rce "omitted profile exits 3, never guessed" 3
 chk "omitted profile reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
 
+baseline
+mk_var '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"solo"}'
+: > "$GH_CALLS"
+run -R o/r --profile solo
+explicit_rc=$rc explicit_out=$out
+if ! grep -q 'actions/variables/SCAFFOLD_GOVERNANCE_PROFILE' "$GH_CALLS"; then
+  t_ok "explicit solo never reads persisted profile"
+else
+  t_fail "explicit solo never reads persisted profile"
+fi
+: > "$GH_CALLS"
+run -R o/r
+if [ "$rc" -eq "$explicit_rc" ] && [ "$out" = "$explicit_out" ]; then
+  t_ok "persisted solo matches explicit output and exit"
+else
+  t_fail "persisted solo matches explicit output and exit (explicit=$explicit_rc persisted=$rc)"
+fi
+
+team_green
+mk_var '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"team"}'
+: > "$GH_CALLS"
+run -R o/r --profile team
+explicit_rc=$rc explicit_out=$out
+if ! grep -q 'actions/variables/SCAFFOLD_GOVERNANCE_PROFILE' "$GH_CALLS"; then
+  t_ok "explicit team never reads persisted profile"
+else
+  t_fail "explicit team never reads persisted profile"
+fi
+: > "$GH_CALLS"
+run -R o/r
+if [ "$rc" -eq "$explicit_rc" ] && [ "$out" = "$explicit_out" ]; then
+  t_ok "persisted team matches explicit output and exit"
+else
+  t_fail "persisted team matches explicit output and exit (explicit=$explicit_rc persisted=$rc)"
+fi
+
+persisted_unknown "absent persisted profile is UNKNOWN"
+rc=0
+"$WORK/bin/gh" api repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE \
+  > /dev/null 2> "$WORK/variable-404.err" || rc=$?
+if [ "$rc" -eq 1 ] && grep -q 'HTTP 404' "$WORK/variable-404.err"; then
+  t_ok "absent variable fixture is a true 404"
+else
+  t_fail "absent variable fixture is a true 404 (rc=$rc)"
+fi
+persisted_unknown "Actions-disabled profile read is UNKNOWN" "" actions-disabled
+persisted_unknown "unauthorized profile read is UNKNOWN" "" unauthorized
+persisted_unknown "failed profile API read is UNKNOWN" "" api-failure
+persisted_unknown "malformed profile JSON is UNKNOWN" '{'
+persisted_unknown "missing profile value is UNKNOWN" '{"name":"SCAFFOLD_GOVERNANCE_PROFILE"}'
+persisted_unknown "non-string profile value is UNKNOWN" '{"value":7}'
+persisted_unknown "empty profile value is UNKNOWN" '{"value":""}'
+for spec in \
+  'spaces|{"value":" solo "}' \
+  'tab|{"value":"solo\t"}' \
+  'leading newline|{"value":"\nsolo"}' \
+  'trailing newline|{"value":"solo\n"}' \
+  'leading carriage return|{"value":"\rsolo"}' \
+  'trailing carriage return|{"value":"solo\r"}' \
+  'case variant|{"value":"Solo"}' \
+  'other value|{"value":"pirate"}'
+do
+  persisted_unknown "${spec%%|*} profile value is UNKNOWN" "${spec#*|}"
+done
+
+baseline
 run -R o/r --profile team
 rce "solo baseline fails team intent" 1
 chk "team gap: stale reviews OFF" "^pull_request\.dismiss_stale_reviews${T}OFF${T}false"
@@ -327,8 +417,20 @@ for bad in --method=DELETE -XDELETE -fk=v -F=k=v --field=k=v --raw-field=k=v --i
   [ "$rc" -eq 64 ] || wall="leaks $bad"
 done
 if [ "$wall" = ok ]; then t_ok "shim wall refuses equals-form and attached mutating flags"; else t_fail "shim wall refuses equals-form and attached mutating flags ($wall)"; fi
+rc=0
+"$WORK/bin/gh" api --method PATCH \
+  repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE \
+  --field value=team >/dev/null 2>&1 || rc=$?
+if [ "$rc" -eq 64 ]; then
+  t_ok "shim wall refuses repository-variable mutation"
+else
+  t_fail "shim wall refuses repository-variable mutation (rc=$rc)"
+fi
 baseline
 (cd "$WORK/cwd" && bash "$SENSOR" -R o/r --profile solo >/dev/null 2>&1)
 if [ -z "$(ls -A "$WORK/cwd")" ]; then t_ok "sensor persists no profile or file state"; else t_fail "sensor persists no profile or file state"; fi
+baseline
+(cd "$WORK/cwd" && bash "$SENSOR" -R o/r >/dev/null 2>&1 || :)
+if [ -z "$(ls -A "$WORK/cwd")" ]; then t_ok "persisted lookup writes no local state"; else t_fail "persisted lookup writes no local state"; fi
 
 t_summary
