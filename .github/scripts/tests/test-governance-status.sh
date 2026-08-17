@@ -47,6 +47,7 @@ case "$path" in
   repos/*/rulesets/*) f="rs-repo-${path##*/}.json" ;;
   orgs/*/rulesets/*) f="rs-org-${path##*/}.json" ;;
   orgs/*) f=org.json ;;
+  repos/*/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE) f=govvar.json ;;
   repos/*/actions/permissions/workflow) f=workflow.json ;;
   repos/*/commits/*/check-runs*) f=checkruns.json ;;
   repos/*/contents/.github/workflows/*) p="${path%%\?*}"; f="wff-${p##*/}" ;;
@@ -103,6 +104,7 @@ mk_marker() { printf '# log\n<!-- scaffold-version: repo=o/r sha=%s date=x -->\n
 mk_co() { printf '%s\n/.github/docs/agreements/ @owner\n' "$1" > "$GS_FIX/codeowners.raw"; }
 mk_wfdir() { local out="" sep="" n; for n in "$@"; do out="$out$sep{\"name\":\"$n\",\"type\":\"file\"}"; sep=","; done; printf '[%s]\n' "$out" > "$GS_FIX/wfdir.json"; }
 mk_wff() { printf '%s\n' "$2" > "$GS_FIX/wff-$1"; }
+mk_govvar() { printf '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"%s"}\n' "$1" > "$GS_FIX/govvar.json"; }
 
 RRB='[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"pull_request"}]'
 baseline() { # live-like template repository on the solo minimum
@@ -149,7 +151,74 @@ if [ "$first" = "$out" ]; then t_ok "output is deterministic across runs"; else 
 run -R o/r
 rce "omitted profile exits 3, never guessed" 3
 chk "omitted profile reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+if grep -q 'api repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE' "$GH_CALLS"; then t_ok "omitted profile is read from the persisted variable endpoint"; else t_fail "omitted profile is read from the persisted variable endpoint"; fi
 
+# Persisted governance intent (#101): with no --profile, the sensor reads
+# SCAFFOLD_GOVERNANCE_PROFILE and accepts only the exact value solo or team.
+baseline
+mk_govvar solo
+run -R o/r
+rce "persisted solo intent drives the same healthy report as explicit solo" 0
+chk "persisted solo profile is ACTIVE" "^governance\.profile${T}ACTIVE${T}solo$"
+
+team_green
+mk_govvar team
+run -R o/r
+rce "persisted team intent drives the same healthy report as explicit team" 0
+chk "persisted team profile is ACTIVE" "^governance\.profile${T}ACTIVE${T}team$"
+
+baseline
+mk_govvar team
+run -R o/r
+rce "persisted team intent still gates an unhardened repository" 1
+chk "persisted team gap: stale reviews OFF" "^pull_request\.dismiss_stale_reviews${T}OFF${T}false"
+
+baseline
+rm -f "$GS_FIX/govvar.json"
+run -R o/r
+rce "missing persisted variable exits 3, never guessed" 3
+chk "missing persisted variable reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+
+for bad in '' ' solo' 'solo ' 'Solo' 'TEAM' 'nonsense'; do
+  baseline
+  mk_govvar "$bad"
+  run -R o/r
+  rce "invalid persisted value '$bad' exits 3, never guessed" 3
+  chk "invalid persisted value '$bad' reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+done
+
+baseline
+printf '{"name":"SCAFFOLD_GOVERNANCE_PROFILE"}\n' > "$GS_FIX/govvar.json"
+run -R o/r
+rce "persisted payload without a value field exits 3" 3
+chk "absent value field reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+
+baseline
+printf 'not json\n' > "$GS_FIX/govvar.json"
+run -R o/r
+rce "malformed (non-JSON) persisted response exits 3" 3
+chk "malformed persisted response reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+
+baseline
+mk_govvar solo
+runf "actions/variables" -R o/r
+rce "persisted variable read failure (Actions-disabled or unauthorized) exits 3" 3
+chk "failed persisted read reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+
+baseline
+mk_govvar solo
+GH_CALLS_MARK="$(wc -l < "$GH_CALLS")"
+run -R o/r --profile team
+rce "explicit --profile overrides persisted intent" 1
+chk "explicit override drives team requirements, not the persisted solo value" "^pull_request\.dismiss_stale_reviews${T}OFF${T}false"
+NEWCALLS="$(tail -n "+$((GH_CALLS_MARK + 1))" "$GH_CALLS")"
+if printf '%s\n' "$NEWCALLS" | grep -q 'actions/variables/SCAFFOLD_GOVERNANCE_PROFILE'; then
+  t_fail "explicit --profile must not read the persisted variable endpoint"
+else
+  t_ok "explicit --profile never reads the persisted variable endpoint"
+fi
+
+baseline
 run -R o/r --profile team
 rce "solo baseline fails team intent" 1
 chk "team gap: stale reviews OFF" "^pull_request\.dismiss_stale_reviews${T}OFF${T}false"
