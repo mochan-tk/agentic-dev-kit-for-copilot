@@ -263,15 +263,14 @@ if [ "$(st repo)" != ok ]; then emit merge_queue.applicability UNKNOWN "reposito
 elif [ "$OWNER" = User ]; then emit merge_queue.applicability N/A "owner_type=User; merge queue not applicable" 0
 else
   # Public repositories are eligible by repository evidence alone; private
-  # ones need plan proof via GET /orgs/{owner}, failing closed, and a free
-  # plan is ineligible before any rule or coverage evidence is consulted.
+  # ones require a recognized plan from GET /orgs/{owner}, failing closed.
   PRIV="$(jqr '.private' repo)" OPLAN=eligible
   if [ "$PRIV" = true ]; then
     fetch orgp "orgs/${REPO%%/*}"
     OPLAN=""; [ "$(st orgp)" != ok ] || OPLAN="$(jqr '.plan.name // empty' orgp)"
   fi
-  if [ -z "$OPLAN" ]; then emit merge_queue.applicability UNKNOWN "organization plan evidence unavailable" "$BASE"
-  elif [ "$PRIV" = true ] && [ "$OPLAN" = free ]; then emit merge_queue.applicability N/A "private repository on free plan is ineligible" 0
+  if [ -z "$OPLAN" ] || { [ "$PRIV" = true ] && [ "$OPLAN" != free ] && [ "$OPLAN" != team ] && [ "$OPLAN" != enterprise ]; }; then emit merge_queue.applicability UNKNOWN "organization plan evidence unavailable" "$BASE"
+  elif [ "$PRIV" = true ] && { [ "$OPLAN" = free ] || [ "$OPLAN" = team ]; }; then emit merge_queue.applicability N/A "private repository plan=$OPLAN is ineligible" 0
   elif [ "$RULES" != 1 ]; then emit merge_queue.applicability UNKNOWN "effective rules unavailable" "$BASE"
   elif [ "$MQN" -gt 0 ]; then
     MQCOV=0
