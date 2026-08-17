@@ -243,24 +243,22 @@ run -R o/r --profile solo
 rce "unresolved codeowners does not gate solo" 0
 chk "solo still shows codeowners OFF" "^codeowners\.tuning${T}OFF"
 
-baseline
-mk_repo Organization true
-run -R o/r --profile solo
+baseline; mk_repo Organization true; run -R o/r --profile solo
 rce "private org without plan evidence fails closed" 3
 chk "unavailable org plan is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}organization plan evidence unavailable"
-mk_org ''; run -R o/r --profile solo
-rce "plan-less org payload stays unknown" 3
-chk "absent plan field is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}organization plan evidence unavailable"
-mk_org ',"plan":{"name":"free"}'
+mk_org ''; run -R o/r --profile solo; rce "plan-less org payload stays unknown" 3; chk "absent plan field is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}organization plan evidence unavailable"
 jq '. + [{"type":"merge_queue","parameters":{},"ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 mk_wfdir ci.yml; mk_wff ci.yml 'on: [pull_request, merge_group]'
-run -R o/r --profile solo
-rce "proven ineligibility outranks rule and coverage" 0
-chk "ineligible org stays N/A despite rule" "^merge_queue\.applicability${T}N/A${T}private repository on free plan"
+mk_org ',"plan":{"name":"unknown"}'; run -R o/r --profile solo
+rce "unrecognized org plan fails closed" 3; chk "unrecognized plan is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}organization plan evidence unavailable"
+for plan in free team; do
+  mk_org ",\"plan\":{\"name\":\"$plan\"}"; run -R o/r --profile solo
+  rce "private org $plan plan is provably ineligible" 0; chk "$plan plan stays N/A despite rule and coverage" "^merge_queue\.applicability${T}N/A${T}private repository plan=$plan is ineligible"
+done
+mk_org ',"plan":{"name":"enterprise"}'; run -R o/r --profile solo
+rce "private enterprise org is eligible with complete evidence" 0; chk "enterprise org reaches ACTIVE" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active.*merge_group coverage in 1 workflow"
 if grep -q '^api orgs/o$' "$GH_CALLS"; then t_ok "org plan evidence read via GET /orgs/{owner}"; else t_fail "org plan evidence read via GET /orgs/{owner}"; fi
-mk_repo Organization false; run -R o/r --profile solo
-rce "public org repository is eligible by repository evidence" 0
-chk "effective merge_queue rule is ACTIVE" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active.*merge_group coverage in 1 workflow"
+mk_repo Organization false; run -R o/r --profile solo; rce "public org repository is eligible by repository evidence" 0; chk "effective merge_queue rule is ACTIVE" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active.*merge_group coverage in 1 workflow"
 mk_wfdir ci.yml lint.yml; mk_wff ci.yml $'on:\n  merge_group:\n    branches: [main]'
 mk_wff lint.yml $'on: [push]\njobs:\n  x:\n    steps:\n      - run: echo merge_group ready\nenv:\n  NOTE: merge_group'
 run -R o/r --profile solo
