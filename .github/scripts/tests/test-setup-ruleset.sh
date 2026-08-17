@@ -77,7 +77,8 @@ valid_team() {
   echo '{"default_branch":"main"}' > "$GH_FIXTURES/repo.json"
   cat > "$GH_FIXTURES/check-runs.json" <<'JSON'
 [{"check_runs":[
-  {"name":"quality","app":{"id":77}},{"name":"task-ritual","app":{"id":77}}
+  {"name":"quality","app":{"id":77}},{"name":"quality","app":{"id":77}},
+  {"name":"task-ritual","app":{"id":77}}
 ]},{"check_runs":[
   {"name":"scaffold-self-check","app":{"id":77}},
   {"name":"copilot-surface","app":{"id":77}}
@@ -140,7 +141,8 @@ if printf '%s' "$SOLO" | jq -e '
     .strict_required_status_checks_policy | not)
 ' >/dev/null; then t_ok "solo dry-run is the current solo payload"
 else t_fail "solo dry-run is the current solo payload"; fi
-assert_no_writes "solo dry-run makes no mutation"
+if [ ! -s "$GH_CALLS" ]; then t_ok "solo dry-run requires no remote evidence"
+else t_fail "solo dry-run requires no remote evidence"; sed 's/^/    # /' "$GH_CALLS"; fi
 
 reset_calls; valid_team
 TEAM="$(run_script -R acme/widget --profile team --dry-run 2>/dev/null || true)"
@@ -180,6 +182,9 @@ echo '[{"id":42,"name":"scaffold-branch-protection","enforcement":"disabled"}]' 
 expect_rc_grep 1 'reconciliation.*required' "explicit profile rejects same-name ruleset" \
   run_script -R acme/widget --profile solo
 assert_no_writes "same-name explicit profile performs no write"
+if ! grep -q 'actions/variables' "$GH_CALLS"; then
+  t_ok "same-name rejection precedes variable reads"
+else t_fail "same-name rejection precedes variable reads"; fi
 
 reset_calls; echo '[]' > "$GH_FIXTURES/rulesets.json"; touch "$GH_FIXTURES/variable.missing"
 echo '{"variables":[]}' > "$GH_FIXTURES/variables.json"
@@ -187,7 +192,9 @@ expect_rc_grep 0 "Created ruleset" "absent variable is created before solo rules
   run_script -R acme/widget --profile solo
 if sed -n '1p;2p;3p;4p;5p' "$GH_CALLS" | grep -q \
   $'api user --jq .login\napi repos/acme/widget/rulesets\napi repos/acme/widget/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE\napi repos/acme/widget/actions/variables?per_page=100\napi --method POST repos/acme/widget/actions/variables'; then
-  t_ok "solo reads precede variable creation and ruleset POST"
+  if [ "$(grep -n -- '--method POST' "$GH_CALLS" | cut -d: -f1 | paste -sd, -)" = "5,6" ]; then
+    t_ok "solo reads precede ordered variable and ruleset writes"
+  else t_fail "solo reads precede ordered variable and ruleset writes"; fi
 else t_fail "solo reads precede variable creation and ruleset POST"; sed 's/^/    # /' "$GH_CALLS"; fi
 
 reset_calls; valid_team
@@ -226,7 +233,7 @@ expect_rc_grep 1 'check.*runs|discover' "check-run authorization failure fails c
 assert_no_writes "check-run authorization failure performs no write"
 
 for mode in read create update; do
-  reset_calls
+  reset_calls; echo '[]' > "$GH_FIXTURES/rulesets.json"
   case "$mode" in
     read) : ;;
     create) touch "$GH_FIXTURES/variable.missing" "$GH_FIXTURES/variable-write.fail"; echo '{"variables":[]}' > "$GH_FIXTURES/variables.json" ;;
