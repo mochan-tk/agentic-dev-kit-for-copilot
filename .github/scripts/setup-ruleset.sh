@@ -55,6 +55,8 @@ Options:
                            the ruleset never blocks merges until a human
                            reviews it and enables it.
   --name <name>            Ruleset name. Default: scaffold-branch-protection.
+  --profile <solo|team>    Persist explicit governance intent for a fresh
+                           ruleset. Team checks are bound to observed App IDs.
   --dry-run                Print the request JSON body to stdout and exit
                            without making any API call.
   -h, --help               Show this help and exit.
@@ -74,6 +76,7 @@ REPO=""
 CHECKS="quality,task-ritual,scaffold-self-check,copilot-surface"
 ENFORCEMENT="disabled"
 NAME="scaffold-branch-protection"
+PROFILE=""
 DRY_RUN="false"
 
 while [[ $# -gt 0 ]]; do
@@ -93,6 +96,12 @@ while [[ $# -gt 0 ]]; do
     --name)
       [[ -n "${2:-}" ]] || { echo "error: --name requires a value" >&2; exit 2; }
       NAME="$2"; shift 2 ;;
+    --profile)
+      case "${2:-}" in
+        solo|team) PROFILE="$2" ;;
+        *) echo "error: --profile must be 'solo' or 'team'" >&2; exit 2 ;;
+      esac
+      shift 2 ;;
     --dry-run)
       DRY_RUN="true"; shift ;;
     -h|--help)
@@ -150,7 +159,7 @@ PAYLOAD="$(jq -n \
     ]
   }')"
 
-if [[ "$DRY_RUN" == "true" ]]; then
+if [[ "$DRY_RUN" == "true" && "$PROFILE" != "team" ]]; then
   # stdout carries only the JSON body (pipeable to jq); notes go to stderr.
   echo "dry-run: request body for POST /repos/{owner}/{repo}/rulesets; no API call made." >&2
   printf '%s\n' "$PAYLOAD"
@@ -166,6 +175,55 @@ if [[ -z "$REPO" ]]; then
 fi
 [[ "$REPO" == */* ]] || { echo "error: repository must be owner/repo, got: $REPO" >&2; exit 2; }
 
+discover_team_payload() {
+  local repo_json default_branch check_runs app_id
+  if ! repo_json="$(gh api "repos/$REPO")"; then
+    echo "error: could not discover the default branch for $REPO." >&2
+    return 1
+  fi
+  if ! default_branch="$(printf '%s' "$repo_json" \
+    | jq -er '.default_branch | select(type == "string" and length > 0)')"; then
+    echo "error: repository metadata has no valid default branch." >&2
+    return 1
+  fi
+  if ! check_runs="$(gh api --paginate --slurp \
+    "repos/$REPO/commits/$default_branch/check-runs?filter=latest&per_page=100")"; then
+    echo "error: could not discover latest check runs for $default_branch." >&2
+    return 1
+  fi
+  # Each requested context must have one unique numeric issuer, and every
+  # context must share that issuer. Duplicate runs from the same App are safe.
+  if ! app_id="$(printf '%s' "$check_runs" | jq -er --arg checks "$CHECKS" '
+    ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
+      | map(select(length > 0))) as $contexts
+    | [$contexts[] as $context
+      | ([.[]?.check_runs[]? | select(.name == $context) | .app.id
+          | select(type == "number")] | unique) as $ids
+      | if ($ids | length) == 1 then $ids[0] else error("issuer") end] as $ids
+    | if (($ids | length) == ($contexts | length)
+          and ($ids | length) > 0 and ($ids | unique | length) == 1)
+      then $ids[0] else error("common issuer") end')"; then
+    echo "error: required-check evidence did not yield one common numeric App ID." >&2
+    return 1
+  fi
+  PAYLOAD="$(printf '%s' "$PAYLOAD" | jq --argjson app_id "$app_id" '
+    (.rules[] | select(.type == "pull_request").parameters)
+      |= (.dismiss_stale_reviews_on_push = true
+          | .require_code_owner_review = true
+          | .require_last_push_approval = true
+          | .required_review_thread_resolution = true)
+    | (.rules[] | select(.type == "required_status_checks").parameters)
+      |= (.strict_required_status_checks_policy = true
+          | .required_status_checks |= map(. + {integration_id: $app_id}))')"
+}
+
+if [[ "$DRY_RUN" == "true" ]]; then
+  discover_team_payload || exit 1
+  echo "dry-run: GET-only team discovery completed; no variable or ruleset write made." >&2
+  printf '%s\n' "$PAYLOAD"
+  exit 0
+fi
+
 # Idempotency: a ruleset with the target name already existing means a prior
 # run (or a human) owns it — skip instead of creating a same-name duplicate.
 # The list call must succeed before we may create anything: proceeding on a
@@ -178,6 +236,11 @@ fi
 EXISTING_ID="$(printf '%s' "$RULESETS_JSON" \
   | jq -r --arg name "$NAME" '[.[] | select(.name == $name)][0].id // empty')"
 if [[ -n "$EXISTING_ID" ]]; then
+  if [[ -n "$PROFILE" ]]; then
+    echo "error: ruleset '$NAME' already exists on $REPO; reconciliation is required." >&2
+    echo "       Explicit profiles support fresh creation only." >&2
+    exit 1
+  fi
   EXISTING_ENFORCEMENT="$(printf '%s' "$RULESETS_JSON" \
     | jq -r --arg name "$NAME" '[.[] | select(.name == $name)][0].enforcement // "unknown"')"
   if [[ "$EXISTING_ENFORCEMENT" == "$ENFORCEMENT" ]]; then
@@ -200,11 +263,62 @@ if [[ -n "$EXISTING_ID" ]]; then
   exit 0
 fi
 
+if [[ "$PROFILE" == "team" ]]; then
+  discover_team_payload || exit 1
+fi
+
+if [[ -n "$PROFILE" ]]; then
+  VARIABLE_PATH="repos/$REPO/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
+  VARIABLE_PRESENT="false"
+  VARIABLE_RESULT=""
+  if VARIABLE_RESULT="$(gh api "$VARIABLE_PATH" 2>&1)"; then
+    if ! printf '%s' "$VARIABLE_RESULT" \
+      | jq -e '.name == "SCAFFOLD_GOVERNANCE_PROFILE"' >/dev/null; then
+      echo "error: governance profile variable response was malformed." >&2
+      exit 1
+    fi
+    VARIABLE_PRESENT="true"
+  elif printf '%s' "$VARIABLE_RESULT" | grep -q 'HTTP 404'; then
+    if ! VARIABLES_JSON="$(gh api "repos/$REPO/actions/variables?per_page=100")"; then
+      echo "error: variable endpoint unavailable; governance profile was not persisted." >&2
+      exit 1
+    fi
+    if ! printf '%s' "$VARIABLES_JSON" | jq -e \
+      '(.variables // []) | all(.name != "SCAFFOLD_GOVERNANCE_PROFILE")' >/dev/null; then
+      echo "error: variable absence could not be proven." >&2
+      exit 1
+    fi
+  else
+    echo "error: governance profile variable could not be read." >&2
+    exit 1
+  fi
+
+  VARIABLE_METHOD="POST"
+  VARIABLE_TARGET="repos/$REPO/actions/variables"
+  if [[ "$VARIABLE_PRESENT" == "true" ]]; then
+    VARIABLE_METHOD="PATCH"
+    VARIABLE_TARGET="$VARIABLE_PATH"
+  fi
+  if ! gh api --method "$VARIABLE_METHOD" "$VARIABLE_TARGET" \
+    -f name=SCAFFOLD_GOVERNANCE_PROFILE -f value="$PROFILE" >/dev/null; then
+    echo "error: governance profile variable persistence failed; ruleset was not created." >&2
+    exit 1
+  fi
+fi
+
 if [[ "$ENFORCEMENT" == "active" ]]; then
   echo "warning: enforcement 'active' starts blocking merges on $REPO immediately." >&2
 fi
 
-RESPONSE="$(printf '%s' "$PAYLOAD" | gh api --method POST "repos/$REPO/rulesets" --input -)"
+if [[ -n "$PROFILE" ]]; then
+  if ! RESPONSE="$(printf '%s' "$PAYLOAD" \
+    | gh api --method POST "repos/$REPO/rulesets" --input -)"; then
+    echo "error: governance profile persisted, but ruleset creation failed." >&2
+    exit 1
+  fi
+else
+  RESPONSE="$(printf '%s' "$PAYLOAD" | gh api --method POST "repos/$REPO/rulesets" --input -)"
+fi
 RULESET_ID="$(printf '%s' "$RESPONSE" | jq -r '.id')"
 
 echo "Created ruleset '$NAME' (id: $RULESET_ID, enforcement: $ENFORCEMENT) on $REPO."

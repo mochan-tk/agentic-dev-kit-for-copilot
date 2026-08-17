@@ -241,8 +241,11 @@ for mode in read create update; do
   esac
   expect_rc_grep 1 'variable' "variable $mode failure stops ruleset creation" \
     run_script -R acme/widget --profile solo
-  [ ! -f "$GH_FIXTURES/posted.json" ] && t_ok "variable $mode failure causes zero ruleset POSTs" \
-    || t_fail "variable $mode failure causes zero ruleset POSTs"
+  if [ ! -f "$GH_FIXTURES/posted.json" ]; then
+    t_ok "variable $mode failure causes zero ruleset POSTs"
+  else
+    t_fail "variable $mode failure causes zero ruleset POSTs"
+  fi
 done
 
 reset_calls; echo '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"solo"}' > "$GH_FIXTURES/variable.json"
