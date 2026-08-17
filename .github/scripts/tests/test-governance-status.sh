@@ -46,6 +46,7 @@ case "$path" in
   repos/*/rules/branches/*) f=rules.json ;;
   repos/*/rulesets/*) f="rs-repo-${path##*/}.json" ;;
   orgs/*/rulesets/*) f="rs-org-${path##*/}.json" ;;
+  orgs/*) f=org.json ;;
   repos/*/actions/permissions/workflow) f=workflow.json ;;
   repos/*/commits/*/check-runs*) f=checkruns.json ;;
   repos/*/contents/.github/workflows/*) p="${path%%\?*}"; f="wff-${p##*/}" ;;
@@ -87,6 +88,7 @@ team_rules() { # fully hardened; binds every context to app id $1
     "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 }
 mk_repo() { printf '{"default_branch":"main","owner":{"login":"o","type":"%s"},"private":%s%s}\n' "$1" "$2" "${3:-}" > "$GS_FIX/repo.json"; }
+mk_org() { printf '{"login":"o"%s}\n' "${1:-}" > "$GS_FIX/org.json"; }
 mk_rs() { printf '{"id":%s,"bypass_actors":%s}\n' "$1" "$3" > "$GS_FIX/rs-$2-$1.json"; }
 mk_wf() { printf '{"default_workflow_permissions":"%s","can_approve_pull_request_reviews":%s}\n' "$1" "$2" > "$GS_FIX/workflow.json"; }
 mk_runs() {
@@ -108,17 +110,13 @@ baseline() { # live-like template repository on the solo minimum
   solo_rules
   mk_rs 101 repo "$RRB"
   mk_runs quality:15368 task-ritual:15368 scaffold-self-check:15368 copilot-surface:15368
-  mk_wf read false
-  mk_repo User false
-  mk_marker unknown
-  mk_co '# CUSTOMIZE: replace @owner'
+  mk_wf read false; mk_repo User false
+  mk_marker unknown; mk_co '# CUSTOMIZE: replace @owner'
 }
 team_green() { # hardened adopted fixtures that satisfy team intent end to end
   baseline
-  team_rules 15368
-  mk_rs 101 repo '[]'
-  mk_marker abc123
-  mk_co '# reviewed owners'
+  team_rules 15368; mk_rs 101 repo '[]'
+  mk_marker abc123; mk_co '# reviewed owners'
 }
 
 run() { rc=0; out="$(bash "$SENSOR" "$@" 2>&1)" || rc=$?; }
@@ -169,9 +167,8 @@ rce "stronger settings stay healthy for solo" 0
 
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
-  "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,
-  "require_last_push_approval":false,"required_review_thread_resolution":false},
-  "ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
+  "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
+  "required_review_thread_resolution":false},"ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 mk_rs 900 org '[{"actor_id":42,"actor_type":"Integration","bypass_mode":"always"}]'
 run -R o/r --profile solo
@@ -247,25 +244,29 @@ rce "unresolved codeowners does not gate solo" 0
 chk "solo still shows codeowners OFF" "^codeowners\.tuning${T}OFF"
 
 baseline
-mk_repo Organization false
+mk_repo Organization true
 run -R o/r --profile solo
-rce "org unresolved applicability gates the declared profile" 3
-chk "unproven merge queue is UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE"
-mk_repo Organization true ',"plan":{"name":"free"}'
+rce "private org without plan evidence fails closed" 3
+chk "unavailable org plan is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}organization plan evidence unavailable"
+mk_org ''; run -R o/r --profile solo
+rce "plan-less org payload stays unknown" 3
+chk "absent plan field is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}organization plan evidence unavailable"
+mk_org ',"plan":{"name":"free"}'
+jq '. + [{"type":"merge_queue","parameters":{},"ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+mk_wfdir ci.yml; mk_wff ci.yml 'on: [pull_request, merge_group]'
 run -R o/r --profile solo
-rce "proven ineligibility stays healthy" 0
-chk "proven ineligibility is N/A" "^merge_queue\.applicability${T}N/A${T}private repository on free plan"
-jq '. + [{"type":"merge_queue","parameters":{},"ruleset_source_type":"Repository",
-  "ruleset_source":"o/r","ruleset_id":101}]' \
-  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
-mk_wfdir ci.yml lint.yml
-mk_wff ci.yml 'on: [pull_request, merge_group]'
-mk_wff lint.yml '# merge_group planned someday'
-run -R o/r --profile solo
-rce "merge queue with complete evidence stays healthy" 0
+rce "proven ineligibility outranks rule and coverage" 0
+chk "ineligible org stays N/A despite rule" "^merge_queue\.applicability${T}N/A${T}private repository on free plan"
+if grep -q '^api orgs/o$' "$GH_CALLS"; then t_ok "org plan evidence read via GET /orgs/{owner}"; else t_fail "org plan evidence read via GET /orgs/{owner}"; fi
+mk_repo Organization false; run -R o/r --profile solo
+rce "public org repository is eligible by repository evidence" 0
 chk "effective merge_queue rule is ACTIVE" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active.*merge_group coverage in 1 workflow"
-mk_wff ci.yml 'on: [pull_request] # merge_group only in this comment'
+mk_wfdir ci.yml lint.yml; mk_wff ci.yml $'on:\n  merge_group:\n    branches: [main]'
+mk_wff lint.yml $'on: [push]\njobs:\n  x:\n    steps:\n      - run: echo merge_group ready\nenv:\n  NOTE: merge_group'
 run -R o/r --profile solo
+rce "genuine trigger structure is the only coverage evidence" 0
+chk "block-map trigger counts once; token noise never counts" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active.*merge_group coverage in 1 workflow"
+mk_wff ci.yml 'on: [pull_request] # merge_group only in this comment'; run -R o/r --profile solo
 rce "merge_queue rule without merge_group coverage exits 3" 3
 chk "uncovered merge_queue rule is UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE${T}merge_queue rule active without observed merge_group workflow coverage"
 runf "contents/.github/workflows?" -R o/r --profile solo
@@ -274,11 +275,12 @@ chk "unreadable listing is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}m
 runf "workflows/ci.yml" -R o/r --profile solo
 rce "workflow content failure exits 3" 3
 chk "unreadable workflow is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}merge_group workflow coverage evidence unavailable"
-rm -f "$GS_FIX/wfdir.json"
-run -R o/r --profile solo
+rm -f "$GS_FIX/wfdir.json"; run -R o/r --profile solo
 rce "absent workflow directory cannot certify coverage" 3
 chk "absent workflows are UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE${T}merge_queue rule active without observed merge_group workflow coverage"
-mk_repo Organization false
+solo_rules; run -R o/r --profile solo
+rce "org unresolved applicability gates the declared profile" 3
+chk "eligible org without rule is UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE${T}eligible repository without a merge_queue rule"
 runf "rules/branches" -R o/r --profile solo
 rce "org effective-rule failure exits 3" 3
 chk "org merge queue UNKNOWN without effective rules" "^merge_queue\.applicability${T}UNKNOWN${T}effective rules unavailable"
