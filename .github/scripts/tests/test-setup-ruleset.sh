@@ -147,7 +147,8 @@ existing_profile_fixtures() {
 
 detail_fails_closed() {
   local name="$1" profile="$2" rc=0 out
-  out="$(run_script -R acme/widget --profile "$profile" 2>&1)" || rc=$?
+  shift 2
+  out="$(run_script -R acme/widget --profile "$profile" "$@" 2>&1)" || rc=$?
   if [ "$rc" -eq 1 ] \
      && printf '%s\n' "$out" | grep -Eqi 'canonical|custom|detail|malformed' \
      && grep -q 'api repos/acme/widget/rulesets/42' "$GH_CALLS" \
@@ -466,6 +467,23 @@ if grep -q 'api repos/acme/widget/rulesets/42' "$GH_CALLS" \
 else
   t_fail "existing-profile dry-run reads detail without mutation"
 fi
+
+existing_profile_fixtures solo
+rc=0
+out="$(run_script -R acme/widget --profile solo --dry-run 2>&1)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -Eqi 'dry-run.*candidate|no.op' \
+   && [ "$(cat "$GH_CALLS")" = "$(printf '%s\n' \
+     'api repos/acme/widget/rulesets' 'api repos/acme/widget/rulesets/42')" ] \
+   && no_profile_writes; then
+  t_ok "existing canonical solo dry-run validates detail with GET-only candidate output"
+else
+  t_fail "existing canonical solo dry-run validates detail with GET-only candidate output"
+fi
+
+existing_profile_fixtures solo
+jq '.target = "tag"' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp"
+mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "noncanonical solo dry-run fails closed after detail GET" solo --dry-run
 
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
