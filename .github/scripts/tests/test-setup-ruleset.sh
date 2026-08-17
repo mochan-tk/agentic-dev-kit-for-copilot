@@ -220,6 +220,13 @@ expect_rc_grep 2 "must be 'active' or 'disabled'" \
 expect_rc_grep 2 "profile.*solo.*team" \
   "invalid --profile is a usage error" \
   run_script --profile pirate
+reset_calls
+rc=0; out="$(run_script --reconcile 2>&1)" || rc=$?
+if [ "$rc" -eq 2 ] && printf '%s\n' "$out" | grep -Eqi 'reconcile.*profile|profile.*reconcile' \
+   && [ ! -s "$GH_CALLS" ]; then
+  t_ok "--reconcile requires an explicit profile before gh calls"
+else t_fail "--reconcile requires an explicit profile before gh calls"
+fi
 
 # --- dry-run: valid payload, zero gh calls ---------------------------------
 
@@ -470,7 +477,7 @@ fi
 
 existing_profile_fixtures solo
 rc=0
-out="$(run_script -R acme/widget --profile solo --dry-run 2>&1)" || rc=$?
+out="$(run_script -R acme/widget --profile solo --reconcile --dry-run 2>&1)" || rc=$?
 if [ "$rc" -eq 0 ] && printf '%s\n' "$out" | grep -Eqi 'dry-run.*candidate|no.op' \
    && [ "$(cat "$GH_CALLS")" = "$(printf '%s\n' \
      'api repos/acme/widget/rulesets' 'api repos/acme/widget/rulesets/42')" ] \
@@ -483,7 +490,8 @@ fi
 existing_profile_fixtures solo
 jq '.target = "tag"' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp"
 mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
-detail_fails_closed "noncanonical solo dry-run fails closed after detail GET" solo --dry-run
+detail_fails_closed "noncanonical solo dry-run fails closed after detail GET" \
+  solo --reconcile --dry-run
 
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
