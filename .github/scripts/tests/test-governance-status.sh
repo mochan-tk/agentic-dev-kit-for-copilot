@@ -48,6 +48,8 @@ case "$path" in
   orgs/*/rulesets/*) f="rs-org-${path##*/}.json" ;;
   repos/*/actions/permissions/workflow) f=workflow.json ;;
   repos/*/commits/*/check-runs*) f=checkruns.json ;;
+  repos/*/contents/.github/workflows/*) p="${path%%\?*}"; f="wff-${p##*/}" ;;
+  repos/*/contents/.github/workflows*) f=wfdir.json ;;
   repos/*/contents/SCAFFOLD-CHANGELOG.md*) f=changelog.raw ;;
   repos/*/contents/.github/CODEOWNERS*) f=codeowners.raw ;;
   repos/*) f=repo.json ;;
@@ -97,6 +99,8 @@ mk_runs() {
 }
 mk_marker() { printf '# log\n<!-- scaffold-version: repo=o/r sha=%s date=x -->\n' "$1" > "$GS_FIX/changelog.raw"; }
 mk_co() { printf '%s\n/.github/docs/agreements/ @owner\n' "$1" > "$GS_FIX/codeowners.raw"; }
+mk_wfdir() { local out="" sep="" n; for n in "$@"; do out="$out$sep{\"name\":\"$n\",\"type\":\"file\"}"; sep=","; done; printf '[%s]\n' "$out" > "$GS_FIX/wfdir.json"; }
+mk_wff() { printf '%s\n' "$2" > "$GS_FIX/wff-$1"; }
 
 RRB='[{"actor_id":5,"actor_type":"RepositoryRole","bypass_mode":"pull_request"}]'
 baseline() { # live-like template repository on the solo minimum
@@ -245,16 +249,39 @@ chk "solo still shows codeowners OFF" "^codeowners\.tuning${T}OFF"
 baseline
 mk_repo Organization false
 run -R o/r --profile solo
-rce "org without eligibility evidence stays healthy" 0
+rce "org unresolved applicability gates the declared profile" 3
 chk "unproven merge queue is UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE"
 mk_repo Organization true ',"plan":{"name":"free"}'
 run -R o/r --profile solo
+rce "proven ineligibility stays healthy" 0
 chk "proven ineligibility is N/A" "^merge_queue\.applicability${T}N/A${T}private repository on free plan"
 jq '. + [{"type":"merge_queue","parameters":{},"ruleset_source_type":"Repository",
   "ruleset_source":"o/r","ruleset_id":101}]' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+mk_wfdir ci.yml lint.yml
+mk_wff ci.yml 'on: [pull_request, merge_group]'
+mk_wff lint.yml '# merge_group planned someday'
 run -R o/r --profile solo
-chk "effective merge_queue rule is ACTIVE" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active"
+rce "merge queue with complete evidence stays healthy" 0
+chk "effective merge_queue rule is ACTIVE" "^merge_queue\.applicability${T}ACTIVE${T}merge_queue rule active.*merge_group coverage in 1 workflow"
+mk_wff ci.yml 'on: [pull_request] # merge_group only in this comment'
+run -R o/r --profile solo
+rce "merge_queue rule without merge_group coverage exits 3" 3
+chk "uncovered merge_queue rule is UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE${T}merge_queue rule active without observed merge_group workflow coverage"
+runf "contents/.github/workflows?" -R o/r --profile solo
+rce "workflow listing failure exits 3" 3
+chk "unreadable listing is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}merge_group workflow coverage evidence unavailable"
+runf "workflows/ci.yml" -R o/r --profile solo
+rce "workflow content failure exits 3" 3
+chk "unreadable workflow is UNKNOWN" "^merge_queue\.applicability${T}UNKNOWN${T}merge_group workflow coverage evidence unavailable"
+rm -f "$GS_FIX/wfdir.json"
+run -R o/r --profile solo
+rce "absent workflow directory cannot certify coverage" 3
+chk "absent workflows are UNCHECKABLE" "^merge_queue\.applicability${T}UNCHECKABLE${T}merge_queue rule active without observed merge_group workflow coverage"
+mk_repo Organization false
+runf "rules/branches" -R o/r --profile solo
+rce "org effective-rule failure exits 3" 3
+chk "org merge queue UNKNOWN without effective rules" "^merge_queue\.applicability${T}UNKNOWN${T}effective rules unavailable"
 
 baseline
 runf "rules/branches" -R o/r --profile solo
