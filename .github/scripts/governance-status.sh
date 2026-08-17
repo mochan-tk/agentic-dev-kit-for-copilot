@@ -262,13 +262,35 @@ else
   esac
 fi
 
-if [ "$(st repo)" != ok ]; then emit merge_queue.applicability UNKNOWN "repository metadata unavailable" 0
+if [ "$(st repo)" != ok ]; then emit merge_queue.applicability UNKNOWN "repository metadata unavailable" "$BASE"
 elif [ "$OWNER" = User ]; then emit merge_queue.applicability N/A "owner_type=User; merge queue not applicable" 0
-elif [ "$RULES" = 1 ] && [ "$MQN" -gt 0 ]; then emit merge_queue.applicability ACTIVE "merge_queue rule active$MQQ" 0
+elif [ "$RULES" = 1 ] && [ "$MQN" -gt 0 ]; then
+  # A merge_queue rule is ACTIVE only with observed merge_group workflow
+  # coverage; incomplete evidence stays UNKNOWN/UNCHECKABLE and gates.
+  MQCOV=0
+  fetch wfd "repos/$REPO/contents/.github/workflows?ref=$DEFB"
+  if [ "$(st wfd)" = fail ]; then MQCOV=unknown
+  elif [ "$(st wfd)" = ok ]; then
+    while IFS= read -r wfn; do
+      [ -n "$wfn" ] || continue
+      fetch wff "repos/$REPO/contents/.github/workflows/$wfn?ref=$DEFB" raw
+      if [ "$(st wff)" != ok ]; then MQCOV=unknown; break; fi
+      ! sed 's/#.*//' "$WORK/wff.json" | grep -qw merge_group || MQCOV=$((MQCOV + 1))
+    done <<EOF
+$(jqr '.[]? | select(.type == "file") | .name' wfd)
+EOF
+  fi
+  if [ "$MQCOV" = unknown ]; then
+    emit merge_queue.applicability UNKNOWN "merge_group workflow coverage evidence unavailable" "$BASE"
+  elif [ "$MQCOV" -gt 0 ]; then
+    emit merge_queue.applicability ACTIVE "merge_queue rule active$MQQ; merge_group coverage in $MQCOV workflow(s)" 0
+  else
+    emit merge_queue.applicability UNCHECKABLE "merge_queue rule active without observed merge_group workflow coverage" "$BASE"
+  fi
 elif [ "$(jqr '.private' repo)" = true ] && [ "$(jqr '.plan.name // empty' repo)" = free ]; then
   emit merge_queue.applicability N/A "private repository on free plan is ineligible" 0
-elif [ "$RULES" != 1 ]; then emit merge_queue.applicability UNKNOWN "effective rules unavailable" 0
-else emit merge_queue.applicability UNCHECKABLE "organization repository without plan, rule, or merge_group evidence" 0; fi
+elif [ "$RULES" != 1 ]; then emit merge_queue.applicability UNKNOWN "effective rules unavailable" "$BASE"
+else emit merge_queue.applicability UNCHECKABLE "organization repository without plan, eligibility, rule, or merge_group evidence" "$BASE"; fi
 
 while IFS="$TAB" read -r rid rtyp rsrc; do
   [ -n "$rid" ] || continue
