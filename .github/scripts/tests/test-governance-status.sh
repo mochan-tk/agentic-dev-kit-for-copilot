@@ -42,11 +42,22 @@ done
 for frag in ${GS_FAIL:-}; do
   case "$path" in *"$frag"*) echo "gh: HTTP 500 (simulated)" >&2; exit 1 ;; esac
 done
+if [ "$path" = "repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE" ]; then
+  case "${GS_VAR_ERROR:-}" in
+    "") ;;
+    404) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+    actions-disabled) echo "gh: Actions are disabled (HTTP 403)" >&2; exit 1 ;;
+    unauthorized) echo "gh: Resource not accessible by integration (HTTP 403)" >&2; exit 1 ;;
+    generic) echo "gh: Internal Server Error (HTTP 500)" >&2; exit 1 ;;
+    *) echo "gh stub: unknown variable error fixture" >&2; exit 64 ;;
+  esac
+fi
 case "$path" in
   repos/*/rules/branches/*) f=rules.json ;;
   repos/*/rulesets/*) f="rs-repo-${path##*/}.json" ;;
   orgs/*/rulesets/*) f="rs-org-${path##*/}.json" ;;
   orgs/*) f=org.json ;;
+  repos/*/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE) f=profile.json ;;
   repos/*/actions/permissions/workflow) f=workflow.json ;;
   repos/*/commits/*/check-runs*) f=checkruns.json ;;
   repos/*/contents/.github/workflows/*) p="${path%%\?*}"; f="wff-${p##*/}" ;;
@@ -119,10 +130,82 @@ team_green() { # hardened adopted fixtures that satisfy team intent end to end
   mk_marker abc123; mk_co '# reviewed owners'
 }
 
-run() { rc=0; out="$(bash "$SENSOR" "$@" 2>&1)" || rc=$?; }
-runf() { local f="$1"; shift; rc=0; out="$(GS_FAIL="$f" bash "$SENSOR" "$@" 2>&1)" || rc=$?; }
-rce() { if [ "$rc" -eq "$2" ]; then t_ok "$1"; else t_fail "$1 (rc=$rc)"; printf '%s\n' "$out" | sed 's/^/    # /'; fi; }
-chk() { if printf '%s\n' "$out" | grep -Eq "$2"; then t_ok "$1"; else t_fail "$1 (missing: $2)"; printf '%s\n' "$out" | sed 's/^/    # /'; fi; }
+run() {
+  rc=0
+  bash "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+  out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
+}
+runf() {
+  local f="$1"
+  shift; rc=0
+  GS_FAIL="$f" bash "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+  out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
+}
+runv() {
+  local e="$1"
+  shift; rc=0
+  GS_VAR_ERROR="$e" bash "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+  out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
+}
+rce() { if [ "$rc" -eq "$2" ]; then t_ok "$1"; else t_fail "$1 (rc=$rc)"; printf '%s\n%s\n' "$out" "$err" | sed 's/^/    # /'; fi; }
+chk() { if printf '%s\n' "$out" | grep -Eq "$2"; then t_ok "$1"; else t_fail "$1 (missing: $2)"; printf '%s\n%s\n' "$out" "$err" | sed 's/^/    # /'; fi; }
+
+PROFILE_REQ="api repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
+PROFILE_UNKNOWN="^governance\\.profile${T}UNKNOWN${T}persisted profile unavailable or invalid; expected exact solo\\|team$"
+clear_calls() { : > "$GH_CALLS"; }
+mk_profile() { printf '%s\n' "$1" > "$GS_FIX/profile.json"; }
+profile_gets() { grep -Fxc "$PROFILE_REQ" "$GH_CALLS" 2>/dev/null || true; }
+profile_endpoint_calls() {
+  grep -Fc "repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE" "$GH_CALLS" 2>/dev/null || true
+}
+get_once() {
+  if [ "$(profile_gets)" -eq 1 ] && [ "$(profile_endpoint_calls)" -eq 1 ]; then
+    t_ok "$1"
+  else
+    t_fail "$1 (plain=$(profile_gets) endpoint=$(profile_endpoint_calls))"
+  fi
+}
+get_never() {
+  if [ "$(profile_endpoint_calls)" -eq 0 ]; then
+    t_ok "$1"
+  else
+    t_fail "$1 (endpoint=$(profile_endpoint_calls))"
+  fi
+}
+save_run() { saved_rc="$rc"; saved_out="$out"; saved_err="$err"; }
+same_run() {
+  if [ "$rc" -eq "$saved_rc" ] && [ "$out" = "$saved_out" ] && [ "$err" = "$saved_err" ]; then
+    t_ok "$1"
+  else
+    t_fail "$1 (explicit rc=$saved_rc persisted rc=$rc)"
+  fi
+}
+unknown_facts() {
+  chk "$1 keeps default branch fact" "^repository\\.default_branch${T}ACTIVE${T}main$"
+  chk "$1 keeps approval fact" "^pull_request\\.required_approving_review_count${T}ACTIVE"
+  chk "$1 keeps context fact" "^required_checks\\.context\\.quality${T}ACTIVE"
+  chk "$1 keeps Actions fact" "^actions\\.default_workflow_permissions${T}ACTIVE${T}read$"
+  chk "$1 keeps merge-queue fact" "^merge_queue\\.applicability${T}N/A"
+  chk "$1 keeps bypass fact" "^bypass\\.ruleset\\.101${T}ACTIVE"
+}
+invalid_profile_case() {
+  local label="$1" payload="$2" first_out first_err
+  baseline; mk_profile "$payload"; clear_calls
+  run -R o/r
+  rce "$label exits 3" 3
+  chk "$label is deterministic UNKNOWN" "$PROFILE_UNKNOWN"
+  get_once "$label performs exact plain variable GET"
+  if [ -z "$err" ]; then t_ok "$label leaks no API stderr"; else t_fail "$label leaks no API stderr"; fi
+  unknown_facts "$label"
+  first_out="$out"; first_err="$err"; clear_calls
+  run -R o/r
+  if [ "$out" = "$first_out" ] && [ "$err" = "$first_err" ]; then
+    t_ok "$label repeats deterministically"
+  else
+    t_fail "$label repeats deterministically"
+  fi
+  get_once "$label repeat performs exact plain variable GET"
+}
 
 baseline
 run -R o/r --profile solo
@@ -149,6 +232,151 @@ if [ "$first" = "$out" ]; then t_ok "output is deterministic across runs"; else 
 run -R o/r
 rce "omitted profile exits 3, never guessed" 3
 chk "omitted profile reported UNKNOWN" "^governance\.profile${T}UNKNOWN"
+
+# Persisted intent must feed the exact existing profile semantics. Complete
+# output, stderr, and exit-code equality guards ordering and detail as well.
+baseline; clear_calls
+run -R o/r --profile solo
+save_run
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"solo","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}'
+clear_calls; run -R o/r
+same_run "persisted solo equals healthy explicit solo"
+chk "persisted solo is ACTIVE" "^governance\.profile${T}ACTIVE${T}solo$"
+get_once "persisted solo uses one exact plain variable GET"
+persisted_first="$out"; persisted_err="$err"; clear_calls; run -R o/r
+if [ "$out" = "$persisted_first" ] && [ "$err" = "$persisted_err" ]; then
+  t_ok "persisted solo output repeats deterministically"
+else
+  t_fail "persisted solo output repeats deterministically"
+fi
+get_once "persisted solo repeat uses one exact plain variable GET"
+
+baseline; clear_calls
+run -R o/r --profile team
+save_run
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"team","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}'
+clear_calls; run -R o/r
+same_run "persisted team equals failing explicit team"
+get_once "failing persisted team uses one exact plain variable GET"
+
+team_green; clear_calls
+run -R o/r --profile team
+save_run
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"team","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}'
+clear_calls; run -R o/r
+same_run "persisted team equals healthy explicit team"
+chk "persisted team is ACTIVE" "^governance\.profile${T}ACTIVE${T}team$"
+get_once "healthy persisted team uses one exact plain variable GET"
+persisted_first="$out"; persisted_err="$err"; clear_calls; run -R o/r
+if [ "$out" = "$persisted_first" ] && [ "$err" = "$persisted_err" ]; then
+  t_ok "persisted team output repeats deterministically"
+else
+  t_fail "persisted team output repeats deterministically"
+fi
+get_once "persisted team repeat uses one exact plain variable GET"
+
+baseline; clear_calls
+runf "actions/permissions" -R o/r --profile team
+save_run
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"team"}'
+clear_calls; runf "actions/permissions" -R o/r
+same_run "persisted team preserves UNKNOWN-over-OFF precedence"
+get_once "UNKNOWN-precedence run uses one exact plain variable GET"
+
+# Endpoint failures are isolated from GS_FAIL so the rest of the report stays
+# observable and deterministic.
+for var_error in 404 actions-disabled unauthorized generic; do
+  case "$var_error" in
+    404) label="missing variable" ;;
+    actions-disabled) label="Actions-disabled variable" ;;
+    unauthorized) label="unauthorized variable" ;;
+    generic) label="generic variable API failure" ;;
+  esac
+  baseline; clear_calls; runv "$var_error" -R o/r
+  rce "$label exits 3" 3
+  chk "$label is deterministic UNKNOWN" "$PROFILE_UNKNOWN"
+  get_once "$label uses one exact plain variable GET"
+  if [ -z "$err" ]; then t_ok "$label leaks no API stderr"; else t_fail "$label leaks no API stderr"; fi
+  unknown_facts "$label"
+  failure_first="$out"; failure_err="$err"; clear_calls
+  runv "$var_error" -R o/r
+  if [ "$out" = "$failure_first" ] && [ "$err" = "$failure_err" ]; then
+    t_ok "$label repeats deterministically"
+  else
+    t_fail "$label repeats deterministically"
+  fi
+  get_once "$label repeat uses one exact plain variable GET"
+done
+
+# Only byte-exact JSON string values solo and team are valid. In particular,
+# trailing JSON newlines must be rejected before command substitution can
+# strip them.
+while IFS='|' read -r invalid_name invalid_payload; do
+  [ -n "$invalid_name" ] || continue
+  invalid_profile_case "$invalid_name" "$invalid_payload"
+done <<'INVALID_PROFILES'
+malformed object|{
+non-JSON payload|not-json
+truncated value|{"value":
+absent value|{}
+name-only payload|{"name":"SCAFFOLD_GOVERNANCE_PROFILE"}
+null value|{"value":null}
+boolean value|{"value":true}
+numeric value|{"value":0}
+array value|{"value":[]}
+object value|{"value":{}}
+empty value|{"value":""}
+leading space|{"value":" solo"}
+trailing space|{"value":"solo "}
+surrounding space|{"value":" team "}
+leading tab|{"value":"\tsolo"}
+trailing tab|{"value":"team\t"}
+leading newline|{"value":"\nsolo"}
+trailing solo newline|{"value":"solo\n"}
+trailing team newline|{"value":"team\n"}
+leading carriage return|{"value":"\rsolo"}
+trailing solo carriage return|{"value":"solo\r"}
+trailing team carriage return|{"value":"team\r"}
+trailing CRLF|{"value":"solo\r\n"}
+title-case solo|{"value":"Solo"}
+upper-case solo|{"value":"SOLO"}
+title-case team|{"value":"Team"}
+upper-case team|{"value":"TEAM"}
+arbitrary value|{"value":"pirate"}
+solo prefix extension|{"value":"solos"}
+team prefix extension|{"value":"teams"}
+combined profiles|{"value":"solo team"}
+numeric string|{"value":"0"}
+boolean string|{"value":"true"}
+INVALID_PROFILES
+
+# Explicit profiles are one-shot overrides: the opposite persisted fixture is
+# neither read nor modified, and no environment value becomes a fallback.
+baseline
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"team"}'
+profile_sum="$(cksum "$GS_FIX/profile.json")"; clear_calls
+run -R o/r --profile solo
+rce "explicit solo overrides persisted team" 0
+chk "explicit solo remains ACTIVE" "^governance\.profile${T}ACTIVE${T}solo$"
+get_never "explicit solo never reads persisted profile"
+if [ "$(cksum "$GS_FIX/profile.json")" = "$profile_sum" ]; then t_ok "explicit solo does not persist"; else t_fail "explicit solo does not persist"; fi
+
+team_green
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"solo"}'
+profile_sum="$(cksum "$GS_FIX/profile.json")"; clear_calls
+run -R o/r --profile team
+rce "explicit team overrides persisted solo" 0
+chk "explicit team remains ACTIVE" "^governance\.profile${T}ACTIVE${T}team$"
+get_never "explicit team never reads persisted profile"
+if [ "$(cksum "$GS_FIX/profile.json")" = "$profile_sum" ]; then t_ok "explicit team does not persist"; else t_fail "explicit team does not persist"; fi
+
+baseline; clear_calls
+rc=0
+SCAFFOLD_GOVERNANCE_PROFILE=team bash "$SENSOR" -R o/r > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
+rce "environment profile is not a fallback" 3
+chk "environment profile cannot replace persisted evidence" "$PROFILE_UNKNOWN"
+get_once "environment fallback attempt still performs exact variable GET"
 
 run -R o/r --profile team
 rce "solo baseline fails team intent" 1
@@ -327,6 +555,38 @@ for bad in --method=DELETE -XDELETE -fk=v -F=k=v --field=k=v --raw-field=k=v --i
   [ "$rc" -eq 64 ] || wall="leaks $bad"
 done
 if [ "$wall" = ok ]; then t_ok "shim wall refuses equals-form and attached mutating flags"; else t_fail "shim wall refuses equals-form and attached mutating flags ($wall)"; fi
+
+wall_case() {
+  local label="$1"
+  shift; clear_calls; rc=0
+  "$WORK/bin/gh" "$@" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 64 ] && grep -q '^MUTATION ' "$GH_CALLS"; then
+    t_ok "$label"
+  else
+    t_fail "$label (rc=$rc)"
+  fi
+}
+wall_case "wall refuses POST verb" api POST repos/o/r
+wall_case "wall refuses PUT verb" api PUT repos/o/r
+wall_case "wall refuses PATCH verb" api PATCH repos/o/r
+wall_case "wall refuses DELETE verb" api DELETE repos/o/r
+wall_case "wall refuses attached -XPOST" api -XPOST repos/o/r
+wall_case "wall refuses split -X PUT" api -X PUT repos/o/r
+wall_case "wall refuses equals --method=PATCH" api --method=PATCH repos/o/r
+wall_case "wall refuses split --method DELETE" api --method DELETE repos/o/r
+wall_case "wall refuses attached -f field" api -fk=v repos/o/r
+wall_case "wall refuses attached -F field" api -Fkey=value repos/o/r
+wall_case "wall refuses equals --field" api --field=k=v repos/o/r
+wall_case "wall refuses split --raw-field" api --raw-field k=v repos/o/r
+wall_case "wall refuses equals --input" api --input=p.json repos/o/r
+wall_case "wall refuses variable creation" api POST repos/o/r/actions/variables
+wall_case "wall refuses variable update" api PATCH repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE
+wall_case "wall refuses variable deletion" api DELETE repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE
+wall_case "wall refuses ruleset update" api PUT repos/o/r/rulesets/1
+wall_case "wall refuses ruleset deletion" api DELETE repos/o/r/rulesets/1
+wall_case "wall refuses issue edit" api PATCH repos/o/r/issues/109
+wall_case "wall refuses workflow dispatch" api POST repos/o/r/actions/workflows/ci.yml/dispatches
+
 baseline
 (cd "$WORK/cwd" && bash "$SENSOR" -R o/r --profile solo >/dev/null 2>&1)
 if [ -z "$(ls -A "$WORK/cwd")" ]; then t_ok "sensor persists no profile or file state"; else t_fail "sensor persists no profile or file state"; fi
