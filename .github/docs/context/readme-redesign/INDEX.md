@@ -11,10 +11,10 @@ status: raw
 
 ## Conflicts and open questions
 
-- No deterministic conflicts were detected: the supplied README and PNG artifact hashes and dimensions matched the exact values declared in the Task issue before copying them into the repository.
-- No factual correction or image optimization request was identified from the supplied materials, so the work remains a verbatim replacement of the owner-supplied draft and image.
+- Resolved conflict: the originally supplied README omitted the scaffold-specific private-repository + GitHub Free fail-closed caveat required by current repo behavior. The owner approved the exact one-paragraph correction inserted after the prerequisites paragraph.
+- The source PNG and its 1536x1024 RGB metadata remain unchanged; no image optimization or factual edit was requested for the image itself.
 
 ## Files
 
-- `source.md` — exact attachment metadata, hashes, and editorial summary for the replacement README and overview image.
-- `INDEX.md` — this index of the provenance pass and the known conflict/open-question state.
+- `source.md` — exact attachment metadata, the owner approval record, the exact correction text, and the corrected derived README hash.
+- `INDEX.md` — this index of the provenance pass and the resolved policy conflict record.

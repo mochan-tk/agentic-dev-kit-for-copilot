@@ -211,6 +211,10 @@ organization policy. Check the
 [official GitHub Copilot documentation](https://docs.github.com/en/copilot)
 for current requirements.
 
+Public repositories work on any GitHub plan; private repositories require a
+paid plan because `setup-sources.sh` fails closed for private repositories on
+GitHub Free.
+
 ### 1. Install
 
 Run the installer from the root of a new or existing Git repository.
