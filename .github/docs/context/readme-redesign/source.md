@@ -20,7 +20,14 @@ status: raw
   - `method`: `ai-summary`
   - `size_bytes`: `13569`
   - `sha256`: `72bea18c4fcbfc4cda925d9bbfa05390d2aac2eea00aa7da591afe58be32d6a6`
+  - `approval_url`: `https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/116#issuecomment-5332593329`
   - `note`: `Owner-approved exact paragraph inserted after the prerequisites paragraph. All other bytes remain identical to the supplied README source.`
+  - `exact_inserted_paragraph`:
+    ```markdown
+    Public repositories work on any GitHub plan; private repositories require a
+    paid plan because `setup-sources.sh` fails closed for private repositories on
+    GitHub Free.
+    ```
 - Overview image
   - `display_name`: `a_clean_flat_infographic_diagram_poster_style_i.png`
   - `method`: `verbatim`
@@ -33,5 +40,5 @@ status: raw
 ## Editorial decision
 
 - `method: ai-summary`
-- The repository's README replacement is intentionally the owner-supplied Human-on-the-Loop overview draft. The supplied draft and the infographic image satisfy the issue's deterministic validation checks, and the owner approved one factual caveat for current repository behavior: public repositories work on any GitHub plan, but private repositories require a paid plan because `setup-sources.sh` fails closed for private repositories on GitHub Free.
-- This collection records the canonical source material, the owner-approved correction, and the derived README artifact hash after the exact insertion, without private paths or private chat data.
+- The repository's README replacement is intentionally the owner-supplied Human-on-the-Loop overview draft. The supplied draft and the infographic image satisfy the issue's deterministic validation checks, and the owner approved one factual caveat for current repository behavior at `https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/116#issuecomment-5332593329`: public repositories work on any GitHub plan, but private repositories require a paid plan because `setup-sources.sh` fails closed for private repositories on GitHub Free.
+- This collection records the canonical source material, the approved exact paragraph, and the derived README artifact hash after that exact insertion, without private paths or private chat data.
