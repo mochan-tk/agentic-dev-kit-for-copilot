@@ -231,6 +231,6 @@ PY
 
 # The frontmatter above is validated as YAML; whether the tools it grants
 # match the protocol the agent is told to run is a separate question, and
-# one nothing asked until an adopter's Program session could not create a
+# one nothing asked until an adopter's Project session could not create a
 # session (#47). Delegated so the check stays testable on its own inputs.
 bash "$ROOT/.github/scripts/check-agent-tools.sh"

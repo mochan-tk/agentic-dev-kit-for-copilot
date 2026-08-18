@@ -45,6 +45,11 @@ inherit what this one learned.
 
 ### Unreleased
 
+- The top-level Copilot app role is now called the `Project session`, and new
+  sessions use the name `Project`. Existing sessions named `Program` remain
+  valid; no branch, label, issue, PR, Task-ritual, or runtime session migration
+  is required (#113).
+
 - Operator-facing governance documentation now integrates ADR-0004's sensor and
   actuator boundary in one place: the README maps `ownership-overlap.sh`,
   `governance-drift.sh`, `governance-status.sh`, and `setup-ruleset.sh`

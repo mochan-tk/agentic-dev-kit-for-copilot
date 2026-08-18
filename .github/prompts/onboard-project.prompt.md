@@ -48,13 +48,13 @@ Optional context from me: ${input:notes}
    everything left undone in P0–P5 to the first phase Epic's body as a
    `## Deferred from onboarding` checklist (to the PR description when the
    Epics were skipped), and end the PR description with a `## Next steps`
-   section (merge this PR → review the Epics → hand off to the `Program`
+   section (merge this PR → review the Epics → hand off to the `Project`
    session). You are
    not done at push: the PR must exist (if its creation is blocked, tell me
    and print the exact `gh pr create` command), and the chat message where
    you hand me the PR link must end with the numbered handoff — 1. merge
    the evidence PR, 2. review the draft Epics (link them), 3. tell the
-   `Program` session to start once the PR is merged. Create that session as
+   `Project` session to start once the PR is merged. Create that session as
    your last act, handing it the Epic numbers and which phase is first;
    never decompose here yourself. Queued or failing checks
    don't waive the handoff: report problems above it, never instead of it.

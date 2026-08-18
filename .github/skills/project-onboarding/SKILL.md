@@ -255,14 +255,14 @@ PR description instead.
 Chat is not a carrier: a deferred item that exists only in the final
 message evaporates with the session.
 
-**Start the program session** as onboarding's last act, once the evidence
-PR exists and the Epics are drafted: create a session named `Program`
-(`session-orchestration` §Program session protocol) and hand it the Epic
+**Start the Project session** as onboarding's last act, once the evidence
+PR exists and the Epics are drafted: create a session named `Project`
+(`session-orchestration` §Project session protocol) and hand it the Epic
 numbers and which phase is first. It waits for the evidence PR to merge
 before starting the first Epic's session — a phase run against a half-tuned
 repository verifies nothing. Onboarding does not decompose, and does not
-become the program session itself: its context is spent, and conducting is
-a different job. When the Epics were skipped, create no program session and
+become the Project session itself: its context is spent, and conducting is
+a different job. When the Epics were skipped, create no Project session and
 say so — there is nothing to conduct until an Epic exists.
 
 P6 is not complete when the branch is pushed — it is complete when the
@@ -277,7 +277,7 @@ report them *above* the block, never instead of it.
 1. Review and merge the evidence PR (the license merge).
 2. Review and edit the P2-close draft Epics — link them here, first phase
    first (or say they were skipped and point at the Epic form).
-3. Once the evidence PR is merged, tell the `Program` session to start —
+3. Once the evidence PR is merged, tell the `Project` session to start —
    it decomposes the first phase's Epic on your approval, one phase at a
    time, and starts each later Epic's session as its turn comes.
 

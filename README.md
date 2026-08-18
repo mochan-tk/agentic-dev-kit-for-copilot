@@ -213,10 +213,14 @@ degrades every request a little.
 
 **Prerequisites:** `gh` (authenticated — check with `gh auth status`; the
 setup scripts refuse to run without it), `jq`, and the **GitHub Copilot
-app** — the lifecycle runs on its session hierarchy (a program session
+app** — the lifecycle runs on its session hierarchy (a Project session
 starts each Epic's session, which supervises its Tasks), which no other
 surface provides. Copilot CLI and IDE chat execute individual tasks
 alongside it; they are not substitutes for the app.
+
+The **Project session** is the top-level Copilot app session that supervises
+the complete Epic set for one repository-level initiative. It is unrelated to
+a GitHub Projects board.
 
 **On Windows**, also install [Git for Windows](https://gitforwindows.org) —
 the app already requires Git, and its `bash.exe` is what runs these scripts.
