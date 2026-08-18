@@ -58,6 +58,7 @@ Options:
   --profile <solo|team>    Persist explicit governance intent and create a
                            fresh profile ruleset. Existing rulesets require
                            separate reconciliation.
+  --reconcile              Require --profile and reconcile one canonical same-name ruleset.
   --dry-run                Print the request JSON body to stdout and exit
                            without making any API call.
   -h, --help               Show this help and exit.
@@ -79,6 +80,7 @@ ENFORCEMENT="disabled"
 NAME="scaffold-branch-protection"
 DRY_RUN="false"
 PROFILE=""
+RECONCILE="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -105,6 +107,7 @@ while [[ $# -gt 0 ]]; do
       shift 2 ;;
     --dry-run)
       DRY_RUN="true"; shift ;;
+    --reconcile) RECONCILE="true"; shift ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -112,6 +115,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+[[ "$RECONCILE" != "true" || -n "$PROFILE" ]] || { echo "error: --reconcile requires an explicit --profile" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "error: jq not found on PATH" >&2; exit 1; }
 
 # Build the request body with jq so every value is safely quoted. `$name`,
@@ -161,7 +165,7 @@ PAYLOAD="$(jq -n \
   }')"
 
 if [[ -n "$PROFILE" ]]; then
-  if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" ]]; then
+  if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" && "$RECONCILE" != "true" ]]; then
     echo "dry-run: explicit solo candidate; no API call made." >&2
     printf '%s\n' "$PAYLOAD"
     exit 0
@@ -179,6 +183,7 @@ if [[ -n "$PROFILE" ]]; then
     gh api user --jq .login >/dev/null 2>&1 \
       || { echo "error: gh is not authenticated" >&2; exit 1; }
   fi
+  if [[ "$DRY_RUN" != "true" || "$RECONCILE" == "true" ]]; then
   if ! RULESETS_JSON="$(gh api "repos/$REPO/rulesets")"; then
     echo "error: could not list rulesets for $REPO; aborting before writes." >&2
     exit 1
@@ -191,6 +196,8 @@ if [[ -n "$PROFILE" ]]; then
   }
   EXISTING_ID="$(printf '%s' "$RULESETS_JSON" \
     | jq -r --arg name "$NAME" '[.[] | select(.name == $name)][0].id // empty')"
+  [[ "$RECONCILE" != "true" || "$MATCH_COUNT" -eq 1 ]] || { echo "error: --reconcile requires exactly one same-name ruleset." >&2; exit 1; }
+  [[ "$RECONCILE" == "true" || "$MATCH_COUNT" -eq 0 ]] || { echo "error: same-name ruleset requires --reconcile." >&2; exit 1; }
   EXISTING_DETAIL=""
   if [[ -n "$EXISTING_ID" ]]; then
     if ! EXISTING_DETAIL="$(gh api "repos/$REPO/rulesets/$EXISTING_ID")"; then
@@ -234,6 +241,7 @@ if [[ -n "$PROFILE" ]]; then
       echo "error: existing ruleset is noncanonical or malformed; refusing customization." >&2
       exit 1
     fi
+  fi
   fi
 
   if [[ "$PROFILE" == "team" ]]; then
