@@ -45,6 +45,8 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Replaced the top-level README with the Human-on-the-Loop overview draft and committed the matching overview image at `docs/images/agentic-development-kit-overview.png`, preserving the owner-supplied source artifacts and provenance in `.github/docs/context/readme-redesign/`.
+
 - The top-level Copilot app role is now called the `Project session`, and new
   sessions use the name `Project`. Existing sessions named `Program` remain
   valid; no branch, label, issue, PR, Task-ritual, or runtime session migration

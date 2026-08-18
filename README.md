@@ -1,474 +1,329 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/docs/logo.png"
-       width="200" alt="A circular emblem: a fairy conductor, eyes closed, raising a baton as notes drift upward">
+  <img
+    src="https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/docs/logo.png"
+    width="180"
+    alt="A circular emblem showing a fairy conductor raising a baton as musical notes drift upward"
+  >
 </p>
 
-# Agentic Development Kit
+<h1 align="center">Agentic Development Kit for GitHub Copilot</h1>
 
-Three things go wrong when you hand work to AI agents. You cannot **see** what
-was done. Decisions **scatter** across chat windows. And you are never sure
-**how much** you can safely delegate. This repository is a working answer to
-those three — as plain files you can version, review and change.
+<p align="center">
+  <strong>A GitHub-native, Copilot-app-first Human-on-the-Loop control harness for agentic software development.</strong>
+</p>
 
-**Agentic Development** is the name for that answer: a layer of practice laid
-over the process you already run. Waterfall, Scrum, Kanban — it replaces none
-of them. Requirements, design, implementation, test and release stay exactly
-where they are. What changed is *who does the work*. The moment a worker with
-no memory joins the team, the process quietly loses the human recall and
-oversight it was always built on. This layer fills that hole.
+<p align="center">
+  <a href="https://github.com/mochan-tk/agentic-dev-kit-for-copilot/actions/workflows/ci.yml">
+    <img
+      src="https://github.com/mochan-tk/agentic-dev-kit-for-copilot/actions/workflows/ci.yml/badge.svg"
+      alt="CI status"
+    >
+  </a>
+  <a href="LICENSE">
+    <img
+      src="https://img.shields.io/badge/License-MIT-blue.svg"
+      alt="MIT License"
+    >
+  </a>
+</p>
 
-## Two theses
+GitHub Copilot agents run bounded inner loops: they plan, implement, test,
+repair, and return evidence. Humans stay on the outer loop: they set intent
+and risk policy, observe durable state, intervene on exceptions, and retain
+agreement, acceptance, and merge authority.
 
-It starts somewhere unremarkable: **an AI agent is a new team member.** You
-hand a colleague work as an issue, take delivery as a pull request, and judge
-quality by review. GitHub already carries that machinery, so working with
-agents needs no new one.
+This kit turns GitHub into the shared control surface:
 
-The analogy then breaks in exactly three places, and everything here follows
-from them. An agent **loses its memory every morning** — yesterday's agreement
-and the correction you typed are both gone. It **multiplies faster than you
-can watch** — three capable colleagues become ten overnight. And its
-**probation never ends** — trust does not accumulate the way it does with a
-human hire.
+- **Issues** hold work orders, plans, dependencies, escalations, and outcomes.
+- **Copilot app sessions** provide the nested execution and supervision tree.
+- **Worktrees, branches, and pull requests** isolate implementation work.
+- **Checks and evidence tables** make completion claims testable.
+- **Rulesets and governance sensors** expose delegation boundaries.
+- **Retrospectives** improve the loop itself, not only the latest output.
 
-From the first break comes the thesis the rest hangs on: **conversation
-evaporates; only what lands in the repository and its issues persists.** Not a
-slogan, a definition. A commit, an issue, a pull request comment — those are
-landings. A brilliant exchange inside a session is not, and by tomorrow it is
-indistinguishable from something that never happened.
+It does not replace Scrum, Kanban, Waterfall, or your delivery lifecycle. It
+adds a control layer for delegating work without making chat history, model
+memory, or agent self-report the source of truth.
 
-Three disciplines fall out of that, and they are the floor everything else
-stands on. **record-before-report**: the outcome is written to the issue
-before anyone is told. **verify-before-done**: a claim of completion cites a
-command or a check, never a memory. **single-writer**: parallel tasks never
-share a file, or the plan serialises them instead.
+> [!IMPORTANT]
+> The complete orchestration model is designed around the **GitHub Copilot
+> app**. Nested parent/child sessions, the multi-session sidebar, isolated
+> worktrees, and session-control tools are part of the operating model.
+>
+> A bounded implementation Task may occasionally be handed off to another
+> suitable environment, but those environments are not interchangeable
+> runtimes for the complete lifecycle.
 
-## The system learns
+## How it works
 
-A first failure is information. **The second of the same kind is a pattern**,
-and a pattern is answered with mechanism, not with a reminder in chat — you
-are talking to a colleague who forgets every morning. Land the lesson in a
-file and it reaches every surface and every future session at once. That is
-the `retro` loop, and it is why failure rates fall over a project's life: not
-because the models got smarter, but because the conventions grew.
+<p align="center">
+  <a href="docs/images/agentic-development-kit-overview.png">
+    <img
+      src="docs/images/agentic-development-kit-overview.png"
+      width="100%"
+      alt="Human-on-the-Loop overview of the Agentic Development Kit, with GitHub Copilot app as the primary runtime and GitHub as the durable control surface"
+    >
+  </a>
+</p>
 
-Some lessons turn out not to be about your project at all. Those go back to
-the template this kit ships as, so the next project starts where the last one
-finished — organizational learning, compounding.
+The Copilot app runs the nested execution hierarchy. GitHub holds the durable
+state. Humans supervise intent, risk, exceptions, and acceptance from the
+outer loop.
 
-## Start where you are
+```text
+Project session
+└─ Epic #<n> orchestrator session
+   └─ Task #<n> supervisor session
+      └─ PR #<n> worker session
+```
 
-None of this has to arrive at once.
+The **Project session** supervises the complete Epic set for one
+repository-level initiative. It is unrelated to a GitHub Projects board.
 
-- **Level 1 — record-before-report.** Make agents write results into issues
-  and pull requests first. Doable today, and "invisible" starts shrinking
-  immediately.
-- **Level 2 — delegate one task properly.** Write one self-contained issue,
-  hand it to an agent, watch CI go green, land the merge. One small loop, and
-  it doubles as the trial run for how much you can delegate.
-- **Level 3 — full operation.** Verification gates, the actionable frontier,
-  parallel sessions, the learning loops above.
+| Session | Responsibility |
+|---|---|
+| **Project** | Start Epic sessions, watch across phases, and replan the outline |
+| **Epic orchestrator** | Calculate the frontier, dispatch Tasks, monitor, integrate, and replan |
+| **Task supervisor** | Claim, plan, apply risk gates, create the worker, verify, escalate, and record the outcome |
+| **PR worker** | Implement, test, repair, commit, and update one PR inside its ownership boundary |
 
-You can tell which step you are on by the shape of the pain. Results scattered
-across chat windows? Start at 1. Delegation works, but only for the one person
-who knows the trick? Start at 2. Already running work in parallel? Take the
-Level 3 parts in whatever order hurts most.
+Project and Epic sessions conduct; they do not implement.
 
-## How it is put together
+## Why this exists
 
-Everything here is plain files: version them, review them, let the loops
-change them. Two properties shape the rest. The kit is **generic by design** —
-project truth is injected once, through the `project-onboarding` skill, and
-kept honest afterwards by `.github/scripts/tuning-status.sh`, so the same
-template serves any project and can be sharply tuned the moment a target
-arrives. And its execution plane is **Copilot-native**: the GitHub ledger and
-`AGENTS.md` stay platform-neutral, while every other agent-facing surface —
-skills, custom agents, prompts, instruction files, CI walls — is built for
-GitHub Copilot exclusively. The lifecycle is conducted from the **GitHub
-Copilot app**, whose parent/child sessions carry the orchestration model, with
-the Copilot cloud (coding) agent, Copilot CLI and IDE agents executing
-individual tasks. Other platforms get the constitution and the ledger —
-nothing else is promised.
+Without a harness, agent work becomes hard to see, decisions scatter across
+sessions, and delegation boundaries remain vague.
 
-Human judgment does not spread evenly across this lifecycle; it concentrates
-at dispatch and at the **Three Merges**: the **agreement merge** (a
-`.github/docs/agreements/` PR turns distilled context into reviewed truth), the
-**license merge** (the onboarding evidence PR lands run-verified commands —
-every command agents can verify unsupervised widens what may be delegated),
-and the **completion merge** (a task PR whose evidence table proves its
-acceptance criteria). Everything between these points is designed to run
-without a human in the loop.
+A completion claim therefore needs durable answers: which Task ran, which PR
+contains the change, which checks passed, what remains uncertain, and who has
+authority to accept it.
 
-## The lifecycle
+Session history is useful transport, but it is not shared, authoritative
+project state. Anything that must outlive one execution lands on GitHub.
 
-| Phase | What happens | Lives in |
+Trust attaches to a bounded Task, owned paths, deterministic checks, evidence,
+and escalation paths—not to a model name or an agent's confidence.
+
+## Human-on-the-Loop by design
+
+**Human-on-the-Loop (HOTL)** means routine work can proceed without a human
+approving every tool call, while the human remains able to observe, stop,
+redirect, reject, or accept the work.
+
+| Mode | Typical trigger | Human role |
 |---|---|---|
-| 0. Onboard | Tune the scaffold to the project: inventory → gap interview → run-verified commands → fill every CUSTOMIZE → evidence PR | `project-onboarding` skill, `tuning-status.sh` |
-| 1. Collect | Land raw information with provenance — *pluggable via context connectors* (`.github/connectors/`): the built-in interview flow is the default, an existing spec-kit workspace can be adopted instead | `.github/docs/context/` via `context-collection` skill; `setup-sources.sh` wizard |
-| 2. Distill & agree | Turn raw material into reviewed truth (REQ/ADR/glossary/non-goals) via PR — *only when a decision must outlive its task* (promotion bar in the skill); place each piece of knowledge in a context tier. With a non-builtin connector, the enabled source satisfies the same Context Contract | `.github/docs/agreements/` via `context-distillation` skill; contract in `.github/connectors/README.md` |
-| 3. Plan & orchestrate | Rolling-wave issue graph (Epics → just-in-time Task sub-issues, `blocked-by` ordering, actionable frontier); parent/child sessions execute it | `plan-management` + `session-orchestration` skills, issue templates |
-| 4. Route & execute | Each task carries one `exec:*` label + Routing block deciding surface, role, and model tier | `task-routing` skill, `.github/agents/` |
-| 5. Verify & learn | Layered gates (CI → security → AI review → human), evidence tables, and `retro:` PRs that improve the system itself — upstreaming what is project-agnostic | `verification` + `retro` skills, `ci.yml`, rulesets |
+| **Human-on-the-Loop** | Normal, bounded, reversible work | Observe durable state and intervene on exceptions |
+| **Human-in-the-Loop** | `risk:high`, ambiguity, scope drift, irreversible action | Approve or decide before work continues |
+| **Human-in-Command** | Agreements, governance exceptions, acceptance, merge | Retain authority and accountability |
 
-## Repository map
+The normal path is HOTL. The process returns to HITL when risk, ambiguity, or
+evidence quality requires it.
 
-```
-AGENTS.md                          Operating constitution (all agents, all surfaces)
-SCAFFOLD-CHANGELOG.md              Template lineage: adopted version, upgrade path
-LICENSE                            MIT
-.gitignore                         Hygiene: session plan.md, OS/editor cruft stay untracked
-.gitattributes                     Line-ending pin: scaffold paths stay LF so the bash
-                                   scripts survive Windows checkouts (core.autocrlf)
-docs/                              This repository's own development records: context
-                                   collections and ADRs about the scaffold itself
-                                   (the installer never ships it)
-.github/
-  CODEOWNERS                       Human review gate on agreements/, workflows/, connectors/
-  copilot-instructions.md          Repo practicalities: layout, validated commands, PR mechanics
-  dependabot.yml                   Weekly version updates for pinned GitHub Actions
-  instructions/                    Path-scoped rules (.github/docs/, firmware/, code review)
-  agents/                          Roles: orchestrator, planner, reviewer (*.agent.md)
-  skills/                          Procedures (SKILL.md each):
-    project-onboarding/              tune the installed scaffold to the project
-    context-collection/              intake with provenance
-    context-distillation/            agreements + context tiering
-    plan-management/                 issue graph, frontier, replanning
-      scripts/                         frontier.sh, new-task.sh
-      templates/                       canonical epic/task issue bodies
-    task-routing/                    exec:* surface, role, model tier
-    session-orchestration/           parent/child session protocol
-    verification/                    gates, evidence, CI-failure triage
-    retro/                           failures -> system improvements (+ upstreaming)
-  prompts/                         VS Code Copilot Chat shortcuts to the skills
-                                   above (the app loads the skills directly)
-  connectors/                      Context connectors: Contract + conformance rules
-                                   (README.md), builtin + speckit definitions, template
-  ISSUE_TEMPLATE/                  Web forms mirroring the canonical bodies
-  PULL_REQUEST_TEMPLATE.md         Evidence table + deviations + checklist
-  workflows/                       ci.yml (quality, task-ritual, scaffold-self-check,
-                                   copilot-surface jobs),
-                                   copilot-setup-steps.yml (cloud agent env),
-                                   retro-hygiene.yml (monthly review issue)
-  docs/
-    adopter-feedback.md            Feedback mechanism: what is sent, how to disable
-    context/                       Phase-1 raw intake
-    agreements/                    Phase-2 reviewed truth (+ retro-log.md)
-  scripts/
-    check-action-pins.sh           Action references SHA-pinned (quality)
-    check-md-links.sh              Markdown path references resolve (scaffold-self-check)
-    check-template-sync.sh         Issue forms <-> body templates in sync (scaffold-self-check)
-    retro-hygiene.sh               Retro candidates + always-on budget report (--create-issue)
-    scaffold-init.sh               One-liner installer: adopt (or --upgrade) the scaffold in any repo
-    setup-labels.sh                Bootstrap the canonical label set
-    setup-project.sh               Bootstrap the optional Projects v2 roadmap board
-    governance-status.sh           Effective branch-governance sensor: health vs intent
-    governance-drift.sh            Upgrade-drift sensor: control definitions vs tuned files
-    ownership-overlap.sh           Parallel-dispatch sensor: Task ownership overlap
-    setup-ruleset.sh               Branch ruleset actuator and dry-run candidate preview
-    setup-sources.sh               Activate a context connector (writes the SOURCES.md registry)
-    tests/                         Offline regression tests for the CI guards (run-tests.sh)
-    tuning-status.sh               Tuned or not? (report / --ci / --quiet)
-.vscode/mcp.json                   MCP servers for interactive surfaces
-.devcontainer/                     Codespaces / Dev Containers env for kit contributors
-                                   (the installer never ships it)
+### Three governance merges
+
+| Merge | What becomes authoritative |
+|---|---|
+| **Agreement merge** | Distilled context becomes reviewed project truth |
+| **License merge** | Onboarding evidence establishes delegation readiness |
+| **Completion merge** | A Task PR is accepted because its evidence supports the acceptance criteria |
+
+“License” means **delegation readiness**, not the repository's legal license.
+Humans may also intervene through `needs:human`, `needs:replan`, failed
+checks, review comments, or the `risk:high` gate.
+
+## Core disciplines and loops
+
+| Discipline | Rule |
+|---|---|
+| **record-before-report** | Write the durable Issue or PR record before sending a session message |
+| **verify-before-done** | Cite current ground truth—not memory |
+| **single-writer** | Parallel Tasks own disjoint paths; otherwise serialize them |
+| **escalate-don't-guess** | Ambiguity, contradiction, blockage, or scope drift returns to a human or replanning path |
+
+The full operating constitution lives in [`AGENTS.md`](AGENTS.md).
+
+```text
+Worker loop:   edit → test → observe → repair
+Task loop:     claim → plan → dispatch → verify → outcome
+Epic loop:     frontier → dispatch → integrate → replan
+Project loop:  start phase → watch across Epics → replan
+Learning loop: friction → retro → mechanism → future improvement
 ```
 
-Everything the scaffold owns lives in `.github/` (plus root `AGENTS.md`,
-`README.md`, `SCAFFOLD-CHANGELOG.md`); every other top-level path belongs
-to your application and is never touched by the scaffold's checks.
+This is **Loop Engineering**: improve the harness around the agent, not only
+the prompt. Repeated failures become instructions, Skills, templates, tests,
+or CI guards. General improvements can be upstreamed to this scaffold.
 
-## Conventions at a glance
+## Lifecycle
 
-- **Unit of work:** 1 Task issue = 1 session = 1 worktree/branch
-  (`task/<issue-number>-<short-slug>`) = 1 PR (`Closes #<n>`).
-- **Labels:** `type:epic`, `type:task`, `ai:ready`, `needs:human`,
-  `needs:replan`, and exactly one of `exec:cloud | exec:app | exec:cli |
-  exec:ide` per task. Three more are situational, not per-task:
-  `risk:high` pauses a task after its plan comment until a human approves
-  (the default is pass-through), `retro:candidate` marks observed friction
-  for the retro loop, and `from:adopter` marks a feedback report — triage
-  input, not a work order.
-- **Task issue sections (parsed — do not rename):** Objective, Context &
-  references, Acceptance criteria, Out of scope, File ownership,
-  Verification, Routing, Handoff notes.
-- **Frontier** (what may run now): open `type:task` issues labeled
-  `ai:ready` whose `blocked by` issues are all closed —
-  `.github/skills/plan-management/scripts/frontier.sh`.
-- **Reporting:** record-before-report (issue comment first, session message
-  second) and verify-before-done (`gh`/`git` ground truth, never memory).
-  A task's timeline reads start → plan → outcome; the issue body is the
-  requester-owned work order and is never edited by the executing agent.
+| Phase | What happens | Human role |
+|---|---|---|
+| **0. Onboard** | Inventory, validate commands, tune the scaffold, draft Epics, and open an evidence PR | Review and merge delegation readiness |
+| **1. Collect** | Land raw information with provenance | Provide or approve sources |
+| **2. Distill and agree** | Promote durable decisions into requirements, ADRs, glossary entries, and non-goals | Approve the agreement merge |
+| **3. Plan and orchestrate** | Build a rolling-wave Issue graph and calculate the actionable frontier | Set goals, priorities, constraints, and exceptions |
+| **4. Route and execute** | Keep supervision in the app and run each implementation worker in the appropriate environment | Stay on the loop; approve risk-gated work |
+| **5. Verify and learn** | Run checks, review evidence, accept or replan, and promote repeated friction | Accept, reject, redirect, or approve a retro |
 
-## How context reaches an agent (tiering)
+## One Task, end to end
 
-Always-on files (`AGENTS.md`, `copilot-instructions.md`) stay lean and
-universal; path-scoped `.instructions.md` files load only for matching
-paths; skills load on demand by description; task-specific context travels
-in the Task issue itself. The `context-distillation` skill owns tier
-placement; the `retro` skill's Budget rule keeps always-on files from
-bloating. Resist the urge to put everything in always-on context — it
-degrades every request a little.
+1. Create a Task Issue with objective, acceptance criteria, out-of-scope
+   boundary, file ownership, verification, routing, and handoff notes.
+2. The Epic orchestrator opens a dedicated Task supervisor session.
+3. The supervisor claims the Task and records the plan.
+4. A `risk:high` Task pauses for approval; ordinary work proceeds through
+   lazy consensus.
+5. The supervisor creates one active implementation worker.
+6. The worker implements and verifies one pull request.
+7. The supervisor independently checks the PR, diff, checks, ownership, and
+   evidence against current GitHub state.
+8. A human accepts, redirects, or rejects the work; repeated friction enters
+   the retro loop.
 
-## Getting started
+```text
+The Epic set     = one Project session
+One Epic Issue   = one Epic orchestrator session
+One Task Issue   = one Task supervisor session
+One pull request = one active worker + one worktree + one branch
+```
 
-**Prerequisites:** `gh` (authenticated — check with `gh auth status`; the
-setup scripts refuse to run without it), `jq`, and the **GitHub Copilot
-app** — the lifecycle runs on its session hierarchy (a Project session
-starts each Epic's session, which supervises its Tasks), which no other
-surface provides. Copilot CLI and IDE chat execute individual tasks
-alongside it; they are not substitutes for the app.
+A declared trivial Task may use the Task-supervisor no-worker exemption.
+Project and Epic conductors may not.
 
-The **Project session** is the top-level Copilot app session that supervises
-the complete Epic set for one repository-level initiative. It is unrelated to
-a GitHub Projects board.
+The full control hierarchy remains in the Copilot app. When an implementation
+Task requires a different environment, the Task may be handed off while its
+Issue and pull request remain authoritative. See
+[`task-routing`](.github/skills/task-routing/SKILL.md).
 
-**On Windows**, also install [Git for Windows](https://gitforwindows.org) —
-the app already requires Git, and its `bash.exe` is what runs these scripts.
-Do not type `bash` there: the installer leaves `…\Git\bin` off `PATH` by
-design, so `bash` finds the WSL launcher in `System32` instead. Run scaffold
-scripts through the launcher, which locates the real Git Bash for you:
-`pwsh .github/scripts/run.ps1 <script.sh> [arguments]`.
+## Quick start
 
-**Supported plans:** public repositories work on any GitHub plan; private
-ones require a paid plan (the scaffold relies on features that need one),
-so `setup-sources.sh` treats private + Free as a hard stop — make the
-repository public, or upgrade the plan.
+### Prerequisites
 
-**Platforms:** macOS and Linux natively (every script runs on stock
-bash ≥ 3.2).
+- a GitHub repository;
+- the **GitHub Copilot app**;
+- authenticated [`gh`](https://cli.github.com/);
+- `jq`;
+- Git and Bash 3.2 or later;
+- on Windows, [Git for Windows](https://gitforwindows.org/).
 
-- On Windows use WSL2, Git Bash, or the dev container — and type scaffold
-  commands into a Git Bash prompt: plain `bash ...` in PowerShell may
-  resolve to the WSL launcher, which lacks your `gh` login.
-- Contributing to the template itself? Open it in GitHub Codespaces or VS
-  Code Dev Containers — `.devcontainer/` provisions gh, jq, and the
-  CI-pinned shellcheck.
+Availability depends on GitHub and Copilot plans, repository visibility, and
+organization policy. Check the
+[official GitHub Copilot documentation](https://docs.github.com/en/copilot)
+for current requirements.
 
-1. **Install the scaffold** — at the root of your repository (new or
-   existing), run the installer. Swap in your `<owner>/<repo>` to adopt
-   from a fork.
+### 1. Install
 
-   ```sh
-   curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash
-   ```
+Run the installer from the root of a new or existing Git repository.
 
-   On Windows, use the PowerShell bootstrap (it locates Git for Windows
-   and runs the same bash installer through Git Bash):
+#### macOS / Linux
 
-   ```powershell
-   irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1 | iex
-   ```
+```sh
+curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash
+```
 
-   - Installs only what the scaffold owns — `.github/**`, `AGENTS.md`,
-     `SCAFFOLD-CHANGELOG.md` — plus `README.md` / `.gitignore` /
-     `.gitattributes` when you have none; never `LICENSE` or `.vscode/`.
-   - Stages the files without committing and records the adoption in
-     `SCAFFOLD-CHANGELOG.md`; the seeded `.gitattributes` pins scaffold
-     paths to LF so the bash scripts survive Windows checkouts.
-   - Commit them however your repository works — directly on the default
-     branch, or through a pull request. Step 4's ruleset makes the pull
-     request mandatory once it is in place, so the ritual wall exempts the
-     PR that adds `AGENTS.md` and `copilot-instructions.md` to a repository
-     that has neither. It has no Task issue to link because it is what
-     brings the ritual with it.
-   - Safety: collisions refuse unless you pass `--force`; `--dry-run`
-     previews the plan and writes nothing; symlinked paths always
-     refuse; the fetch is pinned to a commit SHA resolved before
-     download.
-   - `SCAFFOLD_REPO=owner/repo` and `SCAFFOLD_REF=<tag|branch|sha>`
-     select a different source or version.
-   - Until onboarding completes, CI shows `scaffold not onboarded`
-     warnings and agents are told not to trust the command sections.
+#### Windows PowerShell
 
-   **Already adopted?** Re-run with `--upgrade` to pull a newer scaffold
-   (append `--dry-run` to preview first):
+```powershell
+irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1 | iex
+```
 
-   - Scaffold-owned machinery is refreshed in place; your tuned surfaces
-     (`copilot-instructions.md`, workflows, `CODEOWNERS`, instructions,
-     `AGENTS.md`) and `.github/docs/**` are kept and listed.
-   - Review the staged diff and land it as one PR.
+On Windows, the bootstrap locates Git Bash from Git for Windows and runs the
+same canonical installer used on macOS and Linux.
 
-   ```sh
-   curl -fsSL https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.sh | bash -s -- --upgrade
-   ```
+The installer stages files but does not commit them, refuses unexpected
+collisions and symlinked paths, and records the resolved scaffold revision.
 
-   On Windows, plain `irm … | iex` cannot forward flags, so invoke it as
-   a script block:
+Land the adoption commit on the remote default branch before onboarding.
 
-   ```powershell
-   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/mochan-tk/agentic-dev-kit-for-copilot/main/.github/scripts/scaffold-init.ps1))) --upgrade
-   ```
+After installation, run scaffold Bash scripts on Windows through the included
+launcher:
 
-   *Done when:* `.github/scripts/tuning-status.sh` lists the pristine `CUSTOMIZE`
-   markers and exits non-zero — the untuned state is machine-visible.
-2. **Onboard** — run the `project-onboarding` skill in a Copilot app
-   session.
+```powershell
+pwsh .github/scripts/run.ps1 tuning-status.sh
+```
 
-   - It inventories the repo, asks only the gaps, verifies commands by
-     running them, and fills or removes every `CUSTOMIZE` block across
-     the Sync Triangle (`copilot-instructions.md` ⇄ `ci.yml` ⇄
-     `copilot-setup-steps.yml`).
-   - Along the way it bootstraps the canonical label set
-     (`.github/scripts/setup-labels.sh` — idempotent; `-R owner/repo`
-     targets another repo) and drafts one outline Epic per phase from your
-     goal and material for you to review.
-   - It ends with one evidence PR — review and merge it (the **license
-     merge**). Manual fallback: search the repo for `CUSTOMIZE` and fill
-     by hand.
-   - After the merge, review the drafted Epics and break the first phase
-     down into Task issues with the `plan-management` skill; full flow in
-     step 6.
+### 2. Onboard in the Copilot app
 
-   *Done when:* `.github/scripts/tuning-status.sh` exits 0 on the merged main.
-3. **MCP** — interactive surfaces read `.vscode/mcp.json`; for the cloud
-   agent and Copilot code review, mirror the servers in *Repository
-   settings → Copilot*.
+Run
+[`project-onboarding`](.github/skills/project-onboarding/SKILL.md).
 
-   - Secrets there must be prefixed `COPILOT_MCP_`; scope each server to
-     the minimal `tools` list.
-   - Keep the cloud agent's firewall and recommended allowlist enabled —
-     extend the allowlist per-domain when a task genuinely needs it,
-     never disable wholesale.
+It inventories the repository, verifies commands, tunes the scaffold, drafts
+phase Epics, opens one evidence PR, and creates the top-level session named
+`Project`.
 
-   *Done when:* each surface you use lists the servers you expect (skip
-   this step if you use none).
-4. **Branch ruleset on `main`** — require a pull request, the CI checks
-   from `ci.yml`, and at least one approval from someone other than the
-   author (this is what makes agent PRs human-gated); optionally
-   restrict who can modify `.github/workflows/` and
-   `.github/docs/agreements/`.
+Review and merge the evidence PR—the **license merge**. Onboarding is complete
+when this succeeds on the merged default branch:
 
-   - Onboarding asks for your consent and runs
-     `.github/scripts/setup-ruleset.sh` accordingly — activation is your
-     explicit choice, never silent.
-   - Repository admins keep a pull-request-only bypass (the explicit,
-     audited "bypass" button), because a solo adopter cannot approve
-     their own PRs; direct pushes stay blocked for everyone.
-   - Declined or skipped during onboarding? Re-run the script with
-     `--enforcement active` later — it promotes the existing disabled
-     ruleset in place instead of duplicating it.
+```sh
+bash .github/scripts/tuning-status.sh
+```
 
-   *Done when:* the ruleset shows **Active** in Settings → Rules →
-   Rulesets, and an unapproved test PR is blocked from merging.
+On Windows:
 
-### Governance sensors and dry-run actuator ([ADR-0004](.github/docs/agreements/adr/ADR-0004-hotl-governance-sensors.md))
+```powershell
+pwsh .github/scripts/run.ps1 tuning-status.sh
+```
 
-[ADR-0004](.github/docs/agreements/adr/ADR-0004-hotl-governance-sensors.md)
-draws a hard line: repository governance is observed by sensors and
-changed only by explicit adopter action. The three sensors below never mutate.
-`setup-ruleset.sh` is an actuator only when you invoke it without `--dry-run`.
-Use this section after onboarding or upgrades, before parallel dispatch, and
-before you rely on branch governance to gate agent work.
+### 3. Start the Project session
 
-- `bash .github/scripts/ownership-overlap.sh -R <owner/repo> <task>...` checks
-  Task **File ownership** declarations before parallel dispatch. Exit **0**
-  means the checked Tasks do not overlap; **1** means at least one overlap was
-  found; **2** means usage, authentication, or API failure; **3** means at
-  least one Task's ownership is uncheckable. The overlap check is a
-  conservative literal-prefix approximation, so false positives serialize work
-  rather than allowing an unproven parallel dispatch. Shared changelog
-  ownership is intentionally not suppressed.
-- `bash .github/scripts/governance-drift.sh --root . --strict` checks whether
-  the current governance control definitions still match the tuned scaffold.
-  Run it after installation, after scaffold upgrades, or whenever you suspect
-  the control catalog drifted. Exit **0** means the report completed with no
-  unwaived missing control under strict mode; **1** means strict drift was
-  found; **2** means invalid input, schema, or dependency evidence blocked the
-  report.
-- `bash .github/scripts/governance-status.sh -R <owner/repo>` checks whether
-  effective branch governance matches declared intent closely enough to trust.
-  Exit **0** means required controls are healthy with complete evidence; **1**
-  means a required control is `OFF`; **2** means usage or dependency failure;
-  **3** means at least one required fact is `UNKNOWN` or `UNCHECKABLE`, which
-  outranks `OFF` and is never safe to treat as healthy. API or authorization
-  failure therefore remains unknown, not inactive.
-- `bash .github/scripts/setup-ruleset.sh -R <owner/repo> --profile solo|team --dry-run`
-  previews a fresh ruleset candidate, and `--profile solo|team --reconcile --dry-run`
-  previews how the canonical same-name ruleset would be reconciled. Exit **0**
-  means a valid preview was produced; **1** means dependency, authentication,
-  API, canonical-ruleset, or issuer evidence blocked the operation; **2** means
-  invalid usage. Reconciliation requires both an explicit profile and exactly
-  one canonical ruleset with the expected name.
+Tell the `Project` session to start after the onboarding PR merges. It opens
+the first actionable Epic session, which decomposes the phase into bounded
+Task Issues.
 
-`governance-status.sh` accepts one-shot `--profile solo|team` overrides for the
-status check itself, while persisted `SCAFFOLD_GOVERNANCE_PROFILE` is the
-repository's declared long-lived intent. `solo` is the viable minimum profile.
-`team` is the opt-in hardened profile that additionally expects stale-review
-dismissal, latest-push approval, code-owner review, review-thread resolution,
-strict required checks, and required-check source binding. This repository's
-current docs must not be read as claiming that either profile is persisted
-today; inspect the live status output for that fact.
+### 4. Close the first loop
 
-Limits remain explicit. Eligible merge queues require `merge_group` CI
-coverage before you can rely on them. Authenticated runtime events, immutable
-roles, heartbeats, budgets, circuit breakers, pause/resume/cancel, and a
-supervision console remain outside repository-file authority. Revisit
-[#6](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/6)
-before enabling external contributors, delegation licenses, or auto-merge,
-whichever comes first.
-5. *(Optional)* **Roadmap board** — `.github/scripts/setup-project.sh init`
-   creates (or reuses) "<repo> roadmap" and links it to the repo.
+Dispatch one Task, review its evidence-bearing PR, accept or redirect it, and
+record repeated friction through the `retro` Skill.
 
-   - Fields: `Start date` / `Target date` plus a `Kind` single-select
-     (Epic/Task). Boards are always user/org-owned; the link surfaces
-     the board in the repository's Projects tab.
-   - Schedule issues with the `dates` subcommand — it also sets `Kind`
-     from the `type:epic` / `type:task` labels.
-   - Manual steps remain: create the Roadmap view in the project UI and
-     group it by `Kind` (`.github/skills/plan-management/SKILL.md`,
-     Roadmap scheduling). At org level you can additionally define issue
-     types and a Project with a Blocked view, keeping Project fields
-     derived from issues.
+## Governance and safety
 
-   *Done when:* the board is visible in the repository's Projects tab.
-6. **First run:**
-   - Collect sources into `.github/docs/context/<topic>/` (`context-collection`).
-   - When decisions must outlive their tasks, distill them
-     (`context-distillation`) →
-     agreements PR → human merges (= agreement). Skip when there is nothing
-     above the promotion bar yet — most knowledge rides in Task issues.
-   - Review the Epics drafted during onboarding — edit or replace them (form
-     or `templates/epic-body.md`) — then break the first phase down
-     (`plan-management`) → approve → Task issues
-     exist, wired and routed.
-   - Dispatch the frontier: `exec:cloud` → assign the issue to Copilot;
-     `exec:app` → open a parent session with the **orchestrator** agent and
-     let it spawn one child session per task (`session-orchestration`);
-     `exec:ide` → a human pairs in the IDE (hardware work lands here).
-   - PRs flow through the gates; on deviations replan (`plan-management`);
-     periodically run the `retro` skill so the system learns. Monthly, `retro-hygiene.yml` files
-     a `Retro hygiene review <YYYY-MM>` issue surfacing promotion-overdue
-     retro candidates and always-on budget drift.
-   *Done when:* the first task PR merges with its evidence table — you have
-   closed the loop once, and the kit is carrying your project.
+The kit includes read-only sensors for Task ownership overlap, effective
+branch governance, and governance drift after upgrades. Ruleset changes
+remain explicit adopter actions.
 
-## Scaffold lineage & upgrades (the second loop)
+`UNKNOWN` and `UNCHECKABLE` are non-success states, not permission to proceed.
 
-Within a project, the `retro` skill evolves this wiring via `retro:` PRs.
-Across projects, improvements flow both ways through the template
-repository: project-agnostic retro fixes are **upstreamed** (retro skill,
-Upstreaming section), and instances **upgrade** by diffing against template
-tags and cherry-picking while keeping their tunings — procedure and version
-history in `SCAFFOLD-CHANGELOG.md`. Rule of thumb: procedures, templates,
-and gates are upgradable; the Sync Triangle content and `applyTo` globs are
-project truth and stay put.
+See:
 
-## Adopter feedback (consent-gated, allowlist-only)
+- [ADR-0004: governance sensors and actuators](.github/docs/agreements/adr/ADR-0004-hotl-governance-sensors.md)
+- [`governance-status.sh`](.github/scripts/governance-status.sh)
+- [`ownership-overlap.sh`](.github/scripts/ownership-overlap.sh)
+- [`governance-drift.sh`](.github/scripts/governance-drift.sh)
 
-When an interactive scaffold script fails unexpectedly, it *offers* — never
-sends automatically — to file a public issue upstream via your own `gh`,
-containing only a fixed eight-field allowlist: no logs, paths, or
-environment data. The body is previewed first, the default answer is No,
-and deleting `.github/scripts/feedback-lib.sh` disables the offer.
-Full description: `.github/docs/adopter-feedback.md`.
+> [!NOTE]
+> This is a repository-level harness, not a complete runtime control plane.
+> Repository files cannot truthfully provide immutable runtime roles,
+> authenticated session-transition events, heartbeats, budgets, circuit
+> breakers, universal pause/resume/cancel, or a unified supervision console.
 
-## Origin note
+Issue
+[#6: Ritual wall threat model](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/6)
+tracks the authenticity and freshness limits of comment-based ritual evidence.
 
-Licensed MIT (see `LICENSE`).
+## Documentation
 
-Conventions here encode one team's answers to: "how do we stay oriented when
-many agents work in parallel?" (issue graph + frontier + record-before-report),
-"how do we switch tools without re-briefing?" (routing labels + shared
-instructions/skills read by every surface), and "how do we keep agents
-honest?" (evidence tables + verify-before-done + layered gates). Adjust via
-PRs; log the reasons in `.github/docs/agreements/retro-log.md`.
+| Topic | Source |
+|---|---|
+| Operating constitution | [`AGENTS.md`](AGENTS.md) |
+| Project onboarding | [`project-onboarding`](.github/skills/project-onboarding/SKILL.md) |
+| Planning and frontier | [`plan-management`](.github/skills/plan-management/SKILL.md) |
+| Session hierarchy and Task ritual | [`session-orchestration`](.github/skills/session-orchestration/SKILL.md) |
+| Worker routing | [`task-routing`](.github/skills/task-routing/SKILL.md) |
+| Evidence and completion gates | [`verification`](.github/skills/verification/SKILL.md) |
+| Learning and upstreaming | [`retro`](.github/skills/retro/SKILL.md) |
+| Version and upgrades | [`SCAFFOLD-CHANGELOG.md`](SCAFFOLD-CHANGELOG.md) |
+
+This project is not a replacement for your delivery methodology, a hosted
+autonomous runtime, or a guarantee that agent-generated code is correct. It
+is a versioned harness for deciding **what may be delegated, under which
+constraints, with which evidence, and where humans retain authority**.
+
+## Contributing
+
+Use the same process the scaffold defines: bounded Task, explicit ownership,
+plan before implementation, one active worker, evidence before completion,
+and retro for repeated friction. Start with [`AGENTS.md`](AGENTS.md).
+
+## License
+
+Licensed under the [MIT License](LICENSE).
