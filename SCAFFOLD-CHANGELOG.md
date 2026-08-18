@@ -45,6 +45,16 @@ inherit what this one learned.
 
 ### Unreleased
 
+- Operator-facing governance documentation now integrates ADR-0004's sensor and
+  actuator boundary in one place: the README maps `ownership-overlap.sh`,
+  `governance-drift.sh`, `governance-status.sh`, and `setup-ruleset.sh`
+  dry-runs into the getting-started flow, explains their meaningful exit
+  states, and records the remaining limits and reopening trigger for runtime
+  capabilities that repository files still cannot truthfully provide. This
+  closes the integration pass for Epic #71 after the producer Tasks for
+  ownership overlap, drift detection, profile reconciliation, and persisted
+  governance intent landed (#88, #91, #96, #109).
+
 - Shared code-review instructions now assign each check to a mechanism instead
   of asking every reviewer to perform one impossible all-purpose pass. Rubber
   Duck owns supported-surface in-loop critique; Copilot code review owns
