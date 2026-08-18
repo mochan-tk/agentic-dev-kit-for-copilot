@@ -58,6 +58,7 @@ Options:
   --profile <solo|team>    Persist explicit governance intent and create a
                            fresh profile ruleset. Existing rulesets require
                            separate reconciliation.
+  --reconcile              Require --profile and reconcile one canonical same-name ruleset.
   --dry-run                Print the request JSON body to stdout and exit
                            without making any API call.
   -h, --help               Show this help and exit.
@@ -79,6 +80,7 @@ ENFORCEMENT="disabled"
 NAME="scaffold-branch-protection"
 DRY_RUN="false"
 PROFILE=""
+RECONCILE="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -105,6 +107,7 @@ while [[ $# -gt 0 ]]; do
       shift 2 ;;
     --dry-run)
       DRY_RUN="true"; shift ;;
+    --reconcile) RECONCILE="true"; shift ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -112,6 +115,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+[[ "$RECONCILE" != "true" || -n "$PROFILE" ]] || { echo "error: --reconcile requires an explicit --profile" >&2; exit 2; }
 command -v jq >/dev/null 2>&1 || { echo "error: jq not found on PATH" >&2; exit 1; }
 
 # Build the request body with jq so every value is safely quoted. `$name`,
@@ -161,7 +165,7 @@ PAYLOAD="$(jq -n \
   }')"
 
 if [[ -n "$PROFILE" ]]; then
-  if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" ]]; then
+  if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" && "$RECONCILE" != "true" ]]; then
     echo "dry-run: explicit solo candidate; no API call made." >&2
     printf '%s\n' "$PAYLOAD"
     exit 0
@@ -178,16 +182,66 @@ if [[ -n "$PROFILE" ]]; then
   if [[ "$DRY_RUN" != "true" ]]; then
     gh api user --jq .login >/dev/null 2>&1 \
       || { echo "error: gh is not authenticated" >&2; exit 1; }
-    if ! RULESETS_JSON="$(gh api "repos/$REPO/rulesets")"; then
-      echo "error: could not list rulesets for $REPO; aborting before writes." >&2
+  fi
+  if [[ "$DRY_RUN" != "true" || "$RECONCILE" == "true" ]]; then
+  if ! RULESETS_JSON="$(gh api "repos/$REPO/rulesets")"; then
+    echo "error: could not list rulesets for $REPO; aborting before writes." >&2
+    exit 1
+  fi
+  MATCH_COUNT="$(printf '%s' "$RULESETS_JSON" \
+    | jq --arg name "$NAME" '[.[] | select(.name == $name)] | length')"
+  [[ "$MATCH_COUNT" -le 1 ]] || {
+    echo "error: multiple same-name rulesets found; expected exactly one." >&2
+    exit 1
+  }
+  EXISTING_ID="$(printf '%s' "$RULESETS_JSON" \
+    | jq -r --arg name "$NAME" '[.[] | select(.name == $name)][0].id // empty')"
+  [[ "$RECONCILE" != "true" || "$MATCH_COUNT" -eq 1 ]] || { echo "error: --reconcile requires exactly one same-name ruleset." >&2; exit 1; }
+  [[ "$RECONCILE" == "true" || "$MATCH_COUNT" -eq 0 ]] || { echo "error: same-name ruleset requires --reconcile." >&2; exit 1; }
+  EXISTING_DETAIL=""
+  if [[ -n "$EXISTING_ID" ]]; then
+    if ! EXISTING_DETAIL="$(gh api "repos/$REPO/rulesets/$EXISTING_ID")"; then
+      echo "error: ruleset detail read failed; aborting before writes." >&2
       exit 1
     fi
-    EXISTING_ID="$(printf '%s' "$RULESETS_JSON" \
-      | jq -r --arg name "$NAME" '[.[] | select(.name == $name)][0].id // empty')"
-    if [[ -n "$EXISTING_ID" ]]; then
-      echo "error: ruleset '$NAME' already exists; explicit-profile reconciliation required." >&2
+    if ! printf '%s' "$EXISTING_DETAIL" | jq -er \
+      --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" '
+      ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
+       | map(select(length > 0)) | sort) as $want
+      | [.rules[] | select(.type == "pull_request")] as $pr
+      | [.rules[] | select(.type == "required_status_checks")] as $rs
+      | ($rs[0].parameters.required_status_checks // []) as $got
+      | ($pr[0].parameters | del(.allowed_merge_methods,.required_reviewers)) as $prp
+      | ($rs[0].parameters | del(.do_not_enforce_on_create)) as $rsp
+      | select((.id | tostring) == $id and .name == $name and .target == "branch"
+          and (.enforcement == "active" or .enforcement == "disabled")
+          and .bypass_actors == [{actor_id:5,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+          and .conditions == {ref_name:{include:["~DEFAULT_BRANCH"],exclude:[]}}
+          and (.rules | length) == 2 and ($pr | length) == 1 and ($rs | length) == 1
+          and ($pr[0].parameters.allowed_merge_methods? // ["merge","squash","rebase"])
+              == ["merge","squash","rebase"]
+          and ($pr[0].parameters.required_reviewers? // []) == []
+          and ($rs[0].parameters.do_not_enforce_on_create? // false) == false
+          and ($rsp | keys | sort) == ["required_status_checks","strict_required_status_checks_policy"]
+          and ([$got[].context] | sort) == $want and ($got | length) == ($want | length))
+      | if $prp == {required_approving_review_count:1,
+            dismiss_stale_reviews_on_push:false,require_code_owner_review:false,
+            require_last_push_approval:false,required_review_thread_resolution:false}
+          and $rs[0].parameters.strict_required_status_checks_policy == false
+          and all($got[]; (keys | sort) == ["context"]) then "solo"
+        elif $prp == {required_approving_review_count:1,
+            dismiss_stale_reviews_on_push:true,require_code_owner_review:true,
+            require_last_push_approval:true,required_review_thread_resolution:true}
+          and $rs[0].parameters.strict_required_status_checks_policy == true
+          and all($got[]; (keys | sort) == ["context","integration_id"]
+            and (.integration_id | type) == "number" and .integration_id >= 0
+            and (.integration_id | floor) == .integration_id)
+          and ([$got[].integration_id] | unique | length) == 1 then "team"
+        else empty end' >/dev/null; then
+      echo "error: existing ruleset is noncanonical or malformed; refusing customization." >&2
       exit 1
     fi
+  fi
   fi
 
   if [[ "$PROFILE" == "team" ]]; then
@@ -276,10 +330,30 @@ EOF
     fi
   fi
 
-  if ! RESPONSE="$(printf '%s' "$PAYLOAD" \
+  if [[ -n "$EXISTING_ID" ]]; then
+    EXISTING_ENFORCEMENT="$(printf '%s' "$EXISTING_DETAIL" | jq -r '.enforcement')"
+    if [[ "$PROFILE" == "solo" ]]; then
+      if [[ "$EXISTING_ENFORCEMENT" != "$ENFORCEMENT" ]]; then
+        gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" \
+          -f enforcement="$ENFORCEMENT" >/dev/null
+      fi
+    elif ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
+      {name,target,enforcement,bypass_actors,conditions,
+       rules:(.rules | map(
+         if .type == "pull_request" then
+           .parameters |= del(.allowed_merge_methods,.required_reviewers)
+         elif .type == "required_status_checks" then
+           .parameters |= del(.do_not_enforce_on_create)
+         else . end))} == $wanted' >/dev/null; then
+      printf '%s' "$PAYLOAD" \
+        | gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" --input - >/dev/null
+    fi
+    echo "Reconciled ruleset '$NAME' (id: $EXISTING_ID) on $REPO."
+    exit 0
+  elif ! RESPONSE="$(printf '%s' "$PAYLOAD" \
     | gh api --method POST "repos/$REPO/rulesets" --input -)"; then
-    echo "error: governance intent persisted, but ruleset creation failed." >&2
-    exit 1
+      echo "error: governance intent persisted, but ruleset creation failed." >&2
+      exit 1
   fi
   RULESET_ID="$(printf '%s' "$RESPONSE" | jq -r '.id')"
   echo "Created ruleset '$NAME' (id: $RULESET_ID, enforcement: $ENFORCEMENT) on $REPO."
