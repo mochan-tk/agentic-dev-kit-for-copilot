@@ -20,7 +20,7 @@ small-task exemption, the label routes that single session.
 **A Task supervisor runs on the default agent** with
 `.github/skills/session-orchestration/SKILL.md` as its manual — the ritual is
 fully described there, so no separate role definition exists. Do not pick
-`orchestrator` for it: that role conducts the program and Epic layers, and
+`orchestrator` for it: that role conducts the Project and Epic layers, and
 its loop is written for a different job.
 
 ## Routing inputs

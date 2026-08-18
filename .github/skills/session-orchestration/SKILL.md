@@ -15,7 +15,7 @@ record on GitHub while using sessions for speed.
 
 | Plan object | Session object | Workspace object |
 |---|---|---|
-| The Epic set (whole project) | One program session (conductor of conductors) | — |
+| The Epic set (whole project) | One Project session (conductor of conductors) | — |
 | Epic issue | Parent (orchestrator) session | — |
 | Task issue | One supervisor session (ritual only, no code edits) | — |
 | Pull request | One active worker session | One worktree + branch `task/<n>-<slug>` (or accepted tool-prefixed variant) |
@@ -48,7 +48,7 @@ it. Sub-agents remain fine for what they are — bounded read-only research
 inside one turn.
 
 **Role boundaries.** A session's role is fixed when it is created; it is not
-something a session reasons its way out of mid-run. A conductor (program or
+something a session reasons its way out of mid-run. A conductor (Project or
 Epic) that finds itself about to edit application files, check out a Task
 branch, or commit has met the boundary, whatever the justification: file or
 locate the Task issue, dispatch it, and verify — or escalate (§6). "It is
@@ -251,9 +251,9 @@ You are the WORKER session for Task issue #<n> in <owner>/<repo>.
 - Do NOT post comments on the issue; report to your supervisor session and stop.
 ```
 
-## Program session protocol
+## Project session protocol
 
-One program session per project, created by onboarding as its closing move
+One Project session per project, created by onboarding as its closing move
 (`project-onboarding` P6) once the phase Epics exist, and kept for the life
 of the plan. It conducts conductors: it never decomposes, dispatches Tasks,
 or edits code itself. Its first move waits for the onboarding evidence PR to
@@ -264,22 +264,22 @@ merge — a phase started against a half-tuned repository verifies nothing.
    Epic number and nothing else; the Epic is the brief. Name it `Epic #<n>`
    (session naming: §Copilot app session tree).
 2. **Epic sessions are siblings, not descendants.** An Epic session that
-   sees the next phase becoming actionable reports that to the program
+   sees the next phase becoming actionable reports that to the Project
    session rather than starting a peer itself: sessions spawning their
    successors nest one level deeper per phase, and after a few phases the
    tree is unreadable. Epics are siblings in the issue graph; their sessions
    mirror that.
 3. **Watch across Epics, not within one.** Phase-spanning trouble is the
-   program session's business: an Epic whose blockers never clear, a
+   Project session's business: an Epic whose blockers never clear, a
    dependency that turns out to be backwards, repeated escalations of the
    same shape. Within an Epic, its own session decides.
 4. **Replan across phases** (`plan-management` skill) when reality diverges
    from the outline — reordering phases, splitting one, dropping another.
    Record the rationale on the affected Epic, not in session memory.
-5. **Ending.** Program sessions die like any other: before one ends, the
+5. **Ending.** Project sessions die like any other: before one ends, the
    state of play must be legible from GitHub alone — each Epic's status
    visible from its issue, its comments, and the board. Whoever restarts a
-   program session reads the graph, not the transcript.
+   Project session reads the graph, not the transcript.
 
 ## Parent session protocol
 
@@ -327,14 +327,14 @@ merge — a phase started against a half-tuned repository verifies nothing.
 6. Route `needs-replan` outcomes to the planner procedure
    (`plan-management` §Replanning) and post the rationale on the Epic.
 7. When the Epic's phase is done — its Tasks closed, their PRs merged, the
-   Epic's own state line current — tell the program session so the next
+   Epic's own state line current — tell the Project session so the next
    phase gets a session, then stop. Do not start that session yourself and
-   do not carry on as it: the program session keeps Epic sessions siblings
-   (see Program session protocol), and a session that continues into the
+   do not carry on as it: the Project session keeps Epic sessions siblings
+   (see Project session protocol), and a session that continues into the
    next phase makes the tree a single thread again. Stay open until the
    Epic closes — rework and late questions come back here. If
-   no program session is running, say so in the Epic's closing comment and
-   name the next Epic, so a human or a fresh program session can pick it up.
+   no Project session is running, say so in the Epic's closing comment and
+   name the next Epic, so a human or a fresh Project session can pick it up.
 
 ## Copilot app session tree
 
@@ -352,7 +352,7 @@ tree. Two structural facts shape it:
   resuming from the ledger.
 
 **Name sessions after what they work on**, so a sidebar of open sessions can
-be read without opening any of them: `Program`, `Epic #1`, `Task #6
+be read without opening any of them: `Project`, `Epic #1`, `Task #6
 supervisor`, `PR #12 worker`. Keep the `#` — a bare number could be anything,
 and a worker's PR number is not its Task's. Issue titles stay out: names are
 display strings in a narrow column, where short and uniform beats descriptive
@@ -380,7 +380,7 @@ acknowledges → only then does the requester archive the supervisor.
 **Conducting sessions are not torn down with them.** Teardown covers the
 executing layers only: workers and Task supervisors, which carry the
 heaviest context and whose record already lives on GitHub. An **Epic
-session lives until its Epic closes**; the **program session lives as long
+session lives until its Epic closes**; the **Project session lives as long
 as the plan**. Keeping them is what makes the tree readable — `Epic #1` and
 `Epic #2` side by side — and guarantees a live session owns starting the
 next phase. Archiving them instead leaves the plan with no conductor, and
