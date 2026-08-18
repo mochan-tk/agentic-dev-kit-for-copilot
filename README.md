@@ -161,7 +161,10 @@ docs/                              This repository's own development records: co
     scaffold-init.sh               One-liner installer: adopt (or --upgrade) the scaffold in any repo
     setup-labels.sh                Bootstrap the canonical label set
     setup-project.sh               Bootstrap the optional Projects v2 roadmap board
-    setup-ruleset.sh               Branch ruleset for the step-4 gates (consent-gated in onboarding)
+    governance-status.sh           Effective branch-governance sensor: health vs intent
+    governance-drift.sh            Upgrade-drift sensor: control definitions vs tuned files
+    ownership-overlap.sh           Parallel-dispatch sensor: Task ownership overlap
+    setup-ruleset.sh               Branch ruleset actuator and dry-run candidate preview
     setup-sources.sh               Activate a context connector (writes the SOURCES.md registry)
     tests/                         Offline regression tests for the CI guards (run-tests.sh)
     tuning-status.sh               Tuned or not? (report / --ci / --quiet)
@@ -343,6 +346,62 @@ bash ≥ 3.2).
 
    *Done when:* the ruleset shows **Active** in Settings → Rules →
    Rulesets, and an unapproved test PR is blocked from merging.
+
+### Governance sensors and dry-run actuator ([ADR-0004](.github/docs/agreements/adr/ADR-0004-hotl-governance-sensors.md))
+
+[ADR-0004](.github/docs/agreements/adr/ADR-0004-hotl-governance-sensors.md)
+draws a hard line: repository governance is observed by sensors and
+changed only by explicit adopter action. The three sensors below never mutate.
+`setup-ruleset.sh` is an actuator only when you invoke it without `--dry-run`.
+Use this section after onboarding or upgrades, before parallel dispatch, and
+before you rely on branch governance to gate agent work.
+
+- `bash .github/scripts/ownership-overlap.sh -R <owner/repo> <task>...` checks
+  Task **File ownership** declarations before parallel dispatch. Exit **0**
+  means the checked Tasks do not overlap; **1** means at least one overlap was
+  found; **2** means usage, authentication, or API failure; **3** means at
+  least one Task's ownership is uncheckable. The overlap check is a
+  conservative literal-prefix approximation, so false positives serialize work
+  rather than allowing an unproven parallel dispatch. Shared changelog
+  ownership is intentionally not suppressed.
+- `bash .github/scripts/governance-drift.sh --root . --strict` checks whether
+  the current governance control definitions still match the tuned scaffold.
+  Run it after installation, after scaffold upgrades, or whenever you suspect
+  the control catalog drifted. Exit **0** means the report completed with no
+  unwaived missing control under strict mode; **1** means strict drift was
+  found; **2** means invalid input, schema, or dependency evidence blocked the
+  report.
+- `bash .github/scripts/governance-status.sh -R <owner/repo>` checks whether
+  effective branch governance matches declared intent closely enough to trust.
+  Exit **0** means required controls are healthy with complete evidence; **1**
+  means a required control is `OFF`; **2** means usage or dependency failure;
+  **3** means at least one required fact is `UNKNOWN` or `UNCHECKABLE`, which
+  outranks `OFF` and is never safe to treat as healthy. API or authorization
+  failure therefore remains unknown, not inactive.
+- `bash .github/scripts/setup-ruleset.sh -R <owner/repo> --profile solo|team --dry-run`
+  previews a fresh ruleset candidate, and `--profile solo|team --reconcile --dry-run`
+  previews how the canonical same-name ruleset would be reconciled. Exit **0**
+  means a valid preview was produced; **1** means dependency, authentication,
+  API, canonical-ruleset, or issuer evidence blocked the operation; **2** means
+  invalid usage. Reconciliation requires both an explicit profile and exactly
+  one canonical ruleset with the expected name.
+
+`governance-status.sh` accepts one-shot `--profile solo|team` overrides for the
+status check itself, while persisted `SCAFFOLD_GOVERNANCE_PROFILE` is the
+repository's declared long-lived intent. `solo` is the viable minimum profile.
+`team` is the opt-in hardened profile that additionally expects stale-review
+dismissal, latest-push approval, code-owner review, review-thread resolution,
+strict required checks, and required-check source binding. This repository's
+current docs must not be read as claiming that either profile is persisted
+today; inspect the live status output for that fact.
+
+Limits remain explicit. Eligible merge queues require `merge_group` CI
+coverage before you can rely on them. Authenticated runtime events, immutable
+roles, heartbeats, budgets, circuit breakers, pause/resume/cancel, and a
+supervision console remain outside repository-file authority. Revisit
+[#6](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/6)
+before enabling external contributors, delegation licenses, or auto-merge,
+whichever comes first.
 5. *(Optional)* **Roadmap board** — `.github/scripts/setup-project.sh init`
    creates (or reuses) "<repo> roadmap" and links it to the repo.
 
