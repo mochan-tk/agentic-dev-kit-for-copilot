@@ -32,3 +32,14 @@ The new tests were committed before the production fix. The final PR
 records subsequent strengthened fixtures and green verification separately.
 The fixture contract is executable without attachments. Counts describe gh
 invocations, not HTTP requests, elapsed time, or measured savings.
+
+## Worker-observed green phase
+
+The focused harness and direct `/bin/bash` suite each passed 94 assertions.
+The direct run identified Bash `3.2.57(1)-release` and used that executable
+for all frontier children. The identical 50-row fixture now uses 53 total
+calls, with one state read per unique blocker. List/dependency/state errors
+exit nonzero without any stdout. Additional cases cover nodes/count
+completeness, repository identity, legacy metadata, and invocation freshness.
+The PR records full-suite and final-head CI evidence; these local observations
+do not imply authenticated scheduling or enforcement.

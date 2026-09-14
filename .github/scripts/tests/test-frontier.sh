@@ -6,7 +6,7 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 # shellcheck source=/dev/null
 . "$HERE/lib.sh"
 SENSOR="$ROOT/.github/skills/plan-management/scripts/frontier.sh"
-printf '# interpreter: BASH=%s BASH_VERSION=%s; all frontier children use "$BASH"\n' "$BASH" "$BASH_VERSION"
+printf '# interpreter: BASH=%s BASH_VERSION=%s; all frontier children use this executable\n' "$BASH" "$BASH_VERSION"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/frontier-test.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/bin" "$WORK/home" "$WORK/fixtures"
@@ -105,7 +105,9 @@ for bad in '{}' 'not-json' '{"blockedBy":[]}' \
   '{"blockedBy":{"nodes":[],"totalCount":"0"}}' \
   '{"blockedBy":{"nodes":[{"number":7}],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[null],"totalCount":1}}' \
-  '{"blockedBy":{"nodes":[{"number":7,"repository":{"nameWithOwner":"bad"}}],"totalCount":1}}'; do
+  '{"blockedBy":{"nodes":[{"number":7,"repository":{"nameWithOwner":"bad"}}],"totalCount":1}}' \
+  '{"blockedBy":{"nodes":[{"number":0,"repository":{"nameWithOwner":"a/repo"}}],"totalCount":1}}' \
+  '{"blockedBy":{"nodes":[],"totalCount":0}} {}'; do
   setup
   printf '%s\n' "$bad" > "$WORK/fixtures/fixture_repo-1.json"
   failure "invalid/incomplete dependency $bad" '#1'
@@ -174,13 +176,30 @@ run -R fixture/repo
 assert "explicit empty legacy dependency row succeeds" test "$RC" -eq 0
 assert "empty legacy row yields ready Task" grep -qx $'#1\tTask 1' "$WORK/out"
 setup
-dependencies 1 a/repo#7 b/repo#7 a/repo#7
+dependencies 1 a/repo#7 b/repo#7
+printf '2\tTask 2\n' >> "$WORK/fixtures/list"
+dependencies 2 a/repo#7
 printf 'CLOSED\n' > "$WORK/fixtures/a_repo-7.state"
 printf 'OPEN\n' > "$WORK/fixtures/b_repo-7.state"
 run -R fixture/repo --all
 assert "cross-repo JSON identity preserved" grep -qx $'#1\tTask 1\t(waiting on: b/repo#7)' "$WORK/out"
 assert "a/repo#7 state read once" test "$(grep -c 'view 7 --repo a/repo --json state' "$WORK/fixtures/calls")" -eq 1
 assert "b/repo#7 state read once" test "$(grep -c 'view 7 --repo b/repo --json state' "$WORK/fixtures/calls")" -eq 1
+setup
+dependencies 1 a/repo#7 a/repo#7
+failure "duplicate nodes cannot establish completeness" '#1'
+setup
+touch "$WORK/fixtures/fixture_repo-1.json.fail"
+{
+  printf 'Blocked by:'
+  for ((i=1; i<=50; i++)); do printf ' #%s' "$i"; done
+  printf '\n'
+} > "$WORK/fixtures/fixture_repo-1.text"
+failure "legacy truncation boundary is unresolved" '#1'
+setup
+printf '2\tTask 2\n' >> "$WORK/fixtures/list"
+printf '{}\n' > "$WORK/fixtures/fixture_repo-2.json"
+failure "late dependency failure suppresses earlier ready Task" '#2'
 
 setup
 : > "$WORK/fixtures/list"

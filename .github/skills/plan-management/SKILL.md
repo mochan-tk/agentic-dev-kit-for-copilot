@@ -85,7 +85,9 @@ this.
 ## The frontier
 
 **Frontier = open Task issues labeled `ai:ready` whose `blocked by` issues are
-all closed.** This is the set an orchestrator may dispatch right now.
+all closed.** This is a discovery result, not a complete claim, ownership,
+or authorization decision. Recheck selected work against the current ledger
+before dispatch.
 
 - Compute it with `.github/skills/plan-management/scripts/frontier.sh`, or manually per issue:
   `gh issue view <n>` shows `Blocked by:` rows; each listed issue must be
@@ -94,6 +96,19 @@ all closed.** This is the set an orchestrator may dispatch right now.
   your version supports.)
 - Before dispatching two frontier tasks together, re-check ownership
   disjointness — the graph guarantees ordering, not file safety.
+- The script requires `jq` and fails nonzero without publishing partial rows
+  when candidate, dependency, completeness, identity, or state reads are
+  unknown. It accepts complete `blockedBy.nodes`/`totalCount` JSON with
+  repository-qualified identities, not an unrecognized response or array
+  fixture. A failed JSON query may use an explicit validated legacy
+  `Blocked by:`/`blocked-by:` metadata row; missing, malformed, or potentially
+  truncated legacy data (50 references) fails closed. Retry discovery with
+  a supported CLI rather than treating those errors as no work.
+- Shared blocker states are read once per repository/issue in an invocation,
+  including cross-repository dependencies. Nothing is cached on disk or
+  between invocations. Known OPEN blockers do not suppress later read errors.
+  Candidate discovery retains the existing 200-issue limit; it is not a
+  claim that every eligible issue in a larger repository was enumerated.
 
 ## Command cookbook
 
