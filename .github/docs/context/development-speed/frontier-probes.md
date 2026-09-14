@@ -16,7 +16,19 @@ with 151 gh calls; dependency-read failure returned one incorrectly ready
 row with exit 0 / 3 calls; list failure returned false no-work success with
 exit 0 / 1 call. These are ledger-reported observations, not worker runs.
 
-The worker verified the baseline HEAD/blob before edits. Fresh regression
-results will be recorded here after running the owned offline suite.
+## Worker-observed red phase
+
+Before production edits, `/bin/bash .github/scripts/tests/test-frontier.sh`
+ran with `BASH=/bin/bash`, `BASH_VERSION=3.2.57(1)-release`; every frontier
+child used that executable. Production still matched the baseline blob.
+The suite exited 1: 86 assertions, 69 failed (including strict mock
+rejections of baseline misrouted reads). The supported nodes/count fixture
+returned the exact 50 rows, exit 0, 151 total calls, and 50 state reads for
+each of blockers 1001 and 1002. Both dependency reads failing returned exit
+0 / 3 calls and an incorrectly ready Task. List failure returned exit 0 /
+1 call and `No open Task issues labeled ai:ready.`.
+
+The new tests were committed before the production fix. The final PR
+records subsequent strengthened fixtures and green verification separately.
 The fixture contract is executable without attachments. Counts describe gh
 invocations, not HTTP requests, elapsed time, or measured savings.
