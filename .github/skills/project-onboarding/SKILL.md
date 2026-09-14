@@ -1,6 +1,6 @@
 ---
 name: project-onboarding
-description: Tune this generic scaffold to a concrete target project — inventory the repo, interview only the gaps, verify every command by actually running it, fill or remove every CUSTOMIZE block, and deliver one evidence-backed onboarding PR. Use this whenever the scaffold lands in a new or existing project, whenever `.github/scripts/tuning-status.sh` reports markers, whenever commands in copilot-instructions are unverified or drift from CI, and whenever a user says "tune/onboard/set up this scaffold for project X".
+description: Tune this generic scaffold to a concrete target project — inventory the repo, interview only the gaps, verify every command by actually running it, fill or remove every CUSTOMIZE block, and deliver one evidence-backed onboarding PR. Use for explicit "tune/onboard/set up this scaffold for project X" requests, adoption, markers, or unverified/drifted commands; apply the entry decision before inventory/tuning. An applicable explicit owner decline linked from the current work order/kickoff defers onboarding within its stated scope, not already-authorized work.
 ---
 
 # Project Onboarding
@@ -26,6 +26,19 @@ Three invariants govern everything below:
   credentials) becomes a *Deferred from onboarding* entry (P6), not work to
   attempt in-session. P3 runs existing commands to verify them — it does
   not build what they are missing.
+
+## Entry decision
+
+Apply First contact in `.github/copilot-instructions.md` before P0 or any
+inventory/tuning. Loading this skill is not consent to onboard. Use the
+canonical [fresh-adopter](../session-orchestration/SKILL.md#scenario-fresh),
+[scoped-decline](../session-orchestration/SKILL.md#scenario-decline),
+[inherited-decline](../session-orchestration/SKILL.md#scenario-inherited),
+[invalid-decline](../session-orchestration/SKILL.md#scenario-invalid), and
+[explicit-request](../session-orchestration/SKILL.md#scenario-request) rows.
+A covered decline returns to the authorized Task without entering P0–P6;
+claim/plan, ownership, approval, and verification still apply to the existing
+roles. When onboarding is requested or accepted, follow P0–P6 unchanged.
 
 ## Procedure
 
@@ -68,9 +81,15 @@ execution stay broken until the scaffold reaches the default branch.
 **No GitHub write — labels, ruleset, Epic — happens before the scaffold is
 reachable from the remote default branch.**
 
-Then run `.github/scripts/tuning-status.sh`. Exit 0 → already tuned; run in re-tune mode
-(see Re-tuning) only if something changed. Otherwise the report is your
-worklist.
+Then run `bash .github/scripts/tuning-status.sh` (on Windows,
+`pwsh .github/scripts/run.ps1 tuning-status.sh`). Interpret report-mode
+outcomes using the canonical [tuned](../session-orchestration/SKILL.md#scenario-tuned),
+[untuned](../session-orchestration/SKILL.md#scenario-fresh), and
+[error](../session-orchestration/SKILL.md#scenario-error) rows; only an
+exit-1 report is the untuned worklist, not a reason to repeat accepted
+onboarding consent. For exit 0, use Re-tuning only if something changed.
+`--ci` is warning-only and exits 0 even with findings;
+it is not a substitute for report/quiet status or P5 adoption evidence.
 
 ### P1 — Inventory (read-only)
 

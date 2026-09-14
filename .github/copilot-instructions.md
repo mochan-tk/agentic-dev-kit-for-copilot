@@ -11,14 +11,18 @@ At the start of a session, run `bash .github/scripts/tuning-status.sh --quiet`
 because typing `bash` there reaches the WSL launcher rather than Git Bash even
 when Git for Windows is correctly installed.
 
-Read the exit code as three answers, not two. **0** means tuned. **1** means
-`CUSTOMIZE` markers remain: this scaffold is **not onboarded**, so your first
-reply must say so, offer to run `/onboard-project` (the project-onboarding
-skill), and wait for an explicit yes or no before taking on any other task.
-**Anything else** — a usage error, a missing interpreter, a script that is not
-there — means the check did not run. Say that plainly and say what you will do
-next; never report it as either answer, and never carry on as though the
-scaffold were tuned.
+Read three outcomes: **0** means tuned; **1** means **not onboarded**;
+**anything else**, including a missing interpreter/script or bad invocation,
+means the check failed to run successfully. Report the error and next step,
+never tuned/untuned or permission to proceed.
+For exit 1, acknowledge untuned. Read any explicit owner decline linked from
+the current work order/kickoff and verify its repository/work scope and
+continuing applicability. If applicable, continue only already-authorized
+work without asking again or starting inventory/tuning. Otherwise offer
+`/onboard-project` and wait for explicit yes/no before other work. Source
+markers, `sha=unknown`, forks, chat memory, or unrelated/revoked/contradictory
+decisions are not substitutes. A new explicit onboarding request still enters
+that workflow. See the canonical [startup scenarios](skills/session-orchestration/SKILL.md#startup-scenarios).
 
 `AGENTS.md` at the repository root defines the operating protocol
 (persistence rule, record-before-report, verify-before-done, unit of work,
@@ -84,26 +88,21 @@ The Task issue body is your work order: you read it, you never edit it
 references, Acceptance criteria, Out of scope, File ownership, Verification,
 and Routing. Read all of it before writing code.
 
-1. Comment on the issue that you are starting (one line is enough).
-2. Before changing any file, post your implementation plan as a comment on
-   the issue — the plan of record (format:
-   `.github/skills/session-orchestration/SKILL.md`). If the plan changes
-   materially later, post an update comment.
-3. Work on branch `task/<issue-number>-<short-slug>`. Touch only paths listed
-   under **File ownership**.
-4. Keep the PR description synchronized with reality: map each acceptance
-   criterion to evidence using the table in the PR template, and link the
-   plan comment (auto-written plan text in the description is a copy — the
-   issue comment stays authoritative).
-5. Run every command in the issue's **Verification** section before marking the
-   PR ready. If a command fails, fix the cause or report the blocker — never
-   delete or weaken the check.
-6. If the task turns out to be materially different from its description,
-   follow the Ambiguity rule in `AGENTS.md` (comment, label `needs:human` or
-   `needs:replan`, stop).
-7. Finish with the record-before-report comment on the issue: status, evidence,
-   deviations, follow-ups (format in
-   `.github/skills/session-orchestration/SKILL.md`).
+**Supervisors** own Task-issue claim/resume, Plan/update, worker-dispatch,
+release, escalation, and outcome comments. Follow the
+[Child session protocol](skills/session-orchestration/SKILL.md#child-session-protocol),
+including existing `risk:high` approval and record-before-report.
+**Workers** follow [Worker protocol](skills/session-orchestration/SKILL.md#worker-protocol-adr-0003):
+execute the approved plan, maintain PR evidence and its Plan link, run every
+Verification command, and report to the supervisor; never post duplicate
+Task-issue comments. Stop scope/authority conflicts and escalate to the
+supervisor, who records them. See [supervisor](skills/session-orchestration/SKILL.md#scenario-supervisor)
+and [worker](skills/session-orchestration/SKILL.md#scenario-worker) scenario rows.
+
+Implementation stays on `task/<issue-number>-<short-slug>` (or managed-prefix
+equivalent), inside **File ownership**; never weaken checks to pass. Only a
+Task supervisor with a declared small-task exemption may implement directly.
+Conductors keep their fixed role and cannot take that exemption (AGENTS.md §4).
 
 ## Pull request conventions
 

@@ -37,8 +37,10 @@ checkout, which is exactly what the layering exists to prevent. So: dispatch
 an Epic or a Task by creating a session, and prove it **started** before the
 work proceeds. Existence is not that proof — a session can sit there having
 run nothing — and neither is the status the app reports. The proof is on
-GitHub: the child's claim comment on the Task issue, read with `gh`. No claim
-comment, no start, whatever the sidebar shows. When it has not started,
+GitHub: the Task supervisor's claim comment, read with `gh`. This is not a
+worker-comment requirement (see [role rows](#scenario-worker)); workers keep
+evidence on their PR and report to their supervisor. No supervisor claim,
+no Task start, whatever the sidebar shows. When it has not started,
 dispatch once more; if the second attempt leaves the issue equally silent,
 escalate with `needs:human`, because what is broken is the tooling and not
 the plan. What that emphatically does not license is finishing the work here:
@@ -107,6 +109,34 @@ plan comment carrying the small-task exemption phrase
 "no worker will be spawned" (matched case-insensitively; AGENTS.md §4) — a
 task showing neither fails the wall.
 
+## Startup scenarios
+
+Run the First contact status command on every fresh, child, replacement, or
+resumed session. Read the owner decision linked from the current work
+order/kickoff and the relevant issue timeline: it must explicitly decline
+onboarding, cover this repository and work scope, and still apply. Carry the
+link and scope into child kickoffs and PR evidence; do not reconstruct either
+from chat memory. If the evidence cannot be read, do not assume a decline.
+
+This is the canonical instruction-contract table, not a runtime enforcement
+mechanism or measured model-compliance test. Status is the report/quiet exit
+contract; CI's warning-only exit 0 does not establish tuned. A decline is not
+authentication, a new implementation release, or a waiver of claim/plan,
+`risk:high` approval, ownership, verification, or human merge authority
+(ADR-0004). Conflicting authority is escalated through the supervisor.
+
+| Scenario | Expected next action |
+|---|---|
+| <a id="scenario-tuned"></a>Tuned repository: status exits 0 | Report tuned; follow the authorized Task and role protocol. |
+| <a id="scenario-fresh"></a>Fresh untuned adopter, or no applicable decline: status exits 1 | Acknowledge not onboarded; offer `/onboard-project` and wait for explicit yes/no before other work. On yes, enter onboarding; a no covers only its stated scope. |
+| <a id="scenario-decline"></a>Intentionally untuned source template: exit 1 plus a linked, applicable owner decline | Acknowledge untuned and cite the decision; continue only already-authorized work without repeating the question or starting inventory/tuning. Keep CUSTOMIZE. |
+| <a id="scenario-inherited"></a>Child, replacement, or resume: exit 1 with that same decline covering its work | Read and carry the decision link/scope; apply the scoped-decline action without a new onboarding or readiness approval stage. Existing per-Task approval conditions still apply. |
+| <a id="scenario-invalid"></a>Missing/unreadable, unrelated, revoked, or contradictory decline | No reusable opt-out: exit 1 follows the fresh-adopter question; conflicting authority is escalated, not permission to proceed. A source marker, `sha=unknown`, fork, prior unrelated Epic, or chat memory never suffices. |
+| <a id="scenario-error"></a>Startup command fails to run successfully: any other outcome, including missing interpreter/script or bad invocation | Report the error and next diagnostic step; do not classify tuned/untuned or use a decline to proceed past the error. |
+| <a id="scenario-request"></a>New explicit request to onboard, even after a decline | Enter project-onboarding's existing workflow, handling startup errors truthfully; the prior decline is not a permanent opt-out. |
+| <a id="scenario-supervisor"></a>Task supervisor, including resume or declared small-task exemption | Own issue claim/resume, Plan/update, dispatch/release, escalation, and outcome; verify the worker's PR record before outcome and report. Under the exemption, also implement; a conductor cannot take it. |
+| <a id="scenario-worker"></a>Worker, including replacement/resume | Execute the approved plan; maintain PR evidence, verify, and report one hop to the supervisor. Never post Task-issue comments; supervisor records plan changes, escalation, and outcome. |
+
 ## Child session protocol
 
 This ritual is executed by the **supervisor** session for its Task issue
@@ -114,7 +144,8 @@ This ritual is executed by the **supervisor** session for its Task issue
 afterwards (see Worker protocol below). Under the declared small-task
 exemption, the supervisor performs both parts single-session.
 
-**Start ritual** (do this before touching any file):
+**Start ritual** (do this before touching any file; apply the
+[startup scenarios](#startup-scenarios) without inventing another gate):
 1. `gh issue view <n>` — read the full brief: Objective, Context & references,
    Acceptance criteria, Out of scope, File ownership, Verification, Routing.
 2. Open every agreement the issue cites (`REQ-###`, ADR links) — many tasks
@@ -168,11 +199,10 @@ only for tasks whose blast radius warrants a pre-flight human eye
 
 **Work loop** (the implementing session — the worker, or the supervisor
 under a declared exemption): stay inside the ownership paths; commit early
-and often;
-update `plan.md` freely — and when the plan changes *materially*, post a
-fresh plan comment on the issue (never edit the old one; the sequence of
-plan comments is the plan's history). If scope drifts, stop and follow the
-Ambiguity rule rather than quietly expanding.
+and often; update `plan.md` freely. When the plan changes *materially*, the
+worker stops and reports to the supervisor, who posts a fresh plan comment
+(never edits the old one; the sequence is the plan's history). If scope
+drifts, follow the Ambiguity rule rather than quietly expanding.
 
 **Verify** (before any completion claim): run every command in the issue's
 Verification section; then confirm external state with commands, e.g.
@@ -180,8 +210,9 @@ Verification section; then confirm external state with commands, e.g.
 `git status --short` (must be clean), and, when the task tracked Project
 items, `gh project item-list`. Evidence = command + observed result.
 
-**Record before report** — post this comment on the Task issue, then (and
-only then) message the parent:
+**Record before report** — the supervisor posts this comment on the Task
+issue, then (and only then) messages its parent. The worker records evidence
+in its PR before reporting to that supervisor; it does not post this comment:
 
 ```markdown
 ## Outcome: <completed | blocked | failed | needs-replan>
@@ -240,6 +271,10 @@ load-bearing, ADR-0003):
 You are the WORKER session for Task issue #<n> in <owner>/<repo>.
 - Issue: <issue URL> — read it in full (`gh issue view <n> --comments`).
 - Plan of record (execute it; no plan gate of your own): <plan comment URL>
+- Startup context: <linked owner onboarding decision and repository/work
+  scope, or none; carry applicable scope to replacement/resumed workers>.
+  Apply [startup scenarios](.github/skills/session-orchestration/SKILL.md#startup-scenarios);
+  a decline does not grant a new implementation release.
 - File ownership (verbatim from the issue — touch EXACTLY these):
   <paths, copied verbatim>
 - Verification (run ALL before marking the PR ready):
@@ -315,15 +350,16 @@ merge — a phase started against a half-tuned repository verifies nothing.
    never re-derives scope from the issue alone.
 4. Steer with short course-correction messages when session logs show drift;
    prefer steering over restarting.
-5. On receiving a report: verify the record exists on the issue and spot-check
+5. On receiving a supervisor report: verify the issue record and spot-check
    the evidence with your own `gh` calls before updating labels/Project state
    or dispatching dependents — `gh` calls are the whole of it, because the
    artifact is CI's to verify and not yours to rebuild (`verification`
    §The layers). An unrecorded report is returned to the child
    with one instruction: record first. **Silence is checked the same way.** A
-   child that wakes its parent having written nothing on the issue has not
-   been quietly productive — it has not started, or it has died. Read the
-   issue before concluding anything about a child that never spoke.
+   supervisor that wakes its parent having written nothing on the issue has
+   not been quietly productive — it has not started, or it has died. Read
+   the issue before concluding anything; this is not a requirement for
+   duplicate worker comments (see [worker row](#scenario-worker)).
 6. Route `needs-replan` outcomes to the planner procedure
    (`plan-management` §Replanning) and post the rationale on the Epic.
 7. When the Epic's phase is done — its Tasks closed, their PRs merged, the
@@ -394,21 +430,28 @@ start ritual *is* the resume path (crash-only design — recovery and startup
 are the same code path).
 
 - **Successor session**: run the start ritual (AGENTS.md §9) exactly as for a
-  fresh task, then derive the current position from the ledger + ground
-  truth: the issue timeline (start / plan / latest comments), the branch
+  fresh task, using the [inherited-decline](#scenario-inherited) and
+  [supervisor](#scenario-supervisor)/[worker](#scenario-worker) rows, then
+  derive the current position from the ledger + ground truth: the issue
+  timeline (start / plan / latest comments), the branch
   (`git log`, `git status`), and the PR (`gh pr view/checks`). What is not on
   GitHub did not happen — do not reconstruct intent from memory or chat.
-- **Claim before touching**: post a *resume comment* on the Task issue
+- **Supervisor claim before touching**: the supervisor posts a *resume
+  comment* on the Task issue
   (`Resuming in session <name/link>, branch task/<n>-<slug>`) before any
   commit. The claim prevents two sessions from silently owning one task; if
-  the timeline shows another live claim, stop and escalate instead.
+  the timeline shows another live claim, stop and escalate instead. A worker
+  follows its existing dispatch, or the supervisor's release-and-successor
+  record for a replacement; it never posts its own resume comment.
 - **Orphan detection is the parent's duty**: a task with a start comment, no
   Outcome comment, and a dead session is an orphan. The parent (or any
   orchestrator sweeping the frontier) either dispatches a successor — which
-  claims as above — or comments the task back to the frontier.
+  follows the role-specific claim/dispatch duties above — or comments the
+  task back to the frontier.
 - **Repeat failure**: if the resumed attempt dies the same way the first one
-  did, apply `needs:human` and stop. Two identical session deaths signal
-  infrastructure, not approach — crash-resume is exempt from the three-strike
+  did, the supervisor records `needs:human` and stops (workers report to it).
+  Two identical session deaths signal infrastructure, not approach —
+  crash-resume is exempt from the three-strike
   ladder (Escalation below).
 
 ## Escalation
