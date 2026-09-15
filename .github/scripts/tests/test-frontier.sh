@@ -108,6 +108,7 @@ for bad in '{}' 'not-json' '{"blockedBy":[]}' \
   '{"blockedBy":{"nodes":[],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[],"totalCount":"0"}}' \
   '{"blockedBy":{"nodes":[{"number":7}],"totalCount":1}}' \
+  '{"blockedBy":{"nodes":[{"number":7,"repository":{"nameWithOwner":"fixture/repo"}}],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[null],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[{"number":7,"url":42}],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[{"number":0,"url":"https://github.com/a/repo/issues/0"}],"totalCount":1}}' \
@@ -159,6 +160,14 @@ dependencies 2 fixture/repo#7 fixture/repo#8
 printf 'OPEN\n' > "$WORK/fixtures/fixture_repo-7.state"
 printf 'UNKNOWN\n' > "$WORK/fixtures/fixture_repo-8.state"
 failure "late unknown after ready Task and OPEN blocker" '#2.*#8'
+setup
+printf '2\tTask 2\n' >> "$WORK/fixtures/list"
+dependencies 2 fixture/repo#7 fixture/repo#8
+jq '.blockedBy.nodes[1].url = "https://github.com/fixture/repo/issues/9"' \
+  "$WORK/fixtures/fixture_repo-2.json" > "$WORK/changed.json"
+mv "$WORK/changed.json" "$WORK/fixtures/fixture_repo-2.json"
+printf 'OPEN\n' > "$WORK/fixtures/fixture_repo-7.state"
+failure "late invalid URL suppresses ready Task and OPEN dependency set" '#2'
 
 setup
 run -R fixture/repo
@@ -218,6 +227,14 @@ mv "$WORK/changed.json" "$WORK/fixtures/fixture_repo-1.json"
 printf 'CLOSED\n' > "$WORK/fixtures/a_repo-7.state"
 run -R fixture/repo
 assert "exported OPEN never overrides fresh CLOSED state" grep -qx $'#1\tTask 1' "$WORK/out"
+setup
+dependencies 1 A/Repo_One.git#7
+printf '2\tTask 2\n' >> "$WORK/fixtures/list"
+dependencies 2 a/repo_one.git#7
+printf 'CLOSED\n' > "$WORK/fixtures/a_repo_one.git-7.state"
+run -R fixture/repo
+assert "canonical URL supports repository punctuation and case normalization" test "$RC" -eq 0
+assert "case variants share qualified state read" test "$(grep -c 'view 7 --repo a/repo_one.git --json state' "$WORK/fixtures/calls")" -eq 1
 setup
 dependencies 1 a/repo#7 a/repo#7
 failure "duplicate nodes cannot establish completeness" '#1'

@@ -64,3 +64,22 @@ These are fresh worker observations, not execution of the supplied archive.
 They establish the compatibility regression that augmented mocks missed.
 URL-negative tests retain fail-closed assertions; state reads must remain
 independent of exported node state. This red evidence precedes parser repair.
+
+## Worker-observed exporter-faithful green phase
+
+After repair, the focused harness (Bash 5.3.15) and direct `/bin/bash`
+3.2.57(1)-release suite each passed all 154 assertions. Every frontier child
+used the suite's `"$BASH"`. The real-export-shaped 50-Task fixture returned
+exit 0, exactly 50 rows, 53 total gh calls, and one state read each for
+1001/1002. Missing repository is normal; missing, unsupported, or mismatched
+URL identity is an error. Only canonical HTTPS github.com issue URLs are
+supported; no Enterprise/custom-host support or current-repository guessing
+is introduced. Exported CLOSED/OPEN state does not override a fresh state read.
+
+The corrected suite preserves error/completeness/duplicate/late-failure,
+cross-repository cache, invocation freshness, options, and legacy coverage.
+New assertions also cover strict URL rejection, old repository-only nodes,
+and case-normalized identities. These are offline worker observations, not
+live GitHub behavior or independent execution of supplied archive probes.
+Corrected-head CI and fresh audit belong in the PR and supervisor Outcome;
+historical accepted records do not supply those conclusions.

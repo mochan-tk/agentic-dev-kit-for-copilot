@@ -11,7 +11,8 @@
 #     --all        Also list blocked ai:ready issues with their open blockers.
 #
 # Requires: gh (>= 2.94 recommended), jq. Prefer complete blockedBy nodes/count
-# JSON; on query failure accept only an explicit, validated legacy metadata row.
+# JSON with canonical HTTPS github.com issue URLs for blocker identity.
+# On query failure accept only an explicit, validated legacy metadata row.
 # Unknown discovery exits nonzero without output. Reads never mutate GitHub.
 
 set -euo pipefail
@@ -48,9 +49,14 @@ blockers_of() {
         if type != "object" then invalid
         elif (.number|type) != "number" then invalid
         elif .number < 1 or .number != (.number|floor) then invalid
-        elif (.repository.nameWithOwner|type) != "string" then invalid
-        elif (.repository.nameWithOwner|test("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")|not) then invalid
-        else "\(.repository.nameWithOwner|ascii_downcase)#\(.number)" end
+        elif (.url|type) != "string" then invalid
+        else
+          (.url | capture("\\Ahttps://github\\.com/(?<owner>[A-Za-z0-9][A-Za-z0-9-]*)/(?<repo>[A-Za-z0-9_.-]+)/issues/(?<number>[1-9][0-9]*)\\z")
+            // invalid) as $identity |
+          if $identity.repo == "." or $identity.repo == ".."
+            or $identity.number != (.number|tostring) then invalid
+          else "\($identity.owner|ascii_downcase)/\($identity.repo|ascii_downcase)#\(.number)" end
+        end
       ) | if length != (unique|length) then invalid else join("\n") end'
   else
     text=$(gh issue view "$num" ${REPO_ARGS[@]+"${REPO_ARGS[@]}"} 2>/dev/null) || return 1

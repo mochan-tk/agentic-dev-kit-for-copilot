@@ -98,9 +98,16 @@ before dispatch.
   disjointness — the graph guarantees ordering, not file safety.
 - The script requires `jq` and fails nonzero without publishing partial rows
   when candidate, dependency, completeness, identity, or state reads are
-  unknown. It accepts complete `blockedBy.nodes`/`totalCount` JSON with
-  repository-qualified identities, not an unrecognized response or array
-  fixture. A failed JSON query may use an explicit validated legacy
+  unknown. It accepts complete `blockedBy.nodes`/`totalCount` JSON. The public
+  [gh v2.98.0 exporter](https://github.com/cli/cli/blob/v2.98.0/api/export_pr.go#L84-L98)
+  emits node `id`, `number`, `title`, `url`, `state`, **not `repository`**.
+  Derive identity only from canonical `https://github.com/OWNER/REPO/issues/N`
+  URLs whose issue number matches the node. Other hosts (including Enterprise),
+  schemes, ports, userinfo, query/fragment suffixes, encoded paths, and dot
+  segments are unsupported and fail closed, not mapped to the current repo.
+  Exported state never replaces the unique-blocker state read. Keep fixtures
+  faithful to the public exporter, not augmented internal GraphQL types.
+  A failed JSON query may use an explicit validated legacy
   `Blocked by:`/`blocked-by:` metadata row; missing, malformed, or potentially
   truncated legacy data (50 references) fails closed. Retry discovery with
   a supported CLI rather than treating those errors as no work.
