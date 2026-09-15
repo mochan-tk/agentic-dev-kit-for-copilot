@@ -55,8 +55,12 @@ setup() {
 }
 dependencies() {
   local task="$1"; shift
+  # Public CLI export, not its internal GraphQL type:
+  # https://github.com/cli/cli/blob/v2.98.0/api/export_pr.go#L84-L98
   jq -n --args '{blockedBy:{nodes:[$ARGS.positional[] | split("#") |
-    {number:(.[1]|tonumber),repository:{nameWithOwner:.[0]}}],
+    {id:("I_fixture_" + .[0] + "_" + .[1]),number:(.[1]|tonumber),
+     title:("Blocker " + .[1]),url:("https://github.com/" + .[0] + "/issues/" + .[1]),
+     state:"CLOSED"}],
     totalCount:($ARGS.positional|length)}}' "$@" > "$WORK/fixtures/fixture_repo-$task.json"
 }
 run() {
@@ -105,12 +109,32 @@ for bad in '{}' 'not-json' '{"blockedBy":[]}' \
   '{"blockedBy":{"nodes":[],"totalCount":"0"}}' \
   '{"blockedBy":{"nodes":[{"number":7}],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[null],"totalCount":1}}' \
-  '{"blockedBy":{"nodes":[{"number":7,"repository":{"nameWithOwner":"bad"}}],"totalCount":1}}' \
-  '{"blockedBy":{"nodes":[{"number":0,"repository":{"nameWithOwner":"a/repo"}}],"totalCount":1}}' \
+  '{"blockedBy":{"nodes":[{"number":7,"url":42}],"totalCount":1}}' \
+  '{"blockedBy":{"nodes":[{"number":0,"url":"https://github.com/a/repo/issues/0"}],"totalCount":1}}' \
   '{"blockedBy":{"nodes":[],"totalCount":0}} {}'; do
   setup
   printf '%s\n' "$bad" > "$WORK/fixtures/fixture_repo-1.json"
   failure "invalid/incomplete dependency $bad" '#1'
+done
+for url in '' 'http://github.com/a/repo/issues/7' \
+  'https://elsewhere.example/a/repo/issues/7' \
+  'https://github.com.evil.example/a/repo/issues/7' \
+  'https://github.com@elsewhere.example/a/repo/issues/7' \
+  'https://user@github.com/a/repo/issues/7' \
+  'https://github.com:443/a/repo/issues/7' \
+  'https://github.com/a/repo/pull/7' \
+  'https://github.com/a/repo/issues/8' \
+  'https://github.com/a/repo/issues/07' \
+  'https://github.com/a/repo/issues/7?x=1' \
+  'https://github.com/a/repo/issues/7#fragment' \
+  'https://github.com/a/repo/issues/7/' \
+  'https://github.com/a/../issues/7' \
+  'https://github.com/a/re%70o/issues/7' \
+  $'https://github.com/a/repo/issues/7\n'; do
+  setup
+  jq -n --arg url "$url" '{blockedBy:{nodes:[{number:7,url:$url}],totalCount:1}}' \
+    > "$WORK/fixtures/fixture_repo-1.json"
+  failure "ambiguous URL $url" '#1'
 done
 setup
 touch "$WORK/fixtures/fixture_repo-1.json.fail" "$WORK/fixtures/fixture_repo-1.text.fail"
@@ -183,8 +207,17 @@ printf 'CLOSED\n' > "$WORK/fixtures/a_repo-7.state"
 printf 'OPEN\n' > "$WORK/fixtures/b_repo-7.state"
 run -R fixture/repo --all
 assert "cross-repo JSON identity preserved" grep -qx $'#1\tTask 1\t(waiting on: b/repo#7)' "$WORK/out"
+assert "cross-repo exported nodes succeed without repository" test "$RC" -eq 0
 assert "a/repo#7 state read once" test "$(grep -c 'view 7 --repo a/repo --json state' "$WORK/fixtures/calls")" -eq 1
 assert "b/repo#7 state read once" test "$(grep -c 'view 7 --repo b/repo --json state' "$WORK/fixtures/calls")" -eq 1
+assert "exported CLOSED never overrides fresh OPEN state" grep -q 'waiting on: b/repo#7' "$WORK/out"
+setup
+dependencies 1 a/repo#7
+jq '.blockedBy.nodes[0].state = "OPEN"' "$WORK/fixtures/fixture_repo-1.json" > "$WORK/changed.json"
+mv "$WORK/changed.json" "$WORK/fixtures/fixture_repo-1.json"
+printf 'CLOSED\n' > "$WORK/fixtures/a_repo-7.state"
+run -R fixture/repo
+assert "exported OPEN never overrides fresh CLOSED state" grep -qx $'#1\tTask 1' "$WORK/out"
 setup
 dependencies 1 a/repo#7 a/repo#7
 failure "duplicate nodes cannot establish completeness" '#1'
@@ -210,6 +243,10 @@ done
 printf 'CLOSED\n' > "$WORK/fixtures/fixture_repo-1001.state"
 printf 'CLOSED\n' > "$WORK/fixtures/fixture_repo-1002.state"
 run -R fixture/repo
+assert "budget fixture matches public exporter keys, no repository" jq -e '
+  .blockedBy.totalCount == 2 and
+  all(.blockedBy.nodes[]; keys == ["id","number","state","title","url"])
+' "$WORK/fixtures/fixture_repo-1.json"
 sed 's/^/#/' "$WORK/fixtures/list" > "$WORK/expected"
 grep '^#' "$WORK/out" > "$WORK/actual"
 assert "shared-blocker fixture succeeds" test "$RC" -eq 0

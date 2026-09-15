@@ -11,7 +11,13 @@ status: raw
 
 ## Conflicts and limits
 
-The external array mock is not the supported CLI nodes/count schema.
+Acceptance at head `b9d5939` was reopened: the original worker's nonempty
+nodes/count fixtures added `repository`, which the actual CLI exporter omits.
+Those green runs were real but did not prove nonempty exporter compatibility.
+The [owner correction](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/119#issuecomment-5673230062)
+supersedes that acceptance; new source-derived red/green observations are
+separated in the probe record. The external array mock is also not the CLI
+nodes/count schema. Internal GraphQL types are not the exported contract.
 Same-head CI runs do not establish body-edit causes or waste percentages;
 approval clock gaps do not measure labor, waiting, or sleep. Recovery claims
 are ledger-reported, not runtime observations. Source-template governance
