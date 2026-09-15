@@ -45,6 +45,24 @@ inherit what this one learned.
 
 ### Unreleased
 
+- `governance-status.sh` and `setup-ruleset.sh` add an explicit
+  `single-maintainer` governance profile, opt-in only via
+  `--profile single-maintainer` or a persisted `SCAFFOLD_GOVERNANCE_PROFILE`
+  variable equal to that exact string; `solo` and `team` behavior is
+  unchanged. The profile requires a mandatory PR gate with zero required
+  approving reviews and no bypass actors on either the PR or required-checks
+  axis, while still requiring all configured CI contexts — the sensor emits
+  new `pull_request.no_bypass_actors` and `required_checks.no_bypass_actors`
+  checks (`ACTIVE`/`OFF`/`UNKNOWN`, never silently healthy on unreadable
+  bypass evidence) alongside the existing zero-approval reading of
+  `pull_request.required_approving_review_count`. The actuator reconciles an
+  existing canonical `solo`- or `team`-shaped ruleset in place by deriving
+  the candidate from the real preimage — flipping only `bypass_actors` and
+  `required_approving_review_count` — so producer-only metadata (for
+  example a real `require_extra_approval_for_unattributed_changes: true`)
+  survives untouched rather than being reset by a lossy template rebuild;
+  malformed, customized, or already-owned targets are still refused (#124).
+
 - Replaced the top-level README with the Human-on-the-Loop overview draft and committed the matching overview image at `docs/images/agentic-development-kit-overview.png`, preserving the owner-supplied source artifacts and provenance in `.github/docs/context/readme-redesign/`.
 
 - The top-level Copilot app role is now called the `Project session`, and new

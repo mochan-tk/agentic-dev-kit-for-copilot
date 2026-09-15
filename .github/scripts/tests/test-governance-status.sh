@@ -129,29 +129,36 @@ team_green() { # hardened adopted fixtures that satisfy team intent end to end
   team_rules 15368; mk_rs 101 repo '[]'
   mk_marker abc123; mk_co '# reviewed owners'
 }
+single_maintainer_green() { # zero-approval, no-bypass fixtures that satisfy
+  # single-maintainer intent end to end (mandatory PR + CI, no reviewer, no bypass)
+  baseline
+  jq '(.[]|select(.type=="pull_request").parameters.required_approving_review_count)=0' \
+    "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+  mk_rs 101 repo '[]'
+}
 
 run() {
   rc=0
-  bash "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+  "$BASH" "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
   out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
 }
 runf() {
   local f="$1"
   shift; rc=0
-  GS_FAIL="$f" bash "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+  GS_FAIL="$f" "$BASH" "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
   out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
 }
 runv() {
   local e="$1"
   shift; rc=0
-  GS_VAR_ERROR="$e" bash "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+  GS_VAR_ERROR="$e" "$BASH" "$SENSOR" "$@" > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
   out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
 }
 rce() { if [ "$rc" -eq "$2" ]; then t_ok "$1"; else t_fail "$1 (rc=$rc)"; printf '%s\n%s\n' "$out" "$err" | sed 's/^/    # /'; fi; }
 chk() { if printf '%s\n' "$out" | grep -Eq "$2"; then t_ok "$1"; else t_fail "$1 (missing: $2)"; printf '%s\n%s\n' "$out" "$err" | sed 's/^/    # /'; fi; }
 
 PROFILE_REQ="api repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
-PROFILE_UNKNOWN="^governance\\.profile${T}UNKNOWN${T}persisted profile unavailable or invalid; expected exact solo\\|team$"
+PROFILE_UNKNOWN="^governance\\.profile${T}UNKNOWN${T}persisted profile unavailable or invalid; expected exact solo\\|team\\|single-maintainer$"
 clear_calls() { : > "$GH_CALLS"; }
 mk_profile() { printf '%s\n' "$1" > "$GS_FIX/profile.json"; }
 profile_gets() { grep -Fxc "$PROFILE_REQ" "$GH_CALLS" 2>/dev/null || true; }
@@ -372,7 +379,7 @@ if [ "$(cksum "$GS_FIX/profile.json")" = "$profile_sum" ]; then t_ok "explicit t
 
 baseline; clear_calls
 rc=0
-SCAFFOLD_GOVERNANCE_PROFILE=team bash "$SENSOR" -R o/r > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
+SCAFFOLD_GOVERNANCE_PROFILE=team "$BASH" "$SENSOR" -R o/r > "$WORK/stdout" 2> "$WORK/stderr" || rc=$?
 out="$(cat "$WORK/stdout")"; err="$(cat "$WORK/stderr")"
 rce "environment profile is not a fallback" 3
 chk "environment profile cannot replace persisted evidence" "$PROFILE_UNKNOWN"
@@ -392,6 +399,49 @@ chk "no bypass suffix without actors" "^pull_request\.required_approving_review_
 chk "empty bypass list stated" "^bypass\.ruleset\.101${T}ACTIVE${T}source=Repository:o/r actors=0$"
 run -R o/r --profile solo
 rce "stronger settings stay healthy for solo" 0
+
+# --- single-maintainer: mandatory PR + CI, zero approvals, no bypass ------
+
+baseline
+run -R o/r --profile single-maintainer
+rce "solo baseline fails single-maintainer intent" 1
+chk "nonzero approval count is OFF for single-maintainer" "^pull_request\.required_approving_review_count${T}OFF${T}count=1 \(approving-review requirement not zero\)$"
+chk "admin bypass actor is OFF for single-maintainer" "^pull_request\.no_bypass_actors${T}OFF${T}bypass actors present bypass=RepositoryRole:5:pull_request$"
+chk "admin bypass actor is OFF for required checks too" "^required_checks\.no_bypass_actors${T}OFF${T}bypass actors present bypass=RepositoryRole:5:pull_request$"
+
+single_maintainer_green
+run -R o/r --profile single-maintainer
+rce "zero-approval no-bypass fixtures are healthy for single-maintainer" 0
+chk "zero approval count is ACTIVE for single-maintainer" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=0$"
+chk "no bypass actors is ACTIVE for single-maintainer" "^pull_request\.no_bypass_actors${T}ACTIVE${T}no bypass actors$"
+chk "no bypass actors is ACTIVE for required checks" "^required_checks\.no_bypass_actors${T}ACTIVE${T}no bypass actors$"
+chk "single-maintainer does not gate team-only review controls" "^pull_request\.dismiss_stale_reviews${T}OFF"
+run -R o/r --profile solo
+rce "single-maintainer zero-approval fixtures fail solo intent" 1
+chk "solo requires a nonzero approval count" "^pull_request\.required_approving_review_count${T}OFF${T}count=0 \(no approving-review requirement\)$"
+
+single_maintainer_green
+runf "rulesets/101" -R o/r --profile single-maintainer
+rce "failed ruleset detail read exits 3 for single-maintainer" 3
+chk "unreadable bypass evidence is UNKNOWN, never healthy" "^pull_request\.no_bypass_actors${T}UNKNOWN${T}bypass evidence unavailable$"
+chk "required-checks bypass evidence mirrors the same UNKNOWN" "^required_checks\.no_bypass_actors${T}UNKNOWN${T}bypass evidence unavailable$"
+
+baseline; clear_calls
+run -R o/r --profile single-maintainer
+save_run
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"single-maintainer","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}'
+clear_calls; run -R o/r
+same_run "persisted single-maintainer equals failing explicit single-maintainer"
+get_once "failing persisted single-maintainer uses one exact plain variable GET"
+
+single_maintainer_green; clear_calls
+run -R o/r --profile single-maintainer
+save_run
+mk_profile '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"single-maintainer","created_at":"2026-01-01T00:00:00Z","updated_at":"2026-01-01T00:00:00Z"}'
+clear_calls; run -R o/r
+same_run "persisted single-maintainer equals healthy explicit single-maintainer"
+chk "persisted single-maintainer is ACTIVE" "^governance\.profile${T}ACTIVE${T}single-maintainer$"
+get_once "healthy persisted single-maintainer uses one exact plain variable GET"
 
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
@@ -588,7 +638,7 @@ wall_case "wall refuses issue edit" api PATCH repos/o/r/issues/109
 wall_case "wall refuses workflow dispatch" api POST repos/o/r/actions/workflows/ci.yml/dispatches
 
 baseline
-(cd "$WORK/cwd" && bash "$SENSOR" -R o/r --profile solo >/dev/null 2>&1)
+(cd "$WORK/cwd" && "$BASH" "$SENSOR" -R o/r --profile solo >/dev/null 2>&1)
 if [ -z "$(ls -A "$WORK/cwd")" ]; then t_ok "sensor persists no profile or file state"; else t_fail "sensor persists no profile or file state"; fi
 
 t_summary

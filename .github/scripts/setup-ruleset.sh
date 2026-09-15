@@ -55,7 +55,8 @@ Options:
                            the ruleset never blocks merges until a human
                            reviews it and enables it.
   --name <name>            Ruleset name. Default: scaffold-branch-protection.
-  --profile <solo|team>    Persist explicit governance intent and create a
+  --profile <solo|team|single-maintainer>
+                           Persist explicit governance intent and create a
                            fresh profile ruleset. Existing rulesets require
                            separate reconciliation.
   --reconcile              Require --profile and reconcile one canonical same-name ruleset.
@@ -101,8 +102,8 @@ while [[ $# -gt 0 ]]; do
       NAME="$2"; shift 2 ;;
     --profile)
       case "${2:-}" in
-        solo|team) PROFILE="$2" ;;
-        *) echo "error: --profile must be 'solo' or 'team'" >&2; exit 2 ;;
+        solo|team|single-maintainer) PROFILE="$2" ;;
+        *) echo "error: --profile must be 'solo', 'team' or 'single-maintainer'" >&2; exit 2 ;;
       esac
       shift 2 ;;
     --dry-run)
@@ -164,9 +165,24 @@ PAYLOAD="$(jq -n \
     ]
   }')"
 
+if [[ "$PROFILE" == "single-maintainer" ]]; then
+  # Fresh single-maintainer template: no bypass actors, zero required
+  # approvals. Overridden below by a preimage-derived candidate when
+  # reconciling an existing ruleset (preserves producer-only fields).
+  PAYLOAD="$(printf '%s' "$PAYLOAD" | jq '
+    .bypass_actors = []
+    | (.rules[] | select(.type == "pull_request").parameters.required_approving_review_count) = 0
+  ')"
+fi
+
 if [[ -n "$PROFILE" ]]; then
   if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" && "$RECONCILE" != "true" ]]; then
     echo "dry-run: explicit solo candidate; no API call made." >&2
+    printf '%s\n' "$PAYLOAD"
+    exit 0
+  fi
+  if [[ "$PROFILE" == "single-maintainer" && "$DRY_RUN" == "true" && "$RECONCILE" != "true" ]]; then
+    echo "dry-run: explicit single-maintainer candidate; no API call made." >&2
     printf '%s\n' "$PAYLOAD"
     exit 0
   fi
@@ -211,25 +227,32 @@ if [[ -n "$PROFILE" ]]; then
       | [.rules[] | select(.type == "pull_request")] as $pr
       | [.rules[] | select(.type == "required_status_checks")] as $rs
       | ($rs[0].parameters.required_status_checks // []) as $got
-      | ($pr[0].parameters | del(.allowed_merge_methods,.required_reviewers)) as $prp
+      | ($pr[0].parameters | del(.allowed_merge_methods,.required_reviewers,
+            .require_extra_approval_for_unattributed_changes)) as $prp
       | ($rs[0].parameters | del(.do_not_enforce_on_create)) as $rsp
+      | (if .bypass_actors == [{actor_id:5,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+           then "admin"
+         elif .bypass_actors == [] then "none"
+         else "other" end) as $bypass_shape
       | select((.id | tostring) == $id and .name == $name and .target == "branch"
           and (.enforcement == "active" or .enforcement == "disabled")
-          and .bypass_actors == [{actor_id:5,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+          and $bypass_shape != "other"
           and .conditions == {ref_name:{include:["~DEFAULT_BRANCH"],exclude:[]}}
           and (.rules | length) == 2 and ($pr | length) == 1 and ($rs | length) == 1
           and ($pr[0].parameters.allowed_merge_methods? // ["merge","squash","rebase"])
               == ["merge","squash","rebase"]
           and ($pr[0].parameters.required_reviewers? // []) == []
+          and ($pr[0].parameters | if has("require_extra_approval_for_unattributed_changes")
+               then .require_extra_approval_for_unattributed_changes else true end) == true
           and ($rs[0].parameters.do_not_enforce_on_create? // false) == false
           and ($rsp | keys | sort) == ["required_status_checks","strict_required_status_checks_policy"]
           and ([$got[].context] | sort) == $want and ($got | length) == ($want | length))
-      | if $prp == {required_approving_review_count:1,
+      | if $bypass_shape == "admin" and $prp == {required_approving_review_count:1,
             dismiss_stale_reviews_on_push:false,require_code_owner_review:false,
             require_last_push_approval:false,required_review_thread_resolution:false}
           and $rs[0].parameters.strict_required_status_checks_policy == false
           and all($got[]; (keys | sort) == ["context"]) then "solo"
-        elif $prp == {required_approving_review_count:1,
+        elif $bypass_shape == "admin" and $prp == {required_approving_review_count:1,
             dismiss_stale_reviews_on_push:true,require_code_owner_review:true,
             require_last_push_approval:true,required_review_thread_resolution:true}
           and $rs[0].parameters.strict_required_status_checks_policy == true
@@ -237,9 +260,28 @@ if [[ -n "$PROFILE" ]]; then
             and (.integration_id | type) == "number" and .integration_id >= 0
             and (.integration_id | floor) == .integration_id)
           and ([$got[].integration_id] | unique | length) == 1 then "team"
+        elif $bypass_shape == "none" and $prp == {required_approving_review_count:0,
+            dismiss_stale_reviews_on_push:false,require_code_owner_review:false,
+            require_last_push_approval:false,required_review_thread_resolution:false}
+          and $rs[0].parameters.strict_required_status_checks_policy == false
+          and all($got[]; (keys | sort) == ["context"]) then "single-maintainer"
         else empty end' >/dev/null; then
       echo "error: existing ruleset is noncanonical or malformed; refusing customization." >&2
       exit 1
+    fi
+    if [[ "$PROFILE" == "single-maintainer" ]]; then
+      # Reconciliation candidate is derived from the real preimage (not the
+      # lossy template) so producer-only fields (required_reviewers,
+      # allowed_merge_methods, require_extra_approval_for_unattributed_changes,
+      # do_not_enforce_on_create, per-context integration_id shape) survive
+      # untouched; only bypass_actors and the approval count are flipped.
+      PAYLOAD="$(printf '%s' "$EXISTING_DETAIL" | jq --arg enforcement "$ENFORCEMENT" '
+        del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
+            .current_user_can_bypass,._links)
+        | .enforcement = $enforcement
+        | .bypass_actors = []
+        | (.rules[] | select(.type == "pull_request").parameters.required_approving_review_count) = 0
+      ')"
     fi
   fi
   fi
@@ -336,6 +378,15 @@ EOF
       if [[ "$EXISTING_ENFORCEMENT" != "$ENFORCEMENT" ]]; then
         gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" \
           -f enforcement="$ENFORCEMENT" >/dev/null
+      fi
+    elif [[ "$PROFILE" == "single-maintainer" ]]; then
+      # PAYLOAD here is preimage-derived (see above), so compare the full
+      # metadata-stripped existing detail directly, not a field subset.
+      if ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
+        del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
+            .current_user_can_bypass,._links) == $wanted' >/dev/null; then
+        printf '%s' "$PAYLOAD" \
+          | gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" --input - >/dev/null
       fi
     elif ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
       {name,target,enforcement,bypass_actors,conditions,

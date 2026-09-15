@@ -70,7 +70,7 @@ export PATH
 
 reset_calls() { : > "$GH_CALLS"; }
 
-run_script() { bash "$SCRIPT" "$@" < /dev/null; }
+run_script() { "$BASH" "$SCRIPT" "$@" < /dev/null; }
 
 no_profile_writes() {
   ! grep -Eq -- '--method (POST|PUT|PATCH|DELETE).*(actions/variables|rulesets)' "$GH_CALLS"
@@ -115,12 +115,13 @@ canonical_detail() {
     --argjson app "$app" '{
       id: 42, name: "scaffold-branch-protection", target: "branch",
       enforcement: $enforcement,
-      bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole",
-                       bypass_mode: "pull_request"}],
+      bypass_actors: (if $profile == "single-maintainer" then []
+        else [{actor_id: 5, actor_type: "RepositoryRole",
+               bypass_mode: "pull_request"}] end),
       conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
       rules: [
         {type: "pull_request", parameters: {
-          required_approving_review_count: 1,
+          required_approving_review_count: (if $profile == "single-maintainer" then 0 else 1 end),
           dismiss_stale_reviews_on_push: ($profile == "team"),
           require_code_owner_review: ($profile == "team"),
           require_last_push_approval: ($profile == "team"),
@@ -134,6 +135,23 @@ canonical_detail() {
                then map(. + {integration_id: $app}) else . end)}}
       ]
     }'
+}
+
+# require_extra_approval_for_unattributed_changes is the one producer-only
+# field a canonical ruleset may legitimately carry as a non-default (true)
+# value — the canonical check tolerates true (see the fix above), unlike
+# allowed_merge_methods/required_reviewers/do_not_enforce_on_create, which
+# the pre-existing canonical check already requires to sit at their default
+# (respectively ["merge","squash","rebase"], [], false) for ANY profile, so
+# a real preimage never carries non-default values for those three. This
+# helper proves single-maintainer reconciliation preserves the real
+# preimage's require_extra_approval flag rather than silently resetting it
+# via a lossy template rebuild.
+with_producer_fields() {
+  jq '
+    (.rules[] | select(.type == "pull_request").parameters) |=
+      (. + {require_extra_approval_for_unattributed_changes: true})
+  '
 }
 
 existing_profile_fixtures() {
@@ -352,6 +370,35 @@ else
 fi
 
 profile_fixtures
+rc=0
+SM="$(run_script -R acme/widget --profile single-maintainer --dry-run 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$SM" | jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+   ' >/dev/null && [ ! -s "$GH_CALLS" ]; then
+  t_ok "explicit single-maintainer dry-run prints a zero-approval no-bypass payload with zero gh calls"
+else
+  t_fail "explicit single-maintainer dry-run prints a zero-approval no-bypass payload with zero gh calls"
+fi
+
+profile_fixtures
+expect_rc_grep 0 "Created ruleset 'scaffold-branch-protection'" \
+  "fresh explicit single-maintainer persists intent before creating the ruleset" \
+  run_script -R acme/widget --profile single-maintainer
+if jq -e '.name == "SCAFFOLD_GOVERNANCE_PROFILE" and .value == "single-maintainer"' \
+     "$GH_FIXTURES/variable-written.json" >/dev/null \
+   && jq -e '
+       .bypass_actors == []
+       and (.rules[] | select(.type == "pull_request").parameters
+         .required_approving_review_count) == 0
+     ' "$GH_FIXTURES/posted.json" >/dev/null; then
+  t_ok "single-maintainer persists exact intent and posts a zero-approval no-bypass ruleset"
+else
+  t_fail "single-maintainer persists exact intent and posts a zero-approval no-bypass ruleset"
+fi
+
+profile_fixtures
 expect_rc_grep 0 "Created ruleset 'scaffold-branch-protection'" \
   "fresh explicit solo persists intent before creating the ruleset" \
   run_script -R acme/widget --profile solo
@@ -493,6 +540,84 @@ mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
 detail_fails_closed "noncanonical solo dry-run fails closed after detail GET" \
   solo --dry-run
 
+# --- explicit single-maintainer: reconciliation from real preimages --------
+
+existing_profile_fixtures solo active
+expect_rc 0 "canonical solo migrates in place to explicit single-maintainer" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+     and (.rules[] | select(.type == "pull_request").parameters
+       .dismiss_stale_reviews_on_push) == false
+     and (.rules[] | select(.type == "required_status_checks").parameters
+       .strict_required_status_checks_policy) == false
+   ' "$GH_FIXTURES/put.json" >/dev/null \
+   && jq -e '.value == "single-maintainer"' "$GH_FIXTURES/variable-written.json" >/dev/null; then
+  t_ok "solo-to-single-maintainer migration flips only bypass and approval count"
+else
+  t_fail "solo-to-single-maintainer migration flips only bypass and approval count"
+fi
+
+existing_profile_fixtures team active
+expect_rc 0 "canonical team migrates in place to explicit single-maintainer" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+     and (.rules[] | select(.type == "pull_request").parameters
+       .dismiss_stale_reviews_on_push) == true
+     and (.rules[] | select(.type == "required_status_checks").parameters
+       .strict_required_status_checks_policy) == true
+     and all(.rules[] | select(.type == "required_status_checks").parameters
+       .required_status_checks[]; .integration_id == 15368)
+   ' "$GH_FIXTURES/put.json" >/dev/null; then
+  t_ok "team-to-single-maintainer migration preserves team review/CI controls"
+else
+  t_fail "team-to-single-maintainer migration preserves team review/CI controls"
+fi
+
+existing_profile_fixtures team active
+canonical_detail team active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "single-maintainer reconciliation from a producer-enriched preimage" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+     and (.rules[] | select(.type == "pull_request").parameters
+       .require_extra_approval_for_unattributed_changes) == true
+   ' "$GH_FIXTURES/put.json" >/dev/null; then
+  t_ok "single-maintainer reconciliation preserves producer-only metadata"
+else
+  t_fail "single-maintainer reconciliation preserves producer-only metadata"
+fi
+
+existing_profile_fixtures single-maintainer active
+expect_rc 0 "exact canonical single-maintainer match is idempotent" \
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
+if jq -e '.value == "single-maintainer"' "$GH_FIXTURES/variable-written.json" >/dev/null \
+   && grep -q 'rulesets/42' "$GH_CALLS" \
+   && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
+  t_ok "exact single-maintainer match persists intent and performs no ruleset write"
+else
+  t_fail "exact single-maintainer match persists intent and performs no ruleset write"
+fi
+
+existing_profile_fixtures single-maintainer
+rc=0
+out="$(run_script -R acme/widget --profile single-maintainer --reconcile --dry-run 2>"$WORK/stderr.tmp")" || rc=$?
+err="$(cat "$WORK/stderr.tmp")"
+if [ "$rc" -eq 0 ] && printf '%s\n' "$err" | grep -Eqi 'dry-run.*candidate|no.op' \
+   && printf '%s\n' "$out" | jq -e '.bypass_actors == []' >/dev/null \
+   && no_profile_writes; then
+  t_ok "existing canonical single-maintainer dry-run validates detail with GET-only candidate output"
+else
+  t_fail "existing canonical single-maintainer dry-run validates detail with GET-only candidate output"
+fi
+
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
   existing_profile_fixtures "$base"
@@ -520,6 +645,11 @@ team missing source is noncanonical|team|del(.rules[]|select(.type=="required_st
 team mixed source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = 42
 team null source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = null
 team malformed source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = "bad"
+single-maintainer nonzero approval count is noncanonical|single-maintainer|.rules[0].parameters.required_approving_review_count = 1
+single-maintainer stray bypass actor is noncanonical|single-maintainer|.bypass_actors = [{actor_id:6,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+single-maintainer mixed review controls are noncanonical|single-maintainer|(.rules[]|select(.type=="pull_request").parameters.dismiss_stale_reviews_on_push) = true
+single-maintainer mixed strictness is noncanonical|single-maintainer|(.rules[]|select(.type=="required_status_checks").parameters.strict_required_status_checks_policy) = true
+single-maintainer explicit false unattributed-approval flag is noncanonical|single-maintainer|(.rules[]|select(.type=="pull_request").parameters.require_extra_approval_for_unattributed_changes) = false
 NONCANONICAL
 
 # Zero matches intentionally remains the #95 fresh-create path tested above.

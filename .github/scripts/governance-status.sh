@@ -16,7 +16,7 @@
 set -u
 
 usage() {
-  echo "Usage: governance-status.sh -R owner/repo [--profile solo|team]" >&2
+  echo "Usage: governance-status.sh -R owner/repo [--profile solo|team|single-maintainer]" >&2
   echo "                            [--checks ctx1,ctx2,...]" >&2
   exit 2
 }
@@ -27,7 +27,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -R|--repo) [ -n "${2:-}" ] || usage; REPO="$2"; shift 2 ;;
     --profile)
-      case "${2:-}" in solo|team) PROFILE="$2" ;; *) usage ;; esac
+      case "${2:-}" in solo|team|single-maintainer) PROFILE="$2" ;; *) usage ;; esac
       shift 2 ;;
     --checks) [ -n "${2:-}" ] || usage; CHECKS="$2"; shift 2 ;;
     *) usage ;;
@@ -70,7 +70,8 @@ jqr() { jq -r "$1" "$WORK/$2.json"; }
 if [ "$PROFILE_ACTIVE" = 0 ]; then
   fetch profile "repos/$REPO/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
   if [ "$(st profile)" = ok ] &&
-     jq -e '.value | type == "string" and (. == "solo" or . == "team")' \
+     jq -e '.value | type == "string"
+       and (. == "solo" or . == "team" or . == "single-maintainer")' \
        "$WORK/profile.json" >/dev/null 2>&1 &&
      jq -r '.value' "$WORK/profile.json" > "$WORK/profile.value" 2>/dev/null &&
      IFS= read -r PROFILE < "$WORK/profile.value"; then
@@ -79,6 +80,8 @@ if [ "$PROFILE_ACTIVE" = 0 ]; then
 fi
 [ "$PROFILE_ACTIVE" != 1 ] || BASE=1
 [ "$PROFILE" != team ] || TEAM=1
+SM=0
+[ "$PROFILE" != single-maintainer ] || SM=1
 
 # emit <key> <state> <detail> <required-flag> — required OFF counts toward
 # exit 1; required UNKNOWN/UNCHECKABLE counts toward exit 3 (which outranks).
@@ -179,13 +182,39 @@ qual_for "$MQSRC"; MQQ="$QUAL"
 if [ -n "$DEFB" ]; then emit repository.default_branch ACTIVE "$DEFB" "$BASE"
 else emit repository.default_branch UNKNOWN "repository metadata unavailable" "$BASE"; fi
 if [ "$PROFILE_ACTIVE" = 1 ]; then emit governance.profile ACTIVE "$PROFILE" 1
-else emit governance.profile UNKNOWN "persisted profile unavailable or invalid; expected exact solo|team" 1; fi
+else emit governance.profile UNKNOWN "persisted profile unavailable or invalid; expected exact solo|team|single-maintainer" 1; fi
 if [ "$RULES" != 1 ]; then
   emit pull_request.required_approving_review_count UNKNOWN "effective rules unavailable" "$BASE"
+elif [ "$SM" = 1 ]; then
+  if [ "$PRN" = 0 ] || [ "$APPR" -ge 1 ]; then
+    emit pull_request.required_approving_review_count OFF "count=$APPR (approving-review requirement not zero)" "$BASE"
+  else
+    emit pull_request.required_approving_review_count ACTIVE "count=$APPR$PQ" "$BASE"
+  fi
 elif [ "$PRN" = 0 ] || [ "$APPR" -lt 1 ]; then
   emit pull_request.required_approving_review_count OFF "count=$APPR (no approving-review requirement)" "$BASE"
 else
   emit pull_request.required_approving_review_count ACTIVE "count=$APPR$PQ" "$BASE"
+fi
+if [ "$SM" = 1 ]; then
+  if [ "$RULES" != 1 ]; then
+    emit pull_request.no_bypass_actors UNKNOWN "effective rules unavailable" 1
+  elif [ "$PQ" = " bypass=unknown" ]; then
+    emit pull_request.no_bypass_actors UNKNOWN "bypass evidence unavailable" 1
+  elif [ -z "$PQ" ]; then
+    emit pull_request.no_bypass_actors ACTIVE "no bypass actors$PQ" 1
+  else
+    emit pull_request.no_bypass_actors OFF "bypass actors present$PQ" 1
+  fi
+  if [ "$RULES" != 1 ]; then
+    emit required_checks.no_bypass_actors UNKNOWN "effective rules unavailable" 1
+  elif [ "$CQ" = " bypass=unknown" ]; then
+    emit required_checks.no_bypass_actors UNKNOWN "bypass evidence unavailable" 1
+  elif [ -z "$CQ" ]; then
+    emit required_checks.no_bypass_actors ACTIVE "no bypass actors$CQ" 1
+  else
+    emit required_checks.no_bypass_actors OFF "bypass actors present$CQ" 1
+  fi
 fi
 
 # rule_row <key> <rule-count> <bool> <qual> <absent-detail> <required>
