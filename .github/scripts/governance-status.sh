@@ -150,6 +150,14 @@ fi
 PRN=0 APPR=0 DSM=false LPA=false COR=false RTR=false STRICT=false MQN=0
 PRSRC="" RSCSRC="" MQSRC=""
 if [ "$RULES" = 1 ]; then
+  if ! jq -e '
+    group_by(.ruleset_id) |
+    all(.[]; ([.[].ruleset_source_type]|unique|length) == 1 and
+      ([.[].ruleset_source]|unique|length) == 1)' "$WORK/rules.json" >/dev/null 2>&1; then
+    RULES=0
+  fi
+fi
+if [ "$RULES" = 1 ]; then
   # shellcheck disable=SC2016  # single-quoted jq program, as in setup-ruleset.sh
   IFS="$TAB" read -r PRN APPR DSM LPA COR RTR STRICT MQN PRSRC RSCSRC MQSRC <<EOF
 $(jqr '[.[]|select(.type=="pull_request")] as $p
