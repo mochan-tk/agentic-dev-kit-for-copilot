@@ -463,7 +463,7 @@ done
 # Keep the other axis healthy to prevent an earlier source failure masking it.
 single_maintainer_green
 mk_rs 900 org '[]'
-jq '. + [{"type":"required_status_checks","parameters":{
+jq 'map(select(.type != "required_status_checks")) + [{"type":"required_status_checks","parameters":{
   "strict_required_status_checks_policy":false,"required_status_checks":[
     {"context":"quality"},{"context":"task-ritual"},{"context":"scaffold-self-check"},{"context":"copilot-surface"}]},
   "ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
@@ -614,9 +614,26 @@ for actor_case in missing malformed nonempty; do
   else
     rce "isolated $actor_case actor evidence is UNKNOWN" 3
     chk "isolated $actor_case PR actor evidence is unknown" "^pull_request\\.no_bypass_actors${T}UNKNOWN"
-    chk "isolated $actor_case CI actor evidence is unknown" "^required_checks\\.no_bypass_actors${T}UNKNOWN"
+    chk "isolated $actor_case CI actor evidence remains active" "^required_checks\\.no_bypass_actors${T}ACTIVE"
   fi
 done
+
+single_maintainer_green
+mk_rs 900 org '[]'
+jq 'map(select(.type != "required_status_checks")) + [{"type":"required_status_checks","parameters":{
+  "strict_required_status_checks_policy":false,"required_status_checks":[
+    {"context":"quality"},{"context":"task-ritual"},
+    {"context":"scaffold-self-check"},{"context":"copilot-surface"}]},
+  "ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+printf '{"id":900,"source_type":"Organization","source":"orgname","enforcement":"active","bypass_actors":[{"actor_id":"bad","actor_type":"Integration","bypass_mode":"always"}]}\n' \
+  > "$GS_FIX/rs-org-900.json"
+export GS_RULES_PAGES=2
+run -R o/r --profile single-maintainer
+unset GS_RULES_PAGES
+rce "isolated malformed CI actor evidence is unknown" 3
+chk "isolated malformed CI actor leaves PR evidence active" "^pull_request\\.no_bypass_actors${T}ACTIVE"
+chk "isolated malformed CI actor is unknown on CI axis" "^required_checks\\.no_bypass_actors${T}UNKNOWN"
 
 # Explicit single-maintainer intent still requires both a pull-request rule
 # and every requested CI context; zero approvals never means no PR or CI.
@@ -656,6 +673,18 @@ mk_rs 900 org '[]'
 run -R o/r --profile single-maintainer
 rce "malformed later-page approval evidence is unknown" 3
 chk "malformed approval evidence is not healthy" "^pull_request\.required_approving_review_count${T}UNKNOWN"
+
+single_maintainer_green
+printf '%s\n%s\n' \
+  '{"type":"pull_request","parameters":{"required_approving_review_count":0,"dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,"required_review_thread_resolution":false},"ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}' \
+  '{"type":"pull_request","parameters":null,"ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}' \
+  > "$GS_FIX/rules.json"
+mk_rs 900 org '[]'
+export GS_RULES_PAGES=2 GS_REQUIRE_RULES_PAGINATE=1
+run -R o/r --profile single-maintainer
+unset GS_RULES_PAGES GS_REQUIRE_RULES_PAGINATE
+rce "array-per-page malformed later rule requires pagination and fails closed" 3
+chk "array-per-page malformed later rule is unknown" "^pull_request\\.required_approving_review_count${T}UNKNOWN"
 
 # A successful detail response with missing source identity/enforcement is
 # permission-elided evidence, not an empty/default producer response.

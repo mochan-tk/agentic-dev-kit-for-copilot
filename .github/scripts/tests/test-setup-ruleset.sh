@@ -736,12 +736,18 @@ jq '. + {id:42,node_id:"R_42",source_type:"Repository",source:"acme/widget",
   > "$GH_FIXTURES/ruleset-detail.json"
 reset_calls
 expect_rc 0 "reapply actual emitted migration candidate is a no-op" \
-  run_script -R acme/widget --profile single-maintainer --reconcile
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
 if ! grep -Eq -- '--method PUT.*rulesets' "$GH_CALLS"; then
   t_ok "actual emitted candidate reapplication performs no ruleset write"
 else
   t_fail "actual emitted candidate reapplication performs no ruleset write"
 fi
+
+existing_profile_fixtures solo active
+jq '._links.html.href = "https://github.com/other/repo/rules/42"' \
+  "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "producer html link for another repository refuses normalization" solo --dry-run
 
 # Compare the complete emitted active candidate against the preimage-derived
 # projection, not selected policy fields.
