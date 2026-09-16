@@ -113,21 +113,27 @@ canonical_detail() {
   local profile="$1" enforcement="${2:-disabled}" app="${3:-15368}"
   jq -n --arg profile "$profile" --arg enforcement "$enforcement" \
     --argjson app "$app" '{
-      id: 42, name: "scaffold-branch-protection", target: "branch",
-      enforcement: $enforcement,
-      bypass_actors: (if $profile == "single-maintainer" then []
+    id: 42, node_id: "R_kgDO42", name: "scaffold-branch-protection",
+    target: "branch", source_type: "Repository", source: "acme/widget",
+    enforcement: $enforcement,
+    created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+    current_user_can_bypass: false,
+    bypass_actors: (if $profile == "single-maintainer" then []
         else [{actor_id: 5, actor_type: "RepositoryRole",
                bypass_mode: "pull_request"}] end),
       conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
       rules: [
         {type: "pull_request", parameters: {
           required_approving_review_count: (if $profile == "single-maintainer" then 0 else 1 end),
+          allowed_merge_methods: ["merge","squash","rebase"],
+          required_reviewers: [],
           dismiss_stale_reviews_on_push: ($profile == "team"),
           require_code_owner_review: ($profile == "team"),
           require_last_push_approval: ($profile == "team"),
           required_review_thread_resolution: ($profile == "team")}},
         {type: "required_status_checks", parameters: {
           strict_required_status_checks_policy: ($profile == "team"),
+          do_not_enforce_on_create: false,
           required_status_checks:
             (["quality","task-ritual","scaffold-self-check","copilot-surface"]
              | map({context: .})
@@ -561,26 +567,12 @@ else
 fi
 
 existing_profile_fixtures team active
-expect_rc 0 "canonical team migrates in place to explicit single-maintainer" \
+expect_rc_grep 1 'contradictory|single-maintainer' \
+  "canonical team refuses contradictory single-maintainer transition" \
   run_script -R acme/widget --profile single-maintainer --reconcile
-if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
-     .bypass_actors == []
-     and (.rules[] | select(.type == "pull_request").parameters
-       .required_approving_review_count) == 0
-     and (.rules[] | select(.type == "pull_request").parameters
-       .dismiss_stale_reviews_on_push) == true
-     and (.rules[] | select(.type == "required_status_checks").parameters
-       .strict_required_status_checks_policy) == true
-     and all(.rules[] | select(.type == "required_status_checks").parameters
-       .required_status_checks[]; .integration_id == 15368)
-   ' "$GH_FIXTURES/put.json" >/dev/null; then
-  t_ok "team-to-single-maintainer migration preserves team review/CI controls"
-else
-  t_fail "team-to-single-maintainer migration preserves team review/CI controls"
-fi
 
-existing_profile_fixtures team active
-canonical_detail team active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
 expect_rc 0 "single-maintainer reconciliation from a producer-enriched preimage" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
@@ -617,6 +609,36 @@ if [ "$rc" -eq 0 ] && printf '%s\n' "$err" | grep -Eqi 'dry-run.*candidate|no.op
 else
   t_fail "existing canonical single-maintainer dry-run validates detail with GET-only candidate output"
 fi
+
+# Remediation regressions are intentionally added before their production fixes.
+for mutation in \
+  '.source = "other/repo"' \
+  '.source_type = "Organization"' \
+  '.rules[0].parameters.allowed_merge_methods = "merge"' \
+  '.rules[0].parameters.required_reviewers = "owner"' \
+  '.rules[1].parameters.do_not_enforce_on_create = "false"'
+do
+  existing_profile_fixtures solo
+  jq "$mutation" "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp"
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+  detail_fails_closed "producer-shaped metadata/type mutation fails closed" solo --dry-run
+done
+
+existing_profile_fixtures team active
+expect_rc_grep 1 'noncanonical|contradictory|refus' \
+  "team-to-single-maintainer contradictory transition is refused" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+
+existing_profile_fixtures solo active
+export GH_FAIL_EXACT='api --method PUT repos/acme/widget/rulesets/42 --input -'
+rc=0
+out="$(run_script -R acme/widget --profile single-maintainer --reconcile 2>&1)" || rc=$?
+if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -Eqi 'intent persisted.*ruleset|partial'; then
+  t_ok "ruleset PUT failure reports persisted intent as partial"
+else
+  t_fail "ruleset PUT failure reports persisted intent as partial"
+fi
+unset GH_FAIL_EXACT
 
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do

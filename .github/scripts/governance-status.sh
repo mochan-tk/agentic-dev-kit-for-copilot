@@ -107,7 +107,30 @@ if [ -n "$DEFB" ]; then
 else
   for name in rules wf runs clog; do echo fail > "$WORK/$name.rc"; done; fi
 RULES=0
-[ "$(st rules)" != ok ] || RULES=1
+if [ "$(st rules)" = ok ] &&
+   jq -e 'type == "array" and all(.[]?;
+     (.type|type) == "string" and
+     (.ruleset_id|type) == "number" and
+     (.ruleset_source_type|type) == "string" and
+     (.ruleset_source|type) == "string" and
+     (.parameters|type) == "object" and
+     (if .type == "pull_request" then
+        (.parameters.required_approving_review_count|type) == "number" and
+        (.parameters.required_approving_review_count >= 0) and
+        ((.parameters.required_approving_review_count|floor) == .parameters.required_approving_review_count) and
+        ([.parameters.dismiss_stale_reviews_on_push,
+          .parameters.require_last_push_approval,
+          .parameters.require_code_owner_review,
+          .parameters.required_review_thread_resolution]
+         | all(.[]; type == "boolean")) and
+        ((.parameters.required_reviewers == null) or
+         (.parameters.required_reviewers|type) == "array")
+      elif .type == "required_status_checks" then
+        (.parameters.strict_required_status_checks_policy|type) == "boolean" and
+        (.parameters.required_status_checks|type) == "array"
+      else true end))' "$WORK/rules.json" >/dev/null 2>&1; then
+  RULES=1
+fi
 
 # Aggregate every effective rule of a type across all active sources: the
 # strongest approval threshold, any-source booleans, and the union of
@@ -153,10 +176,19 @@ while IFS="$TAB" read -r rid rtyp rsrc; do
     *) echo fail > "$WORK/rs$rid.rc" ;;
   esac
   [ "$(st "rs$rid")" = ok ] || continue
-  jqr '.bypass_actors // [] | sort_by(.actor_type, .actor_id)[]
+  if ! jq -e '.bypass_actors | type == "array" and all(.[]?;
+      (.actor_type|type) == "string" and
+      (.bypass_mode|type) == "string" and
+      ((.actor_id == null) or (.actor_id|type) == "number") and
+      ((.actor_name == null) or (.actor_name|type) == "string"))' \
+      "$WORK/rs$rid.json" >/dev/null 2>&1; then
+    echo fail > "$WORK/rs$rid.rc"
+    continue
+  fi
+  jqr '.bypass_actors | sort_by(.actor_type, .actor_id)[]
     | "actor_type=\(.actor_type) actor_id=\(.actor_id // "none") bypass_mode=\(.bypass_mode)"' \
     "rs$rid" > "$WORK/actors.$rid"
-  jqr '.bypass_actors // [] | sort_by(.actor_type, .actor_id)
+  jqr '.bypass_actors | sort_by(.actor_type, .actor_id)
     | map("\(.actor_type):\(.actor_id // "none"):\(.bypass_mode)") | join(",")' \
     "rs$rid" > "$WORK/qual.$rid"
 done < "$WORK/srcs"

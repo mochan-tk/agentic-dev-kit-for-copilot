@@ -62,6 +62,9 @@ inherit what this one learned.
   example a real `require_extra_approval_for_unattributed_changes: true`)
   survives untouched rather than being reset by a lossy template rebuild;
   malformed, customized, or already-owned targets are still refused (#124).
+  Adoption is repository-local: a maintainer must decide each PR and head;
+  this profile does not enable automatic merging and cannot guarantee
+  authenticated human and agent identities are distinguishable.
 
 - Replaced the top-level README with the Human-on-the-Loop overview draft and committed the matching overview image at `docs/images/agentic-development-kit-overview.png`, preserving the owner-supplied source artifacts and provenance in `.github/docs/context/readme-redesign/`.
 

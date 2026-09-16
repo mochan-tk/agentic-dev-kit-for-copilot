@@ -33,15 +33,16 @@ usage() {
 Usage: setup-ruleset.sh [options]
 
 Create a branch ruleset targeting the repository's default branch that
-requires:
-  - a pull request with at least 1 approving review
-  - required status checks (default: all four CI wall jobs —
+requires a pull request and required status checks (default: all four CI
+wall jobs —
     quality,task-ritual,scaffold-self-check,copilot-surface)
 
-Repository admins may bypass, for pull requests only: direct pushes stay
-blocked for everyone, but an admin can merge a PR through the explicit,
-audited "bypass" button. Without this, a solo adopter could never merge
-their own PRs (you cannot approve your own), including the onboarding PR.
+Profiles select the approval and bypass policy: `solo` retains the legacy
+admin pull-request bypass and one approving review; `team` adds review and
+issuer restrictions; `single-maintainer` requires zero approvals and no
+bypass actors. These are repository-local settings: a maintainer decides
+each PR/head, and the script does not provide automatic merge or guarantee
+that human and agent identities can be distinguished.
 
 If a ruleset with the same name already exists, the script updates its
 enforcement when the request differs and otherwise changes nothing.
@@ -221,8 +222,18 @@ if [[ -n "$PROFILE" ]]; then
       exit 1
     fi
     if ! printf '%s' "$EXISTING_DETAIL" | jq -er \
-      --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" '
-      ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
+      --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" --arg repo "$REPO" '
+      select((type == "object")
+        and (.id|type) == "number"
+        and (.name|type) == "string"
+        and (.target|type) == "string"
+        and (.source_type|type) == "string"
+        and (.source|type) == "string"
+        and (.enforcement|type) == "string"
+        and (.bypass_actors|type) == "array"
+        and (.conditions|type) == "object"
+        and (.rules|type) == "array")
+      | ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
        | map(select(length > 0)) | sort) as $want
       | [.rules[] | select(.type == "pull_request")] as $pr
       | [.rules[] | select(.type == "required_status_checks")] as $rs
@@ -235,16 +246,19 @@ if [[ -n "$PROFILE" ]]; then
          elif .bypass_actors == [] then "none"
          else "other" end) as $bypass_shape
       | select((.id | tostring) == $id and .name == $name and .target == "branch"
+          and .source_type == "Repository" and .source == $repo
           and (.enforcement == "active" or .enforcement == "disabled")
           and $bypass_shape != "other"
           and .conditions == {ref_name:{include:["~DEFAULT_BRANCH"],exclude:[]}}
           and (.rules | length) == 2 and ($pr | length) == 1 and ($rs | length) == 1
-          and ($pr[0].parameters.allowed_merge_methods? // ["merge","squash","rebase"])
-              == ["merge","squash","rebase"]
-          and ($pr[0].parameters.required_reviewers? // []) == []
+          and ($pr[0].parameters.allowed_merge_methods | type) == "array"
+          and $pr[0].parameters.allowed_merge_methods == ["merge","squash","rebase"]
+          and ($pr[0].parameters.required_reviewers | type) == "array"
+          and $pr[0].parameters.required_reviewers == []
           and ($pr[0].parameters | if has("require_extra_approval_for_unattributed_changes")
                then .require_extra_approval_for_unattributed_changes else true end) == true
-          and ($rs[0].parameters.do_not_enforce_on_create? // false) == false
+          and ($rs[0].parameters.do_not_enforce_on_create | type) == "boolean"
+          and $rs[0].parameters.do_not_enforce_on_create == false
           and ($rsp | keys | sort) == ["required_status_checks","strict_required_status_checks_policy"]
           and ([$got[].context] | sort) == $want and ($got | length) == ($want | length))
       | if $bypass_shape == "admin" and $prp == {required_approving_review_count:1,
@@ -270,6 +284,17 @@ if [[ -n "$PROFILE" ]]; then
       exit 1
     fi
     if [[ "$PROFILE" == "single-maintainer" ]]; then
+      if printf '%s' "$EXISTING_DETAIL" | jq -e '
+        any(.rules[]; .type == "pull_request" and
+          (.parameters.dismiss_stale_reviews_on_push == true
+           or .parameters.require_code_owner_review == true
+           or .parameters.require_last_push_approval == true
+           or .parameters.required_review_thread_resolution == true))
+        or any(.rules[]; .type == "required_status_checks" and
+          .parameters.strict_required_status_checks_policy == true)' >/dev/null; then
+        echo "error: contradictory team approval/CI requirements; refusing single-maintainer transition." >&2
+        exit 1
+      fi
       # Reconciliation candidate is derived from the real preimage (not the
       # lossy template) so producer-only fields (required_reviewers,
       # allowed_merge_methods, require_extra_approval_for_unattributed_changes,
@@ -343,7 +368,7 @@ EOF
   fi
 
   if [[ "$DRY_RUN" == "true" ]]; then
-    echo "dry-run: explicit team candidate from GET-only evidence; no mutation made." >&2
+    echo "dry-run: explicit $PROFILE candidate from GET-only evidence; no mutation made." >&2
     printf '%s\n' "$PAYLOAD"
     exit 0
   fi
@@ -385,8 +410,11 @@ EOF
       if ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
         del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
             .current_user_can_bypass,._links) == $wanted' >/dev/null; then
-        printf '%s' "$PAYLOAD" \
-          | gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" --input - >/dev/null
+        if ! printf '%s' "$PAYLOAD" \
+          | gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" --input - >/dev/null; then
+          echo "error: governance intent persisted, but ruleset PUT failed; partial state requires operator reconciliation." >&2
+          exit 1
+        fi
       fi
     elif ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
       {name,target,enforcement,bypass_actors,conditions,

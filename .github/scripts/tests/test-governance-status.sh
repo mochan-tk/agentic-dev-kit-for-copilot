@@ -443,6 +443,25 @@ same_run "persisted single-maintainer equals healthy explicit single-maintainer"
 chk "persisted single-maintainer is ACTIVE" "^governance\.profile${T}ACTIVE${T}single-maintainer$"
 get_once "healthy persisted single-maintainer uses one exact plain variable GET"
 
+# Acceptance regressions added before the associated sensor fixes. These
+# fixtures must fail closed rather than silently normalizing malformed
+# producer evidence to zero approvals or an empty bypass list.
+single_maintainer_green
+jq 'map(if .type == "pull_request"
+       then del(.parameters.required_approving_review_count)
+       else . end)' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "missing approval count is an UNKNOWN sensor failure" 3
+chk "missing approval count is not healthy" "^pull_request\.required_approving_review_count${T}UNKNOWN"
+
+single_maintainer_green
+printf '{"id":101}\n' > "$GS_FIX/rs-repo-101.json"
+run -R o/r --profile single-maintainer
+rce "omitted bypass actors are an UNKNOWN sensor failure" 3
+chk "omitted bypass actors are not healthy on PR axis" "^pull_request\.no_bypass_actors${T}UNKNOWN"
+chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no_bypass_actors${T}UNKNOWN"
+
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
