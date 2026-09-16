@@ -224,6 +224,9 @@ if [[ -n "$PROFILE" ]]; then
     if ! printf '%s' "$EXISTING_DETAIL" | jq -er \
       --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" --arg repo "$REPO" '
       select((type == "object")
+        and all(keys[]; IN("id","name","target","enforcement","source_type","source",
+          "node_id","created_at","updated_at","current_user_can_bypass",
+          "bypass_actors","conditions","rules","_links"))
         and (.id|type) == "number"
         and (.name|type) == "string"
         and (.target|type) == "string"
@@ -242,7 +245,9 @@ if [[ -n "$PROFILE" ]]; then
                  and (.current_user_can_bypass | IN("always","pull_requests_only","never"))))
         and (.bypass_actors|type) == "array"
         and (.conditions|type) == "object"
-        and (.rules|type) == "array")
+        and (.rules|type) == "array"
+        and all(.rules[]; (type == "object")
+          and (keys | sort) == ["parameters","type"]))
       | ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
        | map(select(length > 0)) | sort) as $want
       | [.rules[] | select(.type == "pull_request")] as $pr
