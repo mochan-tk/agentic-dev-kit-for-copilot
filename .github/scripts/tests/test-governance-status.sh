@@ -451,11 +451,30 @@ for barrier in require_code_owner_review require_last_push_approval; do
     mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
   mk_rs 900 org '[]'
   export GS_RULES_PAGES=2
+  export GS_REQUIRE_RULES_PAGINATE=1
   run -R o/r --profile single-maintainer
   unset GS_RULES_PAGES
+  unset GS_REQUIRE_RULES_PAGINATE
   rce "single-maintainer zero-count $barrier is OFF" 1
   chk "zero-count $barrier is not neutralized" "^pull_request\\.$barrier${T}OFF${T}true"
 done
+
+# A malformed actor array must affect only the axis contributed by its source.
+# Keep the other axis healthy to prevent an earlier source failure masking it.
+single_maintainer_green
+mk_rs 900 org '[]'
+jq '. + [{"type":"required_status_checks","parameters":{
+  "strict_required_status_checks_policy":false,"required_status_checks":[
+    {"context":"quality"},{"context":"task-ritual"},{"context":"scaffold-self-check"},{"context":"copilot-surface"}]},
+  "ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+printf '{"id":900,"source_type":"Organization","source":"orgname","enforcement":"active","bypass_actors":"bad"}\n' > "$GS_FIX/rs-org-900.json"
+export GS_RULES_PAGES=2 GS_REQUIRE_RULES_PAGINATE=1
+run -R o/r --profile single-maintainer
+unset GS_RULES_PAGES GS_REQUIRE_RULES_PAGINATE
+rce "isolated malformed CI actor array is UNKNOWN" 3
+chk "isolated malformed CI actor leaves PR evidence active" "^pull_request\\.no_bypass_actors${T}ACTIVE"
+chk "isolated malformed CI actor is unknown on CI axis" "^required_checks\\.no_bypass_actors${T}UNKNOWN"
 
 # Missing/null pull-request parameters are unknown evidence, not an invented
 # default count. Parameterless non-review rules remain covered separately.
