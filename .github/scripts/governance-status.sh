@@ -198,8 +198,8 @@ while IFS="$TAB" read -r rid rtyp rsrc; do
   [ "$(st "rs$rid")" = ok ] || continue
   if ! jq -e --argjson id "$rid" --arg typ "$rtyp" --arg src "$rsrc" '
       (.id|type) == "number" and .id == $id and
-      ((.source_type == null) or .source_type == $typ) and
-      ((.source == null) or .source == $src) and
+      (.source_type|type) == "string" and .source_type == $typ and
+      (.source|type) == "string" and .source == $src and
       (.enforcement|type) == "string" and
       (.enforcement == "active" or .enforcement == "disabled") and
       ((.name == null) or (.name|type) == "string")' \
