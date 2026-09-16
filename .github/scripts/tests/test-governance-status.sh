@@ -530,7 +530,7 @@ jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":
 export GS_RULES_PAGES=2
 run -R o/r --profile team
 unset GS_RULES_PAGES
-rce "later effective-rule page is aggregated" 0
+rce "later effective-rule page is aggregated" 1
 chk "later page approval restriction is observed" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=2"
 chk "later page code-owner restriction is observed" "^pull_request\.require_code_owner_review${T}ACTIVE"
 baseline

@@ -100,12 +100,21 @@ if [ "$(st repo)" = ok ]; then
   DEFB="$(jqr '.default_branch // empty' repo)"; OWNER="$(jqr '.owner.type // empty' repo)"
 fi
 if [ -n "$DEFB" ]; then
-  fetch rules "repos/$REPO/rules/branches/$DEFB"
+  fetch rules "repos/$REPO/rules/branches/$DEFB" page
   fetch wf "repos/$REPO/actions/permissions/workflow"
   fetch runs "repos/$REPO/commits/$DEFB/check-runs?filter=latest&per_page=100" page
   fetch clog "repos/$REPO/contents/SCAFFOLD-CHANGELOG.md?ref=$DEFB" raw
 else
   for name in rules wf runs clog; do echo fail > "$WORK/$name.rc"; done; fi
+# `--paginate` yields one JSON array per page for effective branch rules.
+# Normalize only arrays; malformed or permission-elided responses stay unknown.
+if [ "$(st rules)" = ok ] &&
+   jq -s -e 'if all(.[]; type == "array") then add else error("not arrays") end' \
+     "$WORK/rules.json" > "$WORK/rules.normalized.json" 2>/dev/null; then
+  mv "$WORK/rules.normalized.json" "$WORK/rules.json"
+else
+  echo fail > "$WORK/rules.rc"
+fi
 RULES=0
 if [ "$(st rules)" = ok ] &&
    jq -e 'type == "array" and all(.[]?;
