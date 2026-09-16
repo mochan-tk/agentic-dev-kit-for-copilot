@@ -489,7 +489,7 @@ chk "malformed approval evidence is not healthy" "^pull_request\.required_approv
 # A successful detail response with missing source identity/enforcement is
 # permission-elided evidence, not an empty/default producer response.
 single_maintainer_green
-jq 'del(.ruleset_source_type,.ruleset_source)' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+jq 'map(del(.ruleset_source_type,.ruleset_source))' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
   mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile single-maintainer
 rce "missing contributing source identity is unknown" 3
