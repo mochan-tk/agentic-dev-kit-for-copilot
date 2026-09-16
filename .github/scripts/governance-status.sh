@@ -206,7 +206,7 @@ while IFS="$TAB" read -r rid rtyp rsrc; do
       (.source_type|type) == "string" and .source_type == $typ and
       (.source|type) == "string" and .source == $src and
       (.enforcement|type) == "string" and
-      (.enforcement == "active" or .enforcement == "disabled") and
+      .enforcement == "active" and
       ((.name == null) or (.name|type) == "string")' \
       "$WORK/rs$rid.json" >/dev/null 2>&1; then
     echo fail > "$WORK/rs$rid.rc"
