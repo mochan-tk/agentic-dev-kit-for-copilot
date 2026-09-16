@@ -62,7 +62,7 @@ Options:
                            separate reconciliation.
   --reconcile              Require --profile and reconcile one canonical same-name ruleset.
   --dry-run                Print the request JSON body to stdout and exit
-                           without making any API call.
+                           without making any mutation.
   -h, --help               Show this help and exit.
 
 Examples:
