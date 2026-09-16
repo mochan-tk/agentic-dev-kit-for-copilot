@@ -474,6 +474,23 @@ rce "omitted bypass actors are an UNKNOWN sensor failure" 3
 chk "omitted bypass actors are not healthy on PR axis" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no_bypass_actors${T}UNKNOWN"
 
+# Explicit single-maintainer intent still requires both a pull-request rule
+# and every requested CI context; zero approvals never means no PR or CI.
+single_maintainer_green
+jq 'map(select(.type != "pull_request"))' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "single-maintainer without pull-request rule is OFF" 1
+chk "single-maintainer missing pull-request rule is reported" "^pull_request\.required_approving_review_count${T}OFF${T}count=0"
+
+single_maintainer_green
+jq 'map(if .type == "required_status_checks" then
+  .parameters.required_status_checks |= map(select(.context != "quality"))
+  else . end)' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "single-maintainer missing required CI is OFF" 1
+chk "single-maintainer missing required CI is reported" "^required_checks\.context\.quality${T}OFF${T}not required by effective rules$"
+
 # Legacy non-review rules may legitimately omit parameters; malformed
 # pull-request parameters remain covered separately above and must be unknown.
 baseline
@@ -555,6 +572,24 @@ unset GS_RULES_PAGES
 rce "later effective-rule page is aggregated" 1
 chk "later page approval restriction is observed" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=2"
 chk "later page code-owner restriction is observed" "^pull_request\.require_code_owner_review${T}ACTIVE"
+
+# A later contributing source without a readable actor array cannot certify
+# no-bypass status for the aggregate.
+single_maintainer_green
+jq '. + [{"type":"required_status_checks","parameters":{
+  "strict_required_status_checks_policy":false,"required_status_checks":[
+    {"context":"quality"},{"context":"task-ritual"},
+    {"context":"scaffold-self-check"},{"context":"copilot-surface"}]},
+  "ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+mk_rs 900 org '[]'
+jq 'del(.bypass_actors)' "$GS_FIX/rs-org-900.json" > "$GS_FIX/rs.tmp" &&
+  mv "$GS_FIX/rs.tmp" "$GS_FIX/rs-org-900.json"
+export GS_RULES_PAGES=2
+run -R o/r --profile single-maintainer
+unset GS_RULES_PAGES
+rce "later contributing source missing actors is unknown" 3
+chk "later contributing source missing actors is not healthy" "^required_checks\.no_bypass_actors${T}UNKNOWN"
 
 # A successful contributing-detail response with a contradictory id is
 # malformed source evidence and must not qualify bypass controls.
