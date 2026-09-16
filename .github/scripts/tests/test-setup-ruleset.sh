@@ -595,16 +595,15 @@ else
   t_fail "single-maintainer reconciliation preserves producer-only metadata"
 fi
 
-# A producer-shaped required-reviewer configuration is valid when nested and
-# must survive reconciliation; the validator must not require a flat or empty
-# pseudo-schema.
+# A typed nested reviewer configuration is producer-shaped but customized
+# policy, so single-maintainer reconciliation must refuse it before writes.
 existing_profile_fixtures solo active
 canonical_detail solo active | with_producer_fields |
   jq '(.rules[] | select(.type=="pull_request").parameters).required_reviewers=[
     {"file_patterns":["*.go"],"minimum_approvals":0,
      "reviewer":{"id":7,"type":"Team"}}]' \
   > "$GH_FIXTURES/ruleset-detail.json"
-expect_rc 0 "nested producer required-reviewer metadata is accepted" \
+expect_rc_grep 1 'noncanonical|custom' "nested required-reviewer policy is refused" \
   run_script -R acme/widget --profile single-maintainer --reconcile --dry-run
 
 existing_profile_fixtures single-maintainer active

@@ -605,8 +605,8 @@ single_maintainer_green
 jq 'map(select(.type != "pull_request"))' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
   mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile single-maintainer
-rce "single-maintainer without pull-request rule is UNKNOWN" 3
-chk "single-maintainer missing pull-request rule is reported" "^pull_request\.required_approving_review_count${T}UNKNOWN"
+rce "single-maintainer without pull-request rule is OFF" 1
+chk "single-maintainer missing pull-request rule is reported" "^pull_request\.required_approving_review_count${T}OFF${T}count=0 \(no approving-review requirement\)$"
 
 single_maintainer_green
 jq 'map(if .type == "required_status_checks" then
