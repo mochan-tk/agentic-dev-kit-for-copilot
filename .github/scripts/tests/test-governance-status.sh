@@ -500,6 +500,7 @@ do
   rce "malformed nested required reviewer is UNKNOWN" 3
   chk "malformed nested reviewer is not healthy" "^pull_request\\.no_bypass_actors${T}UNKNOWN"
 done
+single_maintainer_green
 run -R o/r --profile solo
 rce "single-maintainer zero-approval fixtures fail solo intent" 1
 chk "solo requires a nonzero approval count" "^pull_request\.required_approving_review_count${T}OFF${T}count=0 \(no approving-review requirement\)$"
