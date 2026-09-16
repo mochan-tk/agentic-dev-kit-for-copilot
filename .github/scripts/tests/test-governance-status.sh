@@ -466,9 +466,7 @@ chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no
 # profiles; they must not invalidate the complete effective-rule document.
 baseline
 jq 'map(if .type == "pull_request" then
-  .parameters |= {dismiss_stale_reviews_on_push:false,
-    require_code_owner_review:false, require_last_push_approval:false,
-    required_review_thread_resolution:false} else . end)' \
+  .parameters = null else . end)' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile solo
 rce "legacy parameterless pull-request rule remains readable" 0
