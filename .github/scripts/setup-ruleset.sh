@@ -231,8 +231,10 @@ if [[ -n "$PROFILE" ]]; then
         and (.source|type) == "string"
         and (.enforcement|type) == "string"
         and ((.node_id == null) or (.node_id|type) == "string")
-        and ((.created_at == null) or (.created_at|type) == "string")
-        and ((.updated_at == null) or (.updated_at|type) == "string")
+        and ((.created_at == null) or ((.created_at|type) == "string" and
+          (.created_at|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))))
+        and ((.updated_at == null) or ((.updated_at|type) == "string" and
+          (.updated_at|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))))
         and ((._links == null) or (._links|type) == "object")
         and ((.current_user_can_bypass == null) or (.current_user_can_bypass|type) == "boolean")
         and (.bypass_actors|type) == "array"
