@@ -635,11 +635,16 @@ for mutation in \
   '.source_type = "Organization"' \
   '.id = "42"' \
   '.created_at = 42' \
+  '.created_at = null' \
   '.updated_at = "not-a-timestamp"' \
   '.created_at = "2026-99-99T00:00:00Z"' \
+  '.created_at = "2026-02-30T00:00:00Z"' \
+  '.updated_at = "2026-01-01T00:00:00+99:99"' \
   '._links = "not-an-object"' \
   '._links = {self:{href:42}}' \
+  '._links = {self:{href:"https://api.github.com/repos/other/repo/rulesets/42"}}' \
   '.node_id = 42' \
+  '.current_user_can_bypass = null' \
   '.current_user_can_bypass = "false"' \
   '.rules[0].parameters.allowed_merge_methods = "merge"' \
   '.rules[0].parameters.required_reviewers = "owner"' \
@@ -651,6 +656,14 @@ do
   mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
   detail_fails_closed "producer-shaped metadata/type mutation fails closed" solo --dry-run
 done
+
+existing_profile_fixtures solo active
+jq '.current_user_can_bypass = "exempt"
+  | ._links = {self:{href:"https://api.github.com/repos/acme/widget/rulesets/42"},
+               html:null}' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "documented exempt enum and nullable html link are accepted" \
+  run_script -R acme/widget --profile solo --reconcile --dry-run
 
 existing_profile_fixtures team active
 expect_rc_grep 1 'noncanonical|contradictory|refus' \
