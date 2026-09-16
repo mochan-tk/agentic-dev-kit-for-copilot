@@ -57,8 +57,8 @@ inherit what this one learned.
   bypass evidence) alongside the existing zero-approval reading of
   `pull_request.required_approving_review_count`. The actuator reconciles an
   existing canonical `solo`-shaped ruleset in place by deriving the candidate
-  from the real GET preimage — changing only the profile-controlled bypass,
-  approval, and code-owner/last-push review fields — so producer-only metadata (for
+  from the real GET preimage — changing only the profile-controlled bypass and
+  approval fields — so producer-only metadata (for
   example a real `require_extra_approval_for_unattributed_changes: true`)
   survives untouched rather than being reset by a lossy template rebuild;
   malformed, customized, or already-owned targets are still refused (#124).

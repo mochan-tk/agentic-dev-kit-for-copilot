@@ -118,6 +118,10 @@ canonical_detail() {
     enforcement: $enforcement,
     created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
     current_user_can_bypass: "never",
+    _links: {
+      self: {href: "https://api.github.com/repos/acme/widget/rulesets/42"},
+      html: {href: "https://github.com/acme/widget/rules/42"}
+    },
     bypass_actors: (if $profile == "single-maintainer" then []
         else [{actor_id: 5, actor_type: "RepositoryRole",
                bypass_mode: "pull_request"}] end),
@@ -144,12 +148,10 @@ canonical_detail() {
 }
 
 # require_extra_approval_for_unattributed_changes is the one producer-only
-# field a canonical ruleset may legitimately carry as a non-default (true)
-# value — the canonical check tolerates true (see the fix above), unlike
-# allowed_merge_methods/required_reviewers/do_not_enforce_on_create, which
-# the pre-existing canonical check already requires to sit at their default
-# (respectively ["merge","squash","rebase"], [], false) for ANY profile, so
-# a real preimage never carries non-default values for those three. This
+# field a canonical ruleset may carry as true. Canonical policy still requires
+# allowed_merge_methods, required_reviewers, and do_not_enforce_on_create to
+# have their default values; this helper proves reconciliation preserves the
+# producer field rather than rebuilding the payload.
 # helper proves single-maintainer reconciliation preserves the real
 # preimage's require_extra_approval flag rather than silently resetting it
 # via a lossy template rebuild.
@@ -728,7 +730,9 @@ expect_rc 0 "emit accepted migration candidate" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 jq '. + {id:42,node_id:"R_42",source_type:"Repository",source:"acme/widget",
   created_at:"2026-01-01T00:00:00Z",updated_at:"2026-01-01T00:00:00Z",
-  current_user_can_bypass:"never",_links:{}}' "$GH_FIXTURES/put.json" \
+  current_user_can_bypass:"never",
+  _links:{self:{href:"https://api.github.com/repos/acme/widget/rulesets/42"},
+          html:{href:"https://github.com/acme/widget/rules/42"}}}' "$GH_FIXTURES/put.json" \
   > "$GH_FIXTURES/ruleset-detail.json"
 reset_calls
 expect_rc 0 "reapply actual emitted migration candidate is a no-op" \

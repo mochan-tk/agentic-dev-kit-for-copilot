@@ -223,6 +223,13 @@ if [[ -n "$PROFILE" ]]; then
     fi
     if ! printf '%s' "$EXISTING_DETAIL" | jq -er \
       --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" --arg repo "$REPO" '
+      def valid_datetime:
+        capture("^(?<year>[0-9]{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-](0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])$") as $parts
+        | ($parts.year | tonumber) as $year
+        | ($parts.month | tonumber) as $month
+        | ($parts.day | tonumber) as $day
+        | ([31, (if (($year % 4 == 0 and $year % 100 != 0) or ($year % 400 == 0)) then 29 else 28 end), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][$month - 1]) as $last_day
+        | $day <= $last_day;
       select((type == "object")
         and all(keys[]; IN("id","name","target","enforcement","source_type","source",
           "node_id","created_at","updated_at","current_user_can_bypass",
@@ -234,16 +241,19 @@ if [[ -n "$PROFILE" ]]; then
         and (.source|type) == "string"
         and (.enforcement|type) == "string"
         and ((.node_id == null) or (.node_id|type) == "string")
-        and ((.created_at == null) or ((.created_at|type) == "string" and
-          (.created_at|test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"))))
-        and ((.updated_at == null) or ((.updated_at|type) == "string" and
-          (.updated_at|test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"))))
-        and ((._links == null) or
-          ((._links|type) == "object" and
-           all(._links[]; (type == "object") and (.href|type) == "string")))
-        and ((.current_user_can_bypass == null)
+        and ((has("created_at") | not) or ((.created_at|type) == "string" and (.created_at|valid_datetime)))
+        and ((has("updated_at") | not) or ((.updated_at|type) == "string" and (.updated_at|valid_datetime)))
+        and ((has("_links") | not) or
+          ((._links|type) == "object"
+           and (._links | keys | all(IN("self","html")))
+           and (._links.self|type) == "object"
+           and (._links.self.href|type) == "string"
+           and ._links.self.href == ("https://api.github.com/repos/" + $repo + "/rulesets/" + $id)
+           and ((._links | has("html") | not) or ._links.html == null
+                or ((._links.html|type) == "object" and (._links.html.href|type) == "string"))))
+        and ((has("current_user_can_bypass") | not)
              or ((.current_user_can_bypass|type) == "string"
-                 and (.current_user_can_bypass | IN("always","pull_requests_only","never"))))
+                 and (.current_user_can_bypass | IN("always","pull_requests_only","never","exempt"))))
         and (.bypass_actors|type) == "array"
         and (.conditions|type) == "object"
         and (.rules|type) == "array"
@@ -271,6 +281,7 @@ if [[ -n "$PROFILE" ]]; then
           and $pr[0].parameters.allowed_merge_methods == ["merge","squash","rebase"]
           and (if ($pr[0].parameters | has("required_reviewers")) then
                  ($pr[0].parameters.required_reviewers | type) == "array" and
+                 $pr[0].parameters.required_reviewers == [] and
                  all($pr[0].parameters.required_reviewers[];
                    (type == "object")
                    and (keys | sort) == ["file_patterns","minimum_approvals","reviewer"]

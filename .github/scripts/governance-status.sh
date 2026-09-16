@@ -2,7 +2,7 @@
 # governance-status.sh — read-only default-branch governance sensor
 # (ADR-0004 decisions 1, 2, 4, 5). Compares effective branch rules, Actions
 # posture, CODEOWNERS tuning, and merge-queue applicability against an
-# explicitly declared solo or team intent (solo = the setup-ruleset.sh
+# explicitly declared solo, team, or single-maintainer intent (solo = the setup-ruleset.sh
 # minimum; stronger observed settings never make solo unhealthy). Aggregates
 # every active rule source including parent rulesets, qualifies
 # ruleset-derived controls with their bypass actors, and reports missing
@@ -187,7 +187,6 @@ $(jqr '[.[]|select(.type=="pull_request")] as $p
    (any($p[]; any((.parameters.required_reviewers // [])[];
       .minimum_approvals > 0)))] | @tsv' rules)
 EOF
-  [ -n "$PRN" ] || RULES=0
   for v in PRSRC RSCSRC MQSRC; do
     eval "[ \"\$$v\" != - ] || $v=\"\""
   done
@@ -263,7 +262,7 @@ if [ "$RULES" != 1 ]; then
   emit pull_request.required_approving_review_count UNKNOWN "effective rules unavailable" "$BASE"
 elif [ "$SM" = 1 ]; then
   if [ "$PRN" = 0 ]; then
-    emit pull_request.required_approving_review_count UNKNOWN "pull_request rule unavailable" "$BASE"
+    emit pull_request.required_approving_review_count OFF "count=0 (no approving-review requirement)" "$BASE"
   elif [ "$APPR" -ge 1 ]; then
     emit pull_request.required_approving_review_count OFF "count=$APPR (approving-review requirement not zero)" "$BASE"
   elif [ "$RRN" = true ]; then
