@@ -151,7 +151,7 @@ fi
 # Aggregate every effective rule of a type across all active sources: the
 # strongest approval threshold, any-source booleans, and the union of
 # contributing ruleset ids. One named ruleset is never the answer.
-PRN=0 APPR=0 DSM=false LPA=false COR=false RTR=false STRICT=false MQN=0
+PRN=0 APPR=0 DSM=false LPA=false COR=false RTR=false STRICT=false MQN=0 RRN=false
 PRSRC="" RSCSRC="" MQSRC=""
 if [ "$RULES" = 1 ]; then
   if ! jq -e '
@@ -163,7 +163,7 @@ if [ "$RULES" = 1 ]; then
 fi
 if [ "$RULES" = 1 ]; then
   # shellcheck disable=SC2016  # single-quoted jq program, as in setup-ruleset.sh
-  IFS="$TAB" read -r PRN APPR DSM LPA COR RTR STRICT MQN PRSRC RSCSRC MQSRC <<EOF
+  IFS="$TAB" read -r PRN APPR DSM LPA COR RTR STRICT MQN PRSRC RSCSRC MQSRC RRN <<EOF
 $(jqr '[.[]|select(.type=="pull_request")] as $p
   | [.[]|select(.type=="required_status_checks")] as $c
   | [.[]|select(.type=="merge_queue")] as $m
@@ -176,7 +176,8 @@ $(jqr '[.[]|select(.type=="pull_request")] as $p
    ([$p[]|(.parameters.require_code_owner_review // false)]|any),
    ([$p[]|(.parameters.required_review_thread_resolution // false)]|any),
    ([$c[].parameters.strict_required_status_checks_policy]|any),
-   ($m|length), srcs($p), srcs($c), srcs($m)] | @tsv' rules)
+   ($m|length), srcs($p), srcs($c), srcs($m),
+   (any($p[]; ((.parameters.required_reviewers // []) | length) > 0))] | @tsv' rules)
 EOF
   [ -n "$PRN" ] || RULES=0
   for v in PRSRC RSCSRC MQSRC; do
@@ -255,6 +256,8 @@ if [ "$RULES" != 1 ]; then
 elif [ "$SM" = 1 ]; then
   if [ "$PRN" = 0 ] || [ "$APPR" -ge 1 ]; then
     emit pull_request.required_approving_review_count OFF "count=$APPR (approving-review requirement not zero)" "$BASE"
+  elif [ "$RRN" = true ]; then
+    emit pull_request.required_approving_review_count OFF "required reviewers configured" "$BASE"
   else
     emit pull_request.required_approving_review_count ACTIVE "count=$APPR$PQ" "$BASE"
   fi
