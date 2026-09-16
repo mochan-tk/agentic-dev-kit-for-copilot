@@ -501,7 +501,7 @@ jq '(.[]|select(.type=="pull_request").parameters) |=
    .require_code_owner_review=true | .require_last_push_approval=true)' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile team
-rce "all effective review restrictions are observed" 3
+rce "all effective review restrictions are observed" 1
 chk "latest-push restriction is reported" "^pull_request\.require_last_push_approval${T}ACTIVE"
 chk "code-owner restriction is reported" "^pull_request\.require_code_owner_review${T}ACTIVE"
 
