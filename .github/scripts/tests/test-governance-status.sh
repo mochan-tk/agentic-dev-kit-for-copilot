@@ -32,13 +32,20 @@ done
 [ "${1:-}" = api ] || { printf 'MUTATION %s\n' "$*" >> "$GH_CALLS"; exit 64; }
 shift
 path=""
+paginate=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -H) shift 2 ;;
-    --paginate) shift ;;
+    --paginate) paginate=1; shift ;;
     *) path="$1"; shift ;;
   esac
 done
+if [ "${GS_REQUIRE_RULES_PAGINATE:-}" = 1 ] &&
+   [ "$paginate" -ne 1 ]; then
+  case "$path" in
+    repos/*/rules/branches/*) echo "gh stub: rules endpoint requires --paginate" >&2; exit 64 ;;
+  esac
+fi
 for frag in ${GS_FAIL:-}; do
   case "$path" in *"$frag"*) echo "gh: HTTP 500 (simulated)" >&2; exit 1 ;; esac
 done
@@ -428,6 +435,71 @@ chk "zero approval count is ACTIVE for single-maintainer" "^pull_request\.requir
 chk "no bypass actors is ACTIVE for single-maintainer" "^pull_request\.no_bypass_actors${T}ACTIVE${T}no bypass actors$"
 chk "no bypass actors is ACTIVE for required checks" "^required_checks\.no_bypass_actors${T}ACTIVE${T}no bypass actors$"
 chk "single-maintainer does not gate team-only review controls" "^pull_request\.dismiss_stale_reviews${T}OFF"
+
+# Independent approval barriers remain effective even when the approving
+# review count is zero. Put each barrier on a later source to exercise
+# aggregation rather than a single-source shortcut.
+for barrier in require_code_owner_review require_last_push_approval; do
+  single_maintainer_green
+  jq --arg barrier "$barrier" \
+    '. + [{"type":"pull_request","parameters":{
+      "required_approving_review_count":0,"dismiss_stale_reviews_on_push":false,
+      "require_code_owner_review":false,"require_last_push_approval":false,
+      "required_review_thread_resolution":false} + {($barrier):true},
+      "ruleset_source_type":"Organization","ruleset_source":"orgname",
+      "ruleset_id":900}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+    mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+  mk_rs 900 org '[]'
+  export GS_RULES_PAGES=2
+  run -R o/r --profile single-maintainer
+  unset GS_RULES_PAGES
+  rce "single-maintainer zero-count $barrier is OFF" 1
+  chk "zero-count $barrier is not neutralized" "^pull_request\\.$barrier${T}OFF${T}true"
+done
+
+# Missing/null pull-request parameters are unknown evidence, not an invented
+# default count. Parameterless non-review rules remain covered separately.
+single_maintainer_green
+jq 'map(if .type == "pull_request" then .parameters = null else . end)' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "null pull-request parameters are UNKNOWN" 3
+chk "null pull-request parameters do not invent count one" "^pull_request\\.required_approving_review_count${T}UNKNOWN"
+
+# Required reviewers use the producer-shaped nested schema. Zero minimum is
+# informational; positive minimum is restrictive; malformed entries are
+# unknown evidence.
+single_maintainer_green
+jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[
+  {"file_patterns":["*.go"],"minimum_approvals":0,
+   "reviewer":{"id":7,"type":"Team"}}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "zero-minimum nested required reviewer is healthy" 0
+chk "zero-minimum nested reviewer does not require approval" "^pull_request\\.required_approving_review_count${T}ACTIVE${T}count=0$"
+
+single_maintainer_green
+jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[
+  {"file_patterns":["*.go"],"minimum_approvals":1,
+   "reviewer":{"id":7,"type":"Team"}}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "positive nested required reviewer is OFF" 1
+chk "positive nested reviewer is restrictive" "^pull_request\\.required_approving_review_count${T}OFF${T}required reviewers configured"
+
+for malformed in \
+  '[{"file_patterns":["*.go"],"minimum_approvals":1,"reviewer":{"id":7,"type":"User"}}]' \
+  '[{"file_patterns":["*.go"],"minimum_approvals":"1","reviewer":{"id":7,"type":"Team"}}]' \
+  '[{"file_patterns":["*.go"],"minimum_approvals":1,"reviewer":{"id":"7","type":"Team"}}]'
+do
+  single_maintainer_green
+  jq --argjson reviewers "$malformed" \
+    '(.[]|select(.type=="pull_request").parameters).required_reviewers=$reviewers' \
+    "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+  run -R o/r --profile single-maintainer
+  rce "malformed nested required reviewer is UNKNOWN" 3
+  chk "malformed nested reviewer is not healthy" "^pull_request\\.no_bypass_actors${T}UNKNOWN"
+done
 run -R o/r --profile solo
 rce "single-maintainer zero-approval fixtures fail solo intent" 1
 chk "solo requires a nonzero approval count" "^pull_request\.required_approving_review_count${T}OFF${T}count=0 \(no approving-review requirement\)$"
@@ -473,6 +545,40 @@ run -R o/r --profile single-maintainer
 rce "omitted bypass actors are an UNKNOWN sensor failure" 3
 chk "omitted bypass actors are not healthy on PR axis" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no_bypass_actors${T}UNKNOWN"
+
+# Missing and malformed actor evidence are isolated on otherwise valid,
+# active, identity-matching details for each contributing axis.
+for actor_case in missing malformed nonempty; do
+  single_maintainer_green
+  mk_rs 900 org '[]'
+  jq '. + [{"type":"required_status_checks","parameters":{
+    "strict_required_status_checks_policy":false,"required_status_checks":[
+      {"context":"quality"},{"context":"task-ritual"},
+      {"context":"scaffold-self-check"},{"context":"copilot-surface"}]},
+    "ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}]' \
+    "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+  case "$actor_case" in
+    missing)
+      jq 'del(.bypass_actors)' "$GS_FIX/rs-repo-101.json" > "$GS_FIX/rs.tmp" &&
+        mv "$GS_FIX/rs.tmp" "$GS_FIX/rs-repo-101.json" ;;
+    malformed)
+      printf '{"id":101,"source_type":"Repository","source":"o/r","enforcement":"active","bypass_actors":[{"actor_id":"bad","actor_type":"RepositoryRole","bypass_mode":"pull_request"}]}\n' > "$GS_FIX/rs-repo-101.json" ;;
+    nonempty)
+      mk_rs 900 org '[{"actor_id":42,"actor_type":"Integration","bypass_mode":"always"}]' ;;
+  esac
+  export GS_RULES_PAGES=2
+  run -R o/r --profile single-maintainer
+  unset GS_RULES_PAGES
+  if [ "$actor_case" = nonempty ]; then
+    rce "isolated nonempty actor evidence is OFF" 1
+    chk "isolated nonempty PR actor evidence remains active" "^pull_request\\.no_bypass_actors${T}ACTIVE"
+    chk "isolated nonempty CI actor evidence is OFF" "^required_checks\\.no_bypass_actors${T}OFF"
+  else
+    rce "isolated $actor_case actor evidence is UNKNOWN" 3
+    chk "isolated $actor_case PR actor evidence is unknown" "^pull_request\\.no_bypass_actors${T}UNKNOWN"
+    chk "isolated $actor_case CI actor evidence is unknown" "^required_checks\\.no_bypass_actors${T}UNKNOWN"
+  fi
+done
 
 # Explicit single-maintainer intent still requires both a pull-request rule
 # and every requested CI context; zero approvals never means no PR or CI.
@@ -567,8 +673,10 @@ jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":
   "ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}]' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 export GS_RULES_PAGES=2
+export GS_REQUIRE_RULES_PAGINATE=1
 run -R o/r --profile team
 unset GS_RULES_PAGES
+unset GS_REQUIRE_RULES_PAGINATE
 rce "later effective-rule page is aggregated" 1
 chk "later page approval restriction is observed" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=2"
 chk "later page code-owner restriction is observed" "^pull_request\.require_code_owner_review${T}ACTIVE"

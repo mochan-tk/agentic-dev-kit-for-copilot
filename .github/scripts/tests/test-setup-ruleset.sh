@@ -595,6 +595,18 @@ else
   t_fail "single-maintainer reconciliation preserves producer-only metadata"
 fi
 
+# A producer-shaped required-reviewer configuration is valid when nested and
+# must survive reconciliation; the validator must not require a flat or empty
+# pseudo-schema.
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields |
+  jq '(.rules[] | select(.type=="pull_request").parameters).required_reviewers=[
+    {"file_patterns":["*.go"],"minimum_approvals":0,
+     "reviewer":{"id":7,"type":"Team"}}]' \
+  > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "nested producer required-reviewer metadata is accepted" \
+  run_script -R acme/widget --profile single-maintainer --reconcile --dry-run
+
 existing_profile_fixtures single-maintainer active
 expect_rc 0 "exact canonical single-maintainer match is idempotent" \
   run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
@@ -625,7 +637,9 @@ for mutation in \
   '.id = "42"' \
   '.created_at = 42' \
   '.updated_at = "not-a-timestamp"' \
+  '.created_at = "2026-99-99T00:00:00Z"' \
   '._links = "not-an-object"' \
+  '._links = {self:{href:42}}' \
   '.node_id = 42' \
   '.current_user_can_bypass = "false"' \
   '.rules[0].parameters.allowed_merge_methods = "merge"' \
