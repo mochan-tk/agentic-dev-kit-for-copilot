@@ -235,12 +235,13 @@ if [[ -n "$PROFILE" ]]; then
         and (.enforcement|type) == "string"
         and ((.node_id == null) or (.node_id|type) == "string")
         and ((.created_at == null) or ((.created_at|type) == "string" and
-          (.created_at|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))))
+          (.created_at|test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"))))
         and ((.updated_at == null) or ((.updated_at|type) == "string" and
-          (.updated_at|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))))
-        and ((._links == null) or (._links|type) == "object")
+          (.updated_at|test("^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"))))
+        and ((._links == null) or
+          ((._links|type) == "object" and
+           all(._links[]; (type == "object") and (.href|type) == "string")))
         and ((.current_user_can_bypass == null)
-             or (.current_user_can_bypass|type) == "boolean"
              or ((.current_user_can_bypass|type) == "string"
                  and (.current_user_can_bypass | IN("always","pull_requests_only","never"))))
         and (.bypass_actors|type) == "array"
@@ -268,8 +269,23 @@ if [[ -n "$PROFILE" ]]; then
           and (.rules | length) == 2 and ($pr | length) == 1 and ($rs | length) == 1
           and ($pr[0].parameters.allowed_merge_methods | type) == "array"
           and $pr[0].parameters.allowed_merge_methods == ["merge","squash","rebase"]
-          and ($pr[0].parameters.required_reviewers | type) == "array"
-          and $pr[0].parameters.required_reviewers == []
+          and (if ($pr[0].parameters | has("required_reviewers")) then
+                 ($pr[0].parameters.required_reviewers | type) == "array" and
+                 all($pr[0].parameters.required_reviewers[];
+                   (type == "object")
+                   and (keys | sort) == ["file_patterns","minimum_approvals","reviewer"]
+                   and (.file_patterns|type) == "array"
+                   and all(.file_patterns[]; type == "string")
+                   and (.minimum_approvals|type) == "number"
+                   and (.minimum_approvals >= 0)
+                   and (.minimum_approvals|floor) == .minimum_approvals
+                   and (.reviewer|type) == "object"
+                   and ((.reviewer|keys|sort) == ["id","type"])
+                   and (.reviewer.id|type) == "number"
+                   and (.reviewer.id >= 0)
+                   and (.reviewer.id|floor) == .reviewer.id
+                   and .reviewer.type == "Team")
+               else true end)
           and ($pr[0].parameters | if has("require_extra_approval_for_unattributed_changes")
                then .require_extra_approval_for_unattributed_changes else true end) == true
           and ($rs[0].parameters.do_not_enforce_on_create | type) == "boolean"

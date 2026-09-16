@@ -442,10 +442,10 @@ chk "single-maintainer does not gate team-only review controls" "^pull_request\.
 for barrier in require_code_owner_review require_last_push_approval; do
   single_maintainer_green
   jq --arg barrier "$barrier" \
-    '. + [{"type":"pull_request","parameters":{
+    '. + [{"type":"pull_request","parameters": ({
       "required_approving_review_count":0,"dismiss_stale_reviews_on_push":false,
       "require_code_owner_review":false,"require_last_push_approval":false,
-      "required_review_thread_resolution":false} + {($barrier):true},
+      "required_review_thread_resolution":false} + {($barrier):true}),
       "ruleset_source_type":"Organization","ruleset_source":"orgname",
       "ruleset_id":900}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
     mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
@@ -586,8 +586,8 @@ single_maintainer_green
 jq 'map(select(.type != "pull_request"))' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
   mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile single-maintainer
-rce "single-maintainer without pull-request rule is OFF" 1
-chk "single-maintainer missing pull-request rule is reported" "^pull_request\.required_approving_review_count${T}OFF${T}count=0"
+rce "single-maintainer without pull-request rule is UNKNOWN" 3
+chk "single-maintainer missing pull-request rule is reported" "^pull_request\.required_approving_review_count${T}UNKNOWN"
 
 single_maintainer_green
 jq 'map(if .type == "required_status_checks" then
@@ -632,7 +632,8 @@ chk "missing source identity is not healthy" "^pull_request\.no_bypass_actors${T
 # later pages and required-reviewer metadata.
 baseline
 jq '(.[]|select(.type=="pull_request").parameters) |=
-  (.required_reviewers=[{"id":7,"type":"User"}] |
+  (.required_reviewers=[{"file_patterns":["*.go"],"minimum_approvals":1,
+     "reviewer":{"id":7,"type":"Team"}}] |
    .require_code_owner_review=true | .require_last_push_approval=true)' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile team
@@ -641,7 +642,7 @@ chk "latest-push restriction is reported" "^pull_request\.require_last_push_appr
 chk "code-owner restriction is reported" "^pull_request\.require_code_owner_review${T}ACTIVE"
 
 single_maintainer_green
-jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[{"id":7,"type":"User"}]' \
+jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[{"file_patterns":["*.go"],"minimum_approvals":1,"reviewer":{"id":7,"type":"Team"}}]' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile single-maintainer
 rce "required-reviewer restriction is OFF for single-maintainer" 1

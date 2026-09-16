@@ -122,11 +122,9 @@ if [ "$(st rules)" = ok ] &&
      (.ruleset_id|type) == "number" and
      (.ruleset_source_type|type) == "string" and
      (.ruleset_source|type) == "string" and
-     (     ((.parameters|type) == "object" or
-      .parameters == null) and
-     (if .type == "pull_request" then
-        (if .parameters == null then true else
-          (.parameters.required_approving_review_count|type) == "number" and
+     (          (if .type == "pull_request" then
+       (.parameters|type) == "object" and
+        (.parameters.required_approving_review_count|type) == "number" and
           (.parameters.required_approving_review_count >= 0) and
           ((.parameters.required_approving_review_count|floor) == .parameters.required_approving_review_count) and
           ([.parameters.dismiss_stale_reviews_on_push,
@@ -134,17 +132,24 @@ if [ "$(st rules)" = ok ] &&
             .parameters.require_code_owner_review,
             .parameters.required_review_thread_resolution]
            | all(.[]; type == "boolean")) and
-          ((.parameters.required_reviewers == null) or
-           ((.parameters.required_reviewers|type) == "array" and
-            all(.parameters.required_reviewers[]?;
-              (type == "object") and
-              (.id|type) == "number" and (.id >= 0) and (.id|floor) == .id and
-              (.type|type) == "string")))
-        end)
+          (if (.parameters | has("required_reviewers")) then
+             (.parameters.required_reviewers|type) == "array" and
+             all(.parameters.required_reviewers[];
+               (type == "object")
+               and (.file_patterns|type) == "array"
+               and all(.file_patterns[]; type == "string")
+               and ((.minimum_approvals|type) == "number")
+               and (.minimum_approvals >= 0)
+               and ((.reviewer|type) == "object")
+               and ((.reviewer.id|type) == "number")
+               and (.reviewer.id >= 0)
+               and (.reviewer.type == "Team"))
+           else true end)
       elif .type == "required_status_checks" then
+        (.parameters|type) == "object" and
         (.parameters.strict_required_status_checks_policy|type) == "boolean" and
         (.parameters.required_status_checks|type) == "array"
-      else true end)))' "$WORK/rules.json" >/dev/null 2>&1; then
+      else ((.parameters|type) == "object" or .parameters == null) end)))' "$WORK/rules.json" >/dev/null 2>&1; then
   RULES=1
 fi
 
@@ -177,7 +182,8 @@ $(jqr '[.[]|select(.type=="pull_request")] as $p
    ([$p[]|(.parameters.required_review_thread_resolution // false)]|any),
    ([$c[].parameters.strict_required_status_checks_policy]|any),
    ($m|length), srcs($p), srcs($c), srcs($m),
-   (any($p[]; ((.parameters.required_reviewers // []) | length) > 0))] | @tsv' rules)
+   (any($p[]; any((.parameters.required_reviewers // [])[];
+      .minimum_approvals > 0)))] | @tsv' rules)
 EOF
   [ -n "$PRN" ] || RULES=0
   for v in PRSRC RSCSRC MQSRC; do
@@ -254,7 +260,9 @@ else emit governance.profile UNKNOWN "persisted profile unavailable or invalid; 
 if [ "$RULES" != 1 ]; then
   emit pull_request.required_approving_review_count UNKNOWN "effective rules unavailable" "$BASE"
 elif [ "$SM" = 1 ]; then
-  if [ "$PRN" = 0 ] || [ "$APPR" -ge 1 ]; then
+  if [ "$PRN" = 0 ]; then
+    emit pull_request.required_approving_review_count UNKNOWN "pull_request rule unavailable" "$BASE"
+  elif [ "$APPR" -ge 1 ]; then
     emit pull_request.required_approving_review_count OFF "count=$APPR (approving-review requirement not zero)" "$BASE"
   elif [ "$RRN" = true ]; then
     emit pull_request.required_approving_review_count OFF "required reviewers configured" "$BASE"
@@ -266,6 +274,7 @@ elif [ "$PRN" = 0 ] || [ "$APPR" -lt 1 ]; then
 else
   emit pull_request.required_approving_review_count ACTIVE "count=$APPR$PQ" "$BASE"
 fi
+REVIEW_GATES=0
 if [ "$SM" = 1 ]; then
   if [ "$RULES" != 1 ]; then
     emit pull_request.no_bypass_actors UNKNOWN "effective rules unavailable" 1
@@ -276,6 +285,7 @@ if [ "$SM" = 1 ]; then
   else
     emit pull_request.no_bypass_actors OFF "bypass actors present$PQ" 1
   fi
+
   if [ "$RULES" != 1 ]; then
     emit required_checks.no_bypass_actors UNKNOWN "effective rules unavailable" 1
   elif [ "$CQ" = " bypass=unknown" ]; then
@@ -286,19 +296,27 @@ if [ "$SM" = 1 ]; then
     emit required_checks.no_bypass_actors OFF "bypass actors present$CQ" 1
   fi
 fi
+[ "$TEAM" = 1 ] && REVIEW_GATES=1
 
 # rule_row <key> <rule-count> <bool> <qual> <absent-detail> <required>
 rule_row() {
-  if [ "$RULES" != 1 ]; then emit "$1" UNKNOWN "effective rules unavailable" "$6"
+  if [ "$SM" = 1 ] && { [ "$1" = pull_request.require_last_push_approval ] ||
+                        [ "$1" = pull_request.require_code_owner_review ]; }; then
+    if [ "$RULES" != 1 ]; then emit "$1" UNKNOWN "effective rules unavailable" 1
+    elif [ "$2" = 0 ]; then emit "$1" OFF "no pull_request rule in effect" 0
+    elif [ "$3" = true ]; then emit "$1" OFF "true" 1
+    else emit "$1" OFF "false" 0
+    fi
+  elif [ "$RULES" != 1 ]; then emit "$1" UNKNOWN "effective rules unavailable" "$6"
   elif [ "$2" = 0 ]; then emit "$1" OFF "$5" "$6"
   elif [ "$3" = true ]; then emit "$1" ACTIVE "true$4" "$6"
   else emit "$1" OFF "false$4" "$6"
   fi
 }
-rule_row pull_request.dismiss_stale_reviews "$PRN" "$DSM" "$PQ" "no pull_request rule in effect" "$TEAM"
-rule_row pull_request.require_last_push_approval "$PRN" "$LPA" "$PQ" "no pull_request rule in effect" "$TEAM"
-rule_row pull_request.require_code_owner_review "$PRN" "$COR" "$PQ" "no pull_request rule in effect" "$TEAM"
-rule_row pull_request.required_review_thread_resolution "$PRN" "$RTR" "$PQ" "no pull_request rule in effect" "$TEAM"
+rule_row pull_request.dismiss_stale_reviews "$PRN" "$DSM" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
+rule_row pull_request.require_last_push_approval "$PRN" "$LPA" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
+rule_row pull_request.require_code_owner_review "$PRN" "$COR" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
+rule_row pull_request.required_review_thread_resolution "$PRN" "$RTR" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
 RSCN=0
 [ -z "$RSCSRC" ] || RSCN=1
 rule_row required_checks.strict_policy "$RSCN" "$STRICT" "$CQ" "no required_status_checks rule in effect" "$TEAM"
