@@ -230,8 +230,8 @@ if [[ -n "$PROFILE" ]]; then
         and (.source_type|type) == "string"
         and (.source|type) == "string"
         and (.enforcement|type) == "string"
-        and ((not (has("node_id") or has("created_at") or has("updated_at")
-                   or has("_links") or has("current_user_can_bypass")))
+        and (((has("node_id") or has("created_at") or has("updated_at")
+               or has("_links") or has("current_user_can_bypass")) == false)
              or (has("node_id") and has("created_at") and has("updated_at")
                  and has("_links") and has("current_user_can_bypass")))
         and ((.node_id == null) or (.node_id|type) == "string")
