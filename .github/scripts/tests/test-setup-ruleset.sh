@@ -622,7 +622,7 @@ for mutation in \
   '.current_user_can_bypass = "false"' \
   '.rules[0].parameters.allowed_merge_methods = "merge"' \
   '.rules[0].parameters.required_reviewers = "owner"' \
-  '.rules[1].parameters.do_not_enforce_on_create = "false"'
+  '.rules[1].parameters.do_not_enforce_on_create = "false"' \
   '.rules[1].parameters.required_status_checks[0].context = 42'
 do
   existing_profile_fixtures solo
