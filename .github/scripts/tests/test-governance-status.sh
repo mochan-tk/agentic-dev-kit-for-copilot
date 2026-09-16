@@ -109,7 +109,7 @@ mk_org() { printf '{"login":"o"%s}\n' "${1:-}" > "$GS_FIX/org.json"; }
 mk_rs() {
   local source="o/r"
   [ "$2" = org ] && source="orgname"
-  printf '{"id":%s,"source_type":"%s","source":"%s","enforcement":"disabled","bypass_actors":%s}\n' \
+  printf '{"id":%s,"source_type":"%s","source":"%s","enforcement":"active","bypass_actors":%s}\n' \
     "$1" "$([ "$2" = org ] && printf Organization || printf Repository)" "$source" "$3" \
     > "$GS_FIX/rs-$2-$1.json"
 }
@@ -596,6 +596,15 @@ jq 'del(.source_type,.source)' "$GS_FIX/rs-repo-101.json" > "$GS_FIX/rs.tmp" &&
 run -R o/r --profile single-maintainer
 rce "missing detail origin is unknown" 3
 chk "missing detail origin is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
+
+# A detail marked inactive contradicts an effective branch-rule contributor;
+# it cannot certify a source as active or prove its actor list empty.
+baseline
+jq '.enforcement="disabled"' "$GS_FIX/rs-repo-101.json" > "$GS_FIX/rs.tmp" &&
+  mv "$GS_FIX/rs.tmp" "$GS_FIX/rs-repo-101.json"
+run -R o/r --profile single-maintainer
+rce "inactive contributing detail is unknown" 3
+chk "inactive contributing detail is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
