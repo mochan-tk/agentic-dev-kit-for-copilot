@@ -462,15 +462,15 @@ rce "omitted bypass actors are an UNKNOWN sensor failure" 3
 chk "omitted bypass actors are not healthy on PR axis" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no_bypass_actors${T}UNKNOWN"
 
-# Parameterless pull-request rules are valid producer output for legacy
-# profiles; they must not invalidate the complete effective-rule document.
+# Legacy non-review rules may legitimately omit parameters; malformed
+# pull-request parameters remain covered separately above and must be unknown.
 baseline
-jq 'map(if .type == "pull_request" then
-  .parameters = null else . end)' \
+jq '. + [{"type":"deletion","ruleset_source_type":"Repository",
+  "ruleset_source":"o/r","ruleset_id":101}]' \
   "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 run -R o/r --profile solo
-rce "legacy parameterless pull-request rule remains readable" 0
-chk "legacy parameterless rule preserves approval result" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=1"
+rce "legacy parameterless non-review rule remains readable" 0
+chk "legacy parameterless non-review rule preserves approval result" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=1"
 
 # Later effective-rule pages and malformed approval counts must be visible and
 # fail closed rather than being normalized into a healthy zero.
