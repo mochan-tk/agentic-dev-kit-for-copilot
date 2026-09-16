@@ -66,6 +66,10 @@ inherit what this one learned.
   this profile does not enable automatic merging and cannot guarantee
   authenticated human and agent identities are distinguishable.
 
+- `single-maintainer` is an explicit profile selection, not an automatic team
+  migration: existing `team` review restrictions are never silently removed,
+  and each pull request and head still requires a maintainer decision.
+
 - Replaced the top-level README with the Human-on-the-Loop overview draft and committed the matching overview image at `docs/images/agentic-development-kit-overview.png`, preserving the owner-supplied source artifacts and provenance in `.github/docs/context/readme-redesign/`.
 
 - The top-level Copilot app role is now called the `Project session`, and new
