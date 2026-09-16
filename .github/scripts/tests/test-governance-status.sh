@@ -505,6 +505,24 @@ run -R o/r --profile solo
 rce "single-maintainer zero-approval fixtures fail solo intent" 1
 chk "solo requires a nonzero approval count" "^pull_request\.required_approving_review_count${T}OFF${T}count=0 \(no approving-review requirement\)$"
 
+for fractional in minimum reviewer-id; do
+  single_maintainer_green
+  if [ "$fractional" = minimum ]; then
+    jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[
+      {"file_patterns":["*.go"],"minimum_approvals":1.5,
+       "reviewer":{"id":7,"type":"Team"}}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+      mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+  else
+    jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[
+      {"file_patterns":["*.go"],"minimum_approvals":1,
+       "reviewer":{"id":7.5,"type":"Team"}}]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+      mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+  fi
+  run -R o/r --profile single-maintainer
+  rce "fractional nested reviewer field is UNKNOWN" 3
+  chk "fractional nested reviewer field is not healthy" "^pull_request\\.no_bypass_actors${T}UNKNOWN"
+done
+
 single_maintainer_green
 runf "rulesets/101" -R o/r --profile single-maintainer
 rce "failed ruleset detail read exits 3 for single-maintainer" 3
