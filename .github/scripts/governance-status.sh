@@ -135,7 +135,11 @@ if [ "$(st rules)" = ok ] &&
             .parameters.required_review_thread_resolution]
            | all(.[]; type == "boolean")) and
           ((.parameters.required_reviewers == null) or
-           (.parameters.required_reviewers|type) == "array")
+           ((.parameters.required_reviewers|type) == "array" and
+            all(.parameters.required_reviewers[]?;
+              (type == "object") and
+              (.id|type) == "number" and (.id >= 0) and (.id|floor) == .id and
+              (.type|type) == "string")))
         end)
       elif .type == "required_status_checks" then
         (.parameters.strict_required_status_checks_policy|type) == "boolean" and
