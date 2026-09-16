@@ -517,6 +517,13 @@ rce "all effective review restrictions are observed" 1
 chk "latest-push restriction is reported" "^pull_request\.require_last_push_approval${T}ACTIVE"
 chk "code-owner restriction is reported" "^pull_request\.require_code_owner_review${T}ACTIVE"
 
+single_maintainer_green
+jq '(.[]|select(.type=="pull_request").parameters).required_reviewers=[{"id":7,"type":"User"}]' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "required-reviewer restriction is OFF for single-maintainer" 1
+chk "required-reviewer restriction is not healthy" "^pull_request\.required_approving_review_count${T}OFF${T}required reviewers configured$"
+
 # A malformed required-reviewer element is unreadable evidence, not an empty
 # or valid reviewer list.
 single_maintainer_green
