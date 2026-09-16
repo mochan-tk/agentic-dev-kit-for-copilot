@@ -542,6 +542,17 @@ jq '.id=999' "$GS_FIX/rs-repo-101.json" > "$GS_FIX/rs.tmp" &&
 run -R o/r --profile single-maintainer
 rce "contradictory contributing detail id is unknown" 3
 chk "contradictory detail id is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
+
+# The same ruleset id cannot identify two different effective sources.
+baseline
+jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":0,
+  "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,
+  "require_last_push_approval":false,"required_review_thread_resolution":false},
+  "ruleset_source_type":"Organization","ruleset_source":"other","ruleset_id":101}]' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "inconsistent source identity is unknown" 3
+chk "inconsistent source identity is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
