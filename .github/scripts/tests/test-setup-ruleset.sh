@@ -618,6 +618,7 @@ for mutation in \
   '.updated_at = "not-a-timestamp"' \
   '._links = "not-an-object"' \
   '.node_id = 42' \
+  '.current_user_can_bypass = "false"' \
   '.rules[0].parameters.allowed_merge_methods = "merge"' \
   '.rules[0].parameters.required_reviewers = "owner"' \
   '.rules[1].parameters.do_not_enforce_on_create = "false"'
