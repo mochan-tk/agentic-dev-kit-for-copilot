@@ -230,8 +230,10 @@ if [[ -n "$PROFILE" ]]; then
         and (.source_type|type) == "string"
         and (.source|type) == "string"
         and (.enforcement|type) == "string"
-        and ((any([.node_id, .created_at, .updated_at, ._links, .current_user_can_bypass][]; . != null) | not)
-             or all([.node_id, .created_at, .updated_at, ._links, .current_user_can_bypass][]; . != null))
+        and ((has("node_id") or has("created_at") or has("updated_at")
+              or has("_links") or has("current_user_can_bypass")) | not
+             or (has("node_id") and has("created_at") and has("updated_at")
+                 and has("_links") and has("current_user_can_bypass")))
         and ((.node_id == null) or (.node_id|type) == "string")
         and ((.created_at == null) or ((.created_at|type) == "string" and
           (.created_at|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))))
