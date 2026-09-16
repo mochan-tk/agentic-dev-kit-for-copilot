@@ -462,6 +462,38 @@ rce "omitted bypass actors are an UNKNOWN sensor failure" 3
 chk "omitted bypass actors are not healthy on PR axis" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no_bypass_actors${T}UNKNOWN"
 
+# Parameterless pull-request rules are valid producer output for legacy
+# profiles; they must not invalidate the complete effective-rule document.
+baseline
+jq 'map(if .type == "pull_request" then
+  .parameters |= {dismiss_stale_reviews_on_push:false,
+    require_code_owner_review:false, require_last_push_approval:false,
+    required_review_thread_resolution:false} else . end)' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile solo
+rce "legacy parameterless pull-request rule remains readable" 0
+chk "legacy parameterless rule preserves approval result" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=1"
+
+# Later effective-rule pages and malformed approval counts must be visible and
+# fail closed rather than being normalized into a healthy zero.
+single_maintainer_green
+printf '%s\n%s\n' \
+  '{"type":"pull_request","parameters":{"required_approving_review_count":0,"dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,"required_review_thread_resolution":false},"ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}' \
+  '{"type":"pull_request","parameters":{"required_approving_review_count":"bad","dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,"required_review_thread_resolution":false},"ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}' \
+  > "$GS_FIX/rules.json"
+mk_rs 900 org '[]'
+run -R o/r --profile single-maintainer
+rce "malformed later-page approval evidence is unknown" 3
+chk "malformed approval evidence is not healthy" "^pull_request\.required_approving_review_count${T}UNKNOWN"
+
+# A successful detail response with missing source identity/enforcement is
+# permission-elided evidence, not an empty/default producer response.
+single_maintainer_green
+jq 'del(.ruleset_source_type,.ruleset_source)' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile single-maintainer
+rce "missing contributing source identity is unknown" 3
+chk "missing source identity is not healthy" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,

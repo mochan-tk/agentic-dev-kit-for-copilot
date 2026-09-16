@@ -640,6 +640,17 @@ else
 fi
 unset GH_FAIL_EXACT
 
+# A single-maintainer intent must not silently persist when an accepted
+# migration output is re-applied with a contradictory solo request.
+existing_profile_fixtures single-maintainer active
+export GH_VARIABLE=present
+printf '%s\n' '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"single-maintainer"}' \
+  > "$GH_FIXTURES/variable.json"
+expect_rc_grep 1 'contradictory|refus' \
+  "single-maintainer to solo contradictory intent is refused before writes" \
+  run_script -R acme/widget --profile solo --reconcile
+unset GH_VARIABLE
+
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
   existing_profile_fixtures "$base"
