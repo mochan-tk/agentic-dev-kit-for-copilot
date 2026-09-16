@@ -140,9 +140,11 @@ if [ "$(st rules)" = ok ] &&
                and all(.file_patterns[]; type == "string")
                and ((.minimum_approvals|type) == "number")
                and (.minimum_approvals >= 0)
+               and ((.minimum_approvals|floor) == .minimum_approvals)
                and ((.reviewer|type) == "object")
                and ((.reviewer.id|type) == "number")
                and (.reviewer.id >= 0)
+               and ((.reviewer.id|floor) == .reviewer.id)
                and (.reviewer.type == "Team"))
            else true end)
       elif .type == "required_status_checks" then
