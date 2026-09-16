@@ -238,6 +238,11 @@ variable_write_fails_closed() {
 
 expect_rc_grep 0 'Usage: setup-ruleset\.sh' "--help prints usage" \
   run_script --help
+if run_script --help | grep -Fq 'without making any mutation.'; then
+  t_ok "--help describes dry-run as write-free"
+else
+  t_fail "--help describes dry-run as write-free"
+fi
 expect_rc_grep 2 'unknown argument' "unknown flag is a usage error" \
   run_script --bogus
 expect_rc_grep 2 "must be 'active' or 'disabled'" \
@@ -631,7 +636,8 @@ else
   t_fail "existing canonical single-maintainer dry-run validates detail with GET-only candidate output"
 fi
 
-# Remediation regressions are intentionally added before their production fixes.
+# Producer metadata mutations below must be rejected before a reconciliation
+# can write either the persisted intent or a ruleset candidate.
 for mutation in \
   '.source = "other/repo"' \
   '.source_type = "Organization"' \

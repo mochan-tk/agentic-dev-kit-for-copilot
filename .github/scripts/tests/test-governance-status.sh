@@ -40,8 +40,7 @@ while [ $# -gt 0 ]; do
     *) path="$1"; shift ;;
   esac
 done
-if [ "${GS_REQUIRE_RULES_PAGINATE:-}" = 1 ] &&
-   [ "$paginate" -ne 1 ]; then
+if [ "${GS_RULES_PAGES:-}" = 2 ] && [ "$paginate" -ne 1 ]; then
   case "$path" in
     repos/*/rules/branches/*) echo "gh stub: rules endpoint requires --paginate" >&2; exit 64 ;;
   esac
@@ -62,8 +61,8 @@ fi
 case "$path" in
   repos/*/rules/branches/*)
     if [ "${GS_RULES_PAGES:-}" = 2 ]; then
-      jq -c '.[0:1]' "$GS_FIX/rules.json"
-      jq -c '.[1:]' "$GS_FIX/rules.json"
+      jq -c '.[0:1]' "$GS_FIX/rules.json" || exit $?
+      jq -c '.[1:]' "$GS_FIX/rules.json" || exit $?
       exit 0
     fi
     f=rules.json ;;
@@ -428,6 +427,8 @@ chk "nonzero approval count is OFF for single-maintainer" "^pull_request\.requir
 chk "admin bypass actor is OFF for single-maintainer" "^pull_request\.no_bypass_actors${T}OFF${T}bypass actors present bypass=RepositoryRole:5:pull_request$"
 chk "admin bypass actor is OFF for required checks too" "^required_checks\.no_bypass_actors${T}OFF${T}bypass actors present bypass=RepositoryRole:5:pull_request$"
 
+# A non-array list response is an outer-shape failure, not a later-page
+# malformed-rule case.
 single_maintainer_green
 run -R o/r --profile single-maintainer
 rce "zero-approval no-bypass fixtures are healthy for single-maintainer" 0
@@ -635,6 +636,22 @@ rce "isolated malformed CI actor evidence is unknown" 3
 chk "isolated malformed CI actor leaves PR evidence active" "^pull_request\\.no_bypass_actors${T}ACTIVE"
 chk "isolated malformed CI actor is unknown on CI axis" "^required_checks\\.no_bypass_actors${T}UNKNOWN"
 
+# A malformed PR actor array on an independently contributing later source
+# cannot contaminate the healthy required-checks source.
+single_maintainer_green
+jq '. + [(.[] | select(.type == "pull_request")
+  | .ruleset_source_type = "Organization"
+  | .ruleset_source = "orgname"
+  | .ruleset_id = 900)]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+mk_rs 900 org '[{"actor_id":"bad","actor_type":"Team","bypass_mode":"pull_request"}]'
+export GS_RULES_PAGES=2
+run -R o/r --profile single-maintainer
+unset GS_RULES_PAGES
+rce "isolated malformed PR actor array evidence is unknown" 3
+chk "isolated malformed PR actor array is unknown" "^pull_request\\.no_bypass_actors${T}UNKNOWN"
+chk "isolated malformed PR actor array leaves CI active" "^required_checks\\.no_bypass_actors${T}ACTIVE"
+
 # Explicit single-maintainer intent still requires both a pull-request rule
 # and every requested CI context; zero approvals never means no PR or CI.
 single_maintainer_green
@@ -671,18 +688,29 @@ printf '%s\n%s\n' \
   > "$GS_FIX/rules.json"
 mk_rs 900 org '[]'
 run -R o/r --profile single-maintainer
-rce "malformed later-page approval evidence is unknown" 3
-chk "malformed approval evidence is not healthy" "^pull_request\.required_approving_review_count${T}UNKNOWN"
+rce "outer-shape malformed rule list is unknown" 3
+chk "outer-shape malformed rule list is not healthy" "^pull_request\.required_approving_review_count${T}UNKNOWN"
 
 single_maintainer_green
-printf '%s\n%s\n' \
-  '{"type":"pull_request","parameters":{"required_approving_review_count":0,"dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,"required_review_thread_resolution":false},"ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}' \
-  '{"type":"pull_request","parameters":null,"ruleset_source_type":"Organization","ruleset_source":"orgname","ruleset_id":900}' \
-  > "$GS_FIX/rules.json"
+jq '. + [(.[] | select(.type == "pull_request")
+  | .ruleset_source_type = "Organization"
+  | .ruleset_source = "orgname"
+  | .ruleset_id = 900)]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
 mk_rs 900 org '[]'
-export GS_RULES_PAGES=2 GS_REQUIRE_RULES_PAGINATE=1
+export GS_RULES_PAGES=2
 run -R o/r --profile single-maintainer
-unset GS_RULES_PAGES GS_REQUIRE_RULES_PAGINATE
+rce "array-per-page healthy later rule requires pagination" 0
+single_maintainer_green
+jq '. + [(.[] | select(.type == "pull_request")
+  | .ruleset_source_type = "Organization"
+  | .ruleset_source = "orgname"
+  | .ruleset_id = 900
+  | .parameters = null)]' "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" &&
+  mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+mk_rs 900 org '[]'
+run -R o/r --profile single-maintainer
+unset GS_RULES_PAGES
 rce "array-per-page malformed later rule requires pagination and fails closed" 3
 chk "array-per-page malformed later rule is unknown" "^pull_request\\.required_approving_review_count${T}UNKNOWN"
 
