@@ -494,6 +494,26 @@ jq 'del(.ruleset_source_type,.ruleset_source)' "$GS_FIX/rules.json" > "$GS_FIX/r
 run -R o/r --profile single-maintainer
 rce "missing contributing source identity is unknown" 3
 chk "missing source identity is not healthy" "^pull_request\.no_bypass_actors${T}UNKNOWN"
+
+# Every effective review restriction contributes to the aggregate, including
+# later pages and required-reviewer metadata.
+baseline
+jq '(.[]|select(.type=="pull_request").parameters) |=
+  (.required_reviewers=[{"id":7,"type":"User"}] |
+   .require_code_owner_review=true | .require_last_push_approval=true)' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+run -R o/r --profile team
+rce "all effective review restrictions are observed" 3
+chk "latest-push restriction is reported" "^pull_request\.require_last_push_approval${T}ACTIVE"
+chk "code-owner restriction is reported" "^pull_request\.require_code_owner_review${T}ACTIVE"
+
+# Permission-elided actor arrays must remain unknown even when the rules page
+# itself is otherwise well formed.
+single_maintainer_green
+printf '{"id":101}\n' > "$GS_FIX/rs-repo-101.json"
+run -R o/r --profile single-maintainer
+rce "permission-elided bypass actor source is unknown" 3
+chk "permission-elided bypass actor source is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,

@@ -651,6 +651,22 @@ expect_rc_grep 1 'contradictory|refus' \
   run_script -R acme/widget --profile solo --reconcile
 unset GH_VARIABLE
 
+# Unknown producer fields are customization, not harmless metadata.
+existing_profile_fixtures solo active
+jq '.rules[0].parameters.unrecognized_producer_flag = true' \
+  "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "unknown producer field refuses normalization" solo --dry-run
+
+# Accepted migration output must be reusable without changing the complete
+# candidate, including explicit active enforcement and default-valued fields.
+existing_profile_fixtures solo active
+expect_rc 0 "reapply accepted single-maintainer migration output" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+existing_profile_fixtures single-maintainer active
+expect_rc 0 "accepted single-maintainer output is idempotent on repeat" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
   existing_profile_fixtures "$base"
