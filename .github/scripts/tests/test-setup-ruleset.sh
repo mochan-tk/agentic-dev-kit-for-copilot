@@ -673,6 +673,19 @@ jq '.rules[0].parameters.unrecognized_producer_flag = true' \
   mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
 detail_fails_closed "unknown producer field refuses normalization" solo --dry-run
 
+# Unknown root and rule-object fields are adopter customization too. They
+# cannot be carried into a single-maintainer candidate merely because known
+# fields have otherwise valid producer shapes.
+for mutation in \
+  '.unrecognized_root_flag = true' \
+  '.rules[0].unrecognized_rule_flag = true'
+do
+  existing_profile_fixtures solo active
+  jq "$mutation" "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+    mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+  detail_fails_closed "unknown producer root or rule field refuses normalization" solo --dry-run
+done
+
 # Accepted migration output must be reusable without changing the complete
 # candidate, including explicit active enforcement and default-valued fields.
 existing_profile_fixtures solo active
@@ -698,6 +711,27 @@ if ! grep -Eq -- '--method PUT.*rulesets' "$GH_CALLS"; then
   t_ok "actual emitted candidate reapplication performs no ruleset write"
 else
   t_fail "actual emitted candidate reapplication performs no ruleset write"
+fi
+
+# Compare the complete emitted active candidate against the preimage-derived
+# projection, not selected policy fields.
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "emit whole active candidate for equality assertion" \
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
+jq -S '
+  del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
+      .current_user_can_bypass,._links)
+  | .enforcement = "active"
+  | .bypass_actors = []
+  | (.rules[] | select(.type == "pull_request").parameters
+     .required_approving_review_count) = 0
+' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/expected-candidate.json"
+jq -S . "$GH_FIXTURES/put.json" > "$GH_FIXTURES/actual-candidate.json"
+if cmp -s "$GH_FIXTURES/expected-candidate.json" "$GH_FIXTURES/actual-candidate.json"; then
+  t_ok "whole active candidate equals preimage projection"
+else
+  t_fail "whole active candidate equals preimage projection"
 fi
 
 # Exact shape: each single mutation is adopter-owned and must fail closed.
