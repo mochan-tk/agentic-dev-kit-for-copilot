@@ -553,6 +553,13 @@ jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":
 run -R o/r --profile single-maintainer
 rce "inconsistent source identity is unknown" 3
 chk "inconsistent source identity is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
+
+baseline
+jq '.enforcement="bogus"' "$GS_FIX/rs-repo-101.json" > "$GS_FIX/rs.tmp" &&
+  mv "$GS_FIX/rs.tmp" "$GS_FIX/rs-repo-101.json"
+run -R o/r --profile single-maintainer
+rce "malformed contributing enforcement is unknown" 3
+chk "malformed contributing enforcement is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
