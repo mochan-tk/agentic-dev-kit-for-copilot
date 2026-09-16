@@ -106,7 +106,13 @@ team_rules() { # fully hardened; binds every context to app id $1
 }
 mk_repo() { printf '{"default_branch":"main","owner":{"login":"o","type":"%s"},"private":%s%s}\n' "$1" "$2" "${3:-}" > "$GS_FIX/repo.json"; }
 mk_org() { printf '{"login":"o"%s}\n' "${1:-}" > "$GS_FIX/org.json"; }
-mk_rs() { printf '{"id":%s,"enforcement":"disabled","bypass_actors":%s}\n' "$1" "$3" > "$GS_FIX/rs-$2-$1.json"; }
+mk_rs() {
+  local source="o/r"
+  [ "$2" = org ] && source="orgname"
+  printf '{"id":%s,"source_type":"%s","source":"%s","enforcement":"disabled","bypass_actors":%s}\n' \
+    "$1" "$([ "$2" = org ] && printf Organization || printf Repository)" "$source" "$3" \
+    > "$GS_FIX/rs-$2-$1.json"
+}
 mk_wf() { printf '{"default_workflow_permissions":"%s","can_approve_pull_request_reviews":%s}\n' "$1" "$2" > "$GS_FIX/workflow.json"; }
 mk_runs() {
   local out="" sep="" p
