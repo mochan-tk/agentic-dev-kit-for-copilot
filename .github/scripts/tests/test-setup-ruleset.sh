@@ -676,6 +676,7 @@ jq '. + {id:42,node_id:"R_42",source_type:"Repository",source:"acme/widget",
   created_at:"2026-01-01T00:00:00Z",updated_at:"2026-01-01T00:00:00Z",
   current_user_can_bypass:false,_links:{}}' "$GH_FIXTURES/put.json" \
   > "$GH_FIXTURES/ruleset-detail.json"
+reset_calls
 expect_rc 0 "reapply actual emitted migration candidate is a no-op" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 if ! grep -Eq -- '--method PUT.*rulesets' "$GH_CALLS"; then
