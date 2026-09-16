@@ -188,6 +188,15 @@ while IFS="$TAB" read -r rid rtyp rsrc; do
     *) echo fail > "$WORK/rs$rid.rc" ;;
   esac
   [ "$(st "rs$rid")" = ok ] || continue
+  if ! jq -e --argjson id "$rid" --arg typ "$rtyp" --arg src "$rsrc" '
+      (.id|type) == "number" and .id == $id and
+      ((.source_type == null) or .source_type == $typ) and
+      ((.source == null) or .source == $src) and
+      ((.name == null) or (.name|type) == "string")' \
+      "$WORK/rs$rid.json" >/dev/null 2>&1; then
+    echo fail > "$WORK/rs$rid.rc"
+    continue
+  fi
   if ! jq -e '.bypass_actors | type == "array" and all(.[]?;
       (.actor_type|type) == "string" and
       (.bypass_mode|type) == "string" and
