@@ -667,6 +667,23 @@ existing_profile_fixtures single-maintainer active
 expect_rc 0 "accepted single-maintainer output is idempotent on repeat" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 
+# Reapply the actual emitted PUT body, with only server metadata restored as a
+# subsequent GET would provide; do not recreate the candidate from a fixture.
+existing_profile_fixtures solo active
+expect_rc 0 "emit accepted migration candidate" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+jq '. + {id:42,node_id:"R_42",source_type:"Repository",source:"acme/widget",
+  created_at:"2026-01-01T00:00:00Z",updated_at:"2026-01-01T00:00:00Z",
+  current_user_can_bypass:false,_links:{}}' "$GH_FIXTURES/put.json" \
+  > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "reapply actual emitted migration candidate is a no-op" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+if ! grep -Eq -- '--method PUT.*rulesets' "$GH_CALLS"; then
+  t_ok "actual emitted candidate reapplication performs no ruleset write"
+else
+  t_fail "actual emitted candidate reapplication performs no ruleset write"
+fi
+
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
   existing_profile_fixtures "$base"
