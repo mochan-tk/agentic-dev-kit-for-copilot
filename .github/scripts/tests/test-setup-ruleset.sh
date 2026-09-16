@@ -620,6 +620,7 @@ for mutation in \
   '._links = "not-an-object"' \
   '.node_id = 42' \
   '.current_user_can_bypass = "false"' \
+  'del(.node_id)' \
   '.rules[0].parameters.allowed_merge_methods = "merge"' \
   '.rules[0].parameters.required_reviewers = "owner"' \
   '.rules[1].parameters.do_not_enforce_on_create = "false"' \
