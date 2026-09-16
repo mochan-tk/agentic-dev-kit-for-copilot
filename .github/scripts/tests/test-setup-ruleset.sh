@@ -616,6 +616,7 @@ for mutation in \
   '.source_type = "Organization"' \
   '.created_at = 42' \
   '._links = "not-an-object"' \
+  '.node_id = 42' \
   '.rules[0].parameters.allowed_merge_methods = "merge"' \
   '.rules[0].parameters.required_reviewers = "owner"' \
   '.rules[1].parameters.do_not_enforce_on_create = "false"'
