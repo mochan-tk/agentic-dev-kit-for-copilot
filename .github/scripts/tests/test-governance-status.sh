@@ -589,7 +589,7 @@ chk "omitted bypass actors are not healthy on checks axis" "^required_checks\.no
 for actor_case in missing malformed nonempty; do
   single_maintainer_green
   mk_rs 900 org '[]'
-  jq '. + [{"type":"required_status_checks","parameters":{
+  jq 'map(select(.type != "required_status_checks")) + [{"type":"required_status_checks","parameters":{
     "strict_required_status_checks_policy":false,"required_status_checks":[
       {"context":"quality"},{"context":"task-ritual"},
       {"context":"scaffold-self-check"},{"context":"copilot-surface"}]},

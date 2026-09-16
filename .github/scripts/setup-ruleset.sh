@@ -250,7 +250,9 @@ if [[ -n "$PROFILE" ]]; then
            and (._links.self.href|type) == "string"
            and ._links.self.href == ("https://api.github.com/repos/" + $repo + "/rulesets/" + $id)
            and ((._links | has("html") | not) or ._links.html == null
-                or ((._links.html|type) == "object" and (._links.html.href|type) == "string"))))
+                or ((._links.html|type) == "object"
+                    and (._links.html.href|type) == "string"
+                    and ._links.html.href == ("https://github.com/" + $repo + "/rules/" + $id)))))
         and ((has("current_user_can_bypass") | not)
              or ((.current_user_can_bypass|type) == "string"
                  and (.current_user_can_bypass | IN("always","pull_requests_only","never","exempt"))))
@@ -491,7 +493,7 @@ fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   # stdout carries only the JSON body (pipeable to jq); notes go to stderr.
-  echo "dry-run: request body for POST /repos/{owner}/{repo}/rulesets; no API call made." >&2
+  echo "dry-run: request body for POST /repos/{owner}/{repo}/rulesets; no mutation made." >&2
   printf '%s\n' "$PAYLOAD"
   exit 0
 fi

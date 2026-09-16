@@ -279,6 +279,8 @@ REVIEW_GATES=0
 if [ "$SM" = 1 ]; then
   if [ "$RULES" != 1 ]; then
     emit pull_request.no_bypass_actors UNKNOWN "effective rules unavailable" 1
+  elif [ "$PRN" -eq 0 ]; then
+    emit pull_request.no_bypass_actors OFF "no pull_request rule in effect" 1
   elif [ "$PQ" = " bypass=unknown" ]; then
     emit pull_request.no_bypass_actors UNKNOWN "bypass evidence unavailable" 1
   elif [ -z "$PQ" ]; then

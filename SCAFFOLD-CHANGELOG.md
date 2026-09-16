@@ -62,6 +62,10 @@ inherit what this one learned.
   example a real `require_extra_approval_for_unattributed_changes: true`)
   survives untouched rather than being reset by a lossy template rebuild;
   malformed, customized, or already-owned targets are still refused (#124).
+  The migration does not add or remove code-owner, latest-push, or other
+  review restrictions; those producer fields remain part of the refusal and
+  preservation boundary. Dry-run output is write-free and reports that it
+  makes no mutation.
   Adoption is repository-local: a maintainer must decide each PR and head;
   this profile does not enable automatic merging and cannot guarantee
   authenticated human and agent identities are distinguishable.

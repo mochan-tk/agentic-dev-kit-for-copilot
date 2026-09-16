@@ -727,7 +727,7 @@ expect_rc 0 "accepted single-maintainer output is idempotent on repeat" \
 # subsequent GET would provide; do not recreate the candidate from a fixture.
 existing_profile_fixtures solo active
 expect_rc 0 "emit accepted migration candidate" \
-  run_script -R acme/widget --profile single-maintainer --reconcile
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
 jq '. + {id:42,node_id:"R_42",source_type:"Repository",source:"acme/widget",
   created_at:"2026-01-01T00:00:00Z",updated_at:"2026-01-01T00:00:00Z",
   current_user_can_bypass:"never",
