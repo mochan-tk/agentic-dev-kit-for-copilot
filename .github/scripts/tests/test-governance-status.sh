@@ -53,7 +53,13 @@ if [ "$path" = "repos/o/r/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE" ]; then
   esac
 fi
 case "$path" in
-  repos/*/rules/branches/*) f=rules.json ;;
+  repos/*/rules/branches/*)
+    if [ "${GS_RULES_PAGES:-}" = 2 ]; then
+      jq -c '.[0:1]' "$GS_FIX/rules.json"
+      jq -c '.[1:]' "$GS_FIX/rules.json"
+      exit 0
+    fi
+    f=rules.json ;;
   repos/*/rulesets/*) f="rs-repo-${path##*/}.json" ;;
   orgs/*/rulesets/*) f="rs-org-${path##*/}.json" ;;
   orgs/*) f=org.json ;;
@@ -512,6 +518,21 @@ printf '{"id":101}\n' > "$GS_FIX/rs-repo-101.json"
 run -R o/r --profile single-maintainer
 rce "permission-elided bypass actor source is unknown" 3
 chk "permission-elided bypass actor source is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
+
+# Effective rules may be returned on multiple API pages; restrictions and
+# bypass evidence on a later page must participate in the aggregate.
+baseline
+jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
+  "dismiss_stale_reviews_on_push":true,"require_code_owner_review":true,
+  "require_last_push_approval":true,"required_review_thread_resolution":true},
+  "ruleset_source_type":"Repository","ruleset_source":"o/r","ruleset_id":101}]' \
+  "$GS_FIX/rules.json" > "$GS_FIX/r.tmp" && mv "$GS_FIX/r.tmp" "$GS_FIX/rules.json"
+export GS_RULES_PAGES=2
+run -R o/r --profile team
+unset GS_RULES_PAGES
+rce "later effective-rule page is aggregated" 0
+chk "later page approval restriction is observed" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=2"
+chk "later page code-owner restriction is observed" "^pull_request\.require_code_owner_review${T}ACTIVE"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
