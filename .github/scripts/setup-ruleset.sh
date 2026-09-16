@@ -307,6 +307,13 @@ if [[ -n "$PROFILE" ]]; then
         | .bypass_actors = []
         | (.rules[] | select(.type == "pull_request").parameters.required_approving_review_count) = 0
       ')"
+    elif [[ "$PROFILE" == "solo" ]] && printf '%s' "$EXISTING_DETAIL" | jq -e '
+      (.bypass_actors == [])
+      and (any(.rules[]; .type == "pull_request" and
+        (.parameters.required_approving_review_count == 0)))
+    ' >/dev/null; then
+      echo "error: contradictory single-maintainer intent; refusing solo transition." >&2
+      exit 1
     fi
   fi
   fi

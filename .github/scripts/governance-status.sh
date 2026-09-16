@@ -113,22 +113,25 @@ if [ "$(st rules)" = ok ] &&
      (.ruleset_id|type) == "number" and
      (.ruleset_source_type|type) == "string" and
      (.ruleset_source|type) == "string" and
-     (.parameters|type) == "object" and
+     (     ((.parameters|type) == "object" or
+      .parameters == null) and
      (if .type == "pull_request" then
-        (.parameters.required_approving_review_count|type) == "number" and
-        (.parameters.required_approving_review_count >= 0) and
-        ((.parameters.required_approving_review_count|floor) == .parameters.required_approving_review_count) and
-        ([.parameters.dismiss_stale_reviews_on_push,
-          .parameters.require_last_push_approval,
-          .parameters.require_code_owner_review,
-          .parameters.required_review_thread_resolution]
-         | all(.[]; type == "boolean")) and
-        ((.parameters.required_reviewers == null) or
-         (.parameters.required_reviewers|type) == "array")
+        (if .parameters == null then true else
+          (.parameters.required_approving_review_count|type) == "number" and
+          (.parameters.required_approving_review_count >= 0) and
+          ((.parameters.required_approving_review_count|floor) == .parameters.required_approving_review_count) and
+          ([.parameters.dismiss_stale_reviews_on_push,
+            .parameters.require_last_push_approval,
+            .parameters.require_code_owner_review,
+            .parameters.required_review_thread_resolution]
+           | all(.[]; type == "boolean")) and
+          ((.parameters.required_reviewers == null) or
+           (.parameters.required_reviewers|type) == "array")
+        end)
       elif .type == "required_status_checks" then
         (.parameters.strict_required_status_checks_policy|type) == "boolean" and
         (.parameters.required_status_checks|type) == "array"
-      else true end))' "$WORK/rules.json" >/dev/null 2>&1; then
+      else true end)))' "$WORK/rules.json" >/dev/null 2>&1; then
   RULES=1
 fi
 
@@ -146,11 +149,11 @@ $(jqr '[.[]|select(.type=="pull_request")] as $p
   | def srcs(x): ([x[].ruleset_id]|unique|map(tostring)|join(","))
       | if . == "" then "-" else . end;
   [($p|length),
-   ([$p[].parameters.required_approving_review_count]|max // 0),
-   ([$p[].parameters.dismiss_stale_reviews_on_push]|any),
-   ([$p[].parameters.require_last_push_approval]|any),
-   ([$p[].parameters.require_code_owner_review]|any),
-   ([$p[].parameters.required_review_thread_resolution]|any),
+   ([$p[]|(.parameters.required_approving_review_count // 1)]|max // 0),
+   ([$p[]|(.parameters.dismiss_stale_reviews_on_push // false)]|any),
+   ([$p[]|(.parameters.require_last_push_approval // false)]|any),
+   ([$p[]|(.parameters.require_code_owner_review // false)]|any),
+   ([$p[]|(.parameters.required_review_thread_resolution // false)]|any),
    ([$c[].parameters.strict_required_status_checks_policy]|any),
    ($m|length), srcs($p), srcs($c), srcs($m)] | @tsv' rules)
 EOF
