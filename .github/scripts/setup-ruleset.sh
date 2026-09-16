@@ -230,6 +230,11 @@ if [[ -n "$PROFILE" ]]; then
         and (.source_type|type) == "string"
         and (.source|type) == "string"
         and (.enforcement|type) == "string"
+        and ((.node_id == null) or (.node_id|type) == "string")
+        and ((.created_at == null) or (.created_at|type) == "string")
+        and ((.updated_at == null) or (.updated_at|type) == "string")
+        and ((._links == null) or (._links|type) == "object")
+        and ((.current_user_can_bypass == null) or (.current_user_can_bypass|type) == "boolean")
         and (.bypass_actors|type) == "array"
         and (.conditions|type) == "object"
         and (.rules|type) == "array")
