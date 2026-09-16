@@ -533,6 +533,15 @@ unset GS_RULES_PAGES
 rce "later effective-rule page is aggregated" 1
 chk "later page approval restriction is observed" "^pull_request\.required_approving_review_count${T}ACTIVE${T}count=2"
 chk "later page code-owner restriction is observed" "^pull_request\.require_code_owner_review${T}ACTIVE"
+
+# A successful contributing-detail response with a contradictory id is
+# malformed source evidence and must not qualify bypass controls.
+single_maintainer_green
+jq '.id=999' "$GS_FIX/rs-repo-101.json" > "$GS_FIX/rs.tmp" &&
+  mv "$GS_FIX/rs.tmp" "$GS_FIX/rs-repo-101.json"
+run -R o/r --profile single-maintainer
+rce "contradictory contributing detail id is unknown" 3
+chk "contradictory detail id is unknown" "^pull_request\.no_bypass_actors${T}UNKNOWN"
 baseline
 jq '. + [{"type":"pull_request","parameters":{"required_approving_review_count":2,
   "dismiss_stale_reviews_on_push":false,"require_code_owner_review":false,"require_last_push_approval":false,
