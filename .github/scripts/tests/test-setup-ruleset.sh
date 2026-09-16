@@ -614,6 +614,7 @@ fi
 for mutation in \
   '.source = "other/repo"' \
   '.source_type = "Organization"' \
+  '.id = "42"' \
   '.created_at = 42' \
   '.updated_at = "not-a-timestamp"' \
   '._links = "not-an-object"' \
