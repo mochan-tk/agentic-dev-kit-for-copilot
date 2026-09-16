@@ -236,7 +236,10 @@ if [[ -n "$PROFILE" ]]; then
         and ((.updated_at == null) or ((.updated_at|type) == "string" and
           (.updated_at|test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))))
         and ((._links == null) or (._links|type) == "object")
-        and ((.current_user_can_bypass == null) or (.current_user_can_bypass|type) == "boolean")
+        and ((.current_user_can_bypass == null)
+             or (.current_user_can_bypass|type) == "boolean"
+             or ((.current_user_can_bypass|type) == "string"
+                 and (.current_user_can_bypass | IN("always","pull_requests_only","never"))))
         and (.bypass_actors|type) == "array"
         and (.conditions|type) == "object"
         and (.rules|type) == "array")
