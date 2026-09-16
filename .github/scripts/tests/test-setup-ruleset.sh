@@ -573,6 +573,14 @@ expect_rc_grep 1 'contradictory|single-maintainer' \
 
 existing_profile_fixtures solo active
 canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+jq '.current_user_can_bypass = "pull_requests_only"' \
+  "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "producer bypass enum is accepted" \
+  run_script -R acme/widget --profile single-maintainer --reconcile --dry-run
+
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
 expect_rc 0 "single-maintainer reconciliation from a producer-enriched preimage" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
