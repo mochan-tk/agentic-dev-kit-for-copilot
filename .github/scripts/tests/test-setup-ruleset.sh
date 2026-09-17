@@ -730,13 +730,13 @@ do
   detail_fails_closed "unknown producer root or rule field refuses normalization" solo --dry-run
 done
 
-# Accepted migration output must be reusable without changing the complete
-# candidate, including explicit active enforcement and default-valued fields.
+# Separately prepared canonical inputs exercise default-enforcement
+# reconciliation without claiming reuse of an emitted active candidate.
 existing_profile_fixtures solo active
-expect_rc 0 "create accepted single-maintainer migration candidate" \
+expect_rc 0 "reconcile separately prepared single-maintainer default candidate" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 existing_profile_fixtures single-maintainer active
-expect_rc 0 "reuse accepted single-maintainer migration candidate" \
+expect_rc 0 "reconcile separately prepared single-maintainer canonical input" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 
 # Reapply the actual emitted PUT body, with only server metadata restored as a
