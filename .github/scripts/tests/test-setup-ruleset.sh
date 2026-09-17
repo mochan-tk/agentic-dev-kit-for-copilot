@@ -602,6 +602,16 @@ else
   t_fail "single-maintainer reconciliation preserves producer-only metadata"
 fi
 
+# A present null node_id is malformed metadata, including during an otherwise
+# accepted single-maintainer reconciliation; reject it before any write.
+existing_profile_fixtures solo active
+jq '.node_id = null' "$GH_FIXTURES/ruleset-detail.json" \
+  > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed \
+  "present null node_id refuses single-maintainer reconciliation before writes" \
+  single-maintainer
+
 # A typed nested reviewer configuration is producer-shaped but customized
 # policy, so single-maintainer reconciliation must refuse it before writes.
 existing_profile_fixtures solo active
@@ -723,10 +733,10 @@ done
 # Accepted migration output must be reusable without changing the complete
 # candidate, including explicit active enforcement and default-valued fields.
 existing_profile_fixtures solo active
-expect_rc 0 "reapply accepted single-maintainer migration output" \
+expect_rc 0 "create accepted single-maintainer migration candidate" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 existing_profile_fixtures single-maintainer active
-expect_rc 0 "accepted single-maintainer output is idempotent on repeat" \
+expect_rc 0 "reuse accepted single-maintainer migration candidate" \
   run_script -R acme/widget --profile single-maintainer --reconcile
 
 # Reapply the actual emitted PUT body, with only server metadata restored as a
