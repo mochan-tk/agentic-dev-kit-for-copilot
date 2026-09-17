@@ -240,7 +240,7 @@ if [[ -n "$PROFILE" ]]; then
         and (.source_type|type) == "string"
         and (.source|type) == "string"
         and (.enforcement|type) == "string"
-        and ((.node_id == null) or (.node_id|type) == "string")
+        and ((has("node_id") | not) or (.node_id|type) == "string")
         and ((has("created_at") | not) or ((.created_at|type) == "string" and (.created_at|valid_datetime)))
         and ((has("updated_at") | not) or ((.updated_at|type) == "string" and (.updated_at|valid_datetime)))
         and ((has("_links") | not) or
