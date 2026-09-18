@@ -70,7 +70,7 @@ export PATH
 
 reset_calls() { : > "$GH_CALLS"; }
 
-run_script() { bash "$SCRIPT" "$@" < /dev/null; }
+run_script() { "$BASH" "$SCRIPT" "$@" < /dev/null; }
 
 no_profile_writes() {
   ! grep -Eq -- '--method (POST|PUT|PATCH|DELETE).*(actions/variables|rulesets)' "$GH_CALLS"
@@ -113,20 +113,31 @@ canonical_detail() {
   local profile="$1" enforcement="${2:-disabled}" app="${3:-15368}"
   jq -n --arg profile "$profile" --arg enforcement "$enforcement" \
     --argjson app "$app" '{
-      id: 42, name: "scaffold-branch-protection", target: "branch",
-      enforcement: $enforcement,
-      bypass_actors: [{actor_id: 5, actor_type: "RepositoryRole",
-                       bypass_mode: "pull_request"}],
+    id: 42, node_id: "R_kgDO42", name: "scaffold-branch-protection",
+    target: "branch", source_type: "Repository", source: "acme/widget",
+    enforcement: $enforcement,
+    created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+    current_user_can_bypass: "never",
+    _links: {
+      self: {href: "https://api.github.com/repos/acme/widget/rulesets/42"},
+      html: {href: "https://github.com/acme/widget/rules/42"}
+    },
+    bypass_actors: (if $profile == "single-maintainer" then []
+        else [{actor_id: 5, actor_type: "RepositoryRole",
+               bypass_mode: "pull_request"}] end),
       conditions: {ref_name: {include: ["~DEFAULT_BRANCH"], exclude: []}},
       rules: [
         {type: "pull_request", parameters: {
-          required_approving_review_count: 1,
+          required_approving_review_count: (if $profile == "single-maintainer" then 0 else 1 end),
+          allowed_merge_methods: ["merge","squash","rebase"],
+          required_reviewers: [],
           dismiss_stale_reviews_on_push: ($profile == "team"),
           require_code_owner_review: ($profile == "team"),
           require_last_push_approval: ($profile == "team"),
           required_review_thread_resolution: ($profile == "team")}},
         {type: "required_status_checks", parameters: {
           strict_required_status_checks_policy: ($profile == "team"),
+          do_not_enforce_on_create: false,
           required_status_checks:
             (["quality","task-ritual","scaffold-self-check","copilot-surface"]
              | map({context: .})
@@ -134,6 +145,21 @@ canonical_detail() {
                then map(. + {integration_id: $app}) else . end)}}
       ]
     }'
+}
+
+# require_extra_approval_for_unattributed_changes is the one producer-only
+# field a canonical ruleset may carry as true. Canonical policy still requires
+# allowed_merge_methods, required_reviewers, and do_not_enforce_on_create to
+# have their default values; this helper proves reconciliation preserves the
+# producer field rather than rebuilding the payload.
+# helper proves single-maintainer reconciliation preserves the real
+# preimage's require_extra_approval flag rather than silently resetting it
+# via a lossy template rebuild.
+with_producer_fields() {
+  jq '
+    (.rules[] | select(.type == "pull_request").parameters) |=
+      (. + {require_extra_approval_for_unattributed_changes: true})
+  '
 }
 
 existing_profile_fixtures() {
@@ -212,6 +238,11 @@ variable_write_fails_closed() {
 
 expect_rc_grep 0 'Usage: setup-ruleset\.sh' "--help prints usage" \
   run_script --help
+if run_script --help | grep -Fq 'without making any mutation.'; then
+  t_ok "--help describes dry-run as write-free"
+else
+  t_fail "--help describes dry-run as write-free"
+fi
 expect_rc_grep 2 'unknown argument' "unknown flag is a usage error" \
   run_script --bogus
 expect_rc_grep 2 "must be 'active' or 'disabled'" \
@@ -349,6 +380,35 @@ if [ "$rc" -eq 0 ] && printf '%s' "$TEAM" | jq -e '
   t_ok "team dry-run uses paginated GET evidence and prints a bound candidate"
 else
   t_fail "team dry-run uses paginated GET evidence and prints a bound candidate"
+fi
+
+profile_fixtures
+rc=0
+SM="$(run_script -R acme/widget --profile single-maintainer --dry-run 2>/dev/null)" || rc=$?
+if [ "$rc" -eq 0 ] && printf '%s' "$SM" | jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+   ' >/dev/null && [ ! -s "$GH_CALLS" ]; then
+  t_ok "explicit single-maintainer dry-run prints a zero-approval no-bypass payload with zero gh calls"
+else
+  t_fail "explicit single-maintainer dry-run prints a zero-approval no-bypass payload with zero gh calls"
+fi
+
+profile_fixtures
+expect_rc_grep 0 "Created ruleset 'scaffold-branch-protection'" \
+  "fresh explicit single-maintainer persists intent before creating the ruleset" \
+  run_script -R acme/widget --profile single-maintainer
+if jq -e '.name == "SCAFFOLD_GOVERNANCE_PROFILE" and .value == "single-maintainer"' \
+     "$GH_FIXTURES/variable-written.json" >/dev/null \
+   && jq -e '
+       .bypass_actors == []
+       and (.rules[] | select(.type == "pull_request").parameters
+         .required_approving_review_count) == 0
+     ' "$GH_FIXTURES/posted.json" >/dev/null; then
+  t_ok "single-maintainer persists exact intent and posts a zero-approval no-bypass ruleset"
+else
+  t_fail "single-maintainer persists exact intent and posts a zero-approval no-bypass ruleset"
 fi
 
 profile_fixtures
@@ -493,6 +553,239 @@ mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
 detail_fails_closed "noncanonical solo dry-run fails closed after detail GET" \
   solo --dry-run
 
+# --- explicit single-maintainer: reconciliation from real preimages --------
+
+existing_profile_fixtures solo active
+expect_rc 0 "canonical solo migrates in place to explicit single-maintainer" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+     and (.rules[] | select(.type == "pull_request").parameters
+       .dismiss_stale_reviews_on_push) == false
+     and (.rules[] | select(.type == "required_status_checks").parameters
+       .strict_required_status_checks_policy) == false
+   ' "$GH_FIXTURES/put.json" >/dev/null \
+   && jq -e '.value == "single-maintainer"' "$GH_FIXTURES/variable-written.json" >/dev/null; then
+  t_ok "solo-to-single-maintainer migration flips only bypass and approval count"
+else
+  t_fail "solo-to-single-maintainer migration flips only bypass and approval count"
+fi
+
+existing_profile_fixtures team active
+expect_rc_grep 1 'contradictory|single-maintainer' \
+  "canonical team refuses contradictory single-maintainer transition" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+jq '.current_user_can_bypass = "pull_requests_only"' \
+  "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "producer bypass enum is accepted" \
+  run_script -R acme/widget --profile single-maintainer --reconcile --dry-run
+
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "single-maintainer reconciliation from a producer-enriched preimage" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+if [ -f "$GH_FIXTURES/put.json" ] && jq -e '
+     .bypass_actors == []
+     and (.rules[] | select(.type == "pull_request").parameters
+       .required_approving_review_count) == 0
+     and (.rules[] | select(.type == "pull_request").parameters
+       .require_extra_approval_for_unattributed_changes) == true
+   ' "$GH_FIXTURES/put.json" >/dev/null; then
+  t_ok "single-maintainer reconciliation preserves producer-only metadata"
+else
+  t_fail "single-maintainer reconciliation preserves producer-only metadata"
+fi
+
+# A present null node_id is malformed metadata, including during an otherwise
+# accepted single-maintainer reconciliation; reject it before any write.
+existing_profile_fixtures solo active
+jq '.node_id = null' "$GH_FIXTURES/ruleset-detail.json" \
+  > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed \
+  "present null node_id refuses single-maintainer reconciliation before writes" \
+  single-maintainer
+
+# A typed nested reviewer configuration is producer-shaped but customized
+# policy, so single-maintainer reconciliation must refuse it before writes.
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields |
+  jq '(.rules[] | select(.type=="pull_request").parameters).required_reviewers=[
+    {"file_patterns":["*.go"],"minimum_approvals":0,
+     "reviewer":{"id":7,"type":"Team"}}]' \
+  > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc_grep 1 'noncanonical|custom' "nested required-reviewer policy is refused" \
+  run_script -R acme/widget --profile single-maintainer --reconcile --dry-run
+
+existing_profile_fixtures single-maintainer active
+expect_rc 0 "exact canonical single-maintainer match is idempotent" \
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
+if jq -e '.value == "single-maintainer"' "$GH_FIXTURES/variable-written.json" >/dev/null \
+   && grep -q 'rulesets/42' "$GH_CALLS" \
+   && ! grep -Eq -- '--method (PUT|POST).*rulesets' "$GH_CALLS"; then
+  t_ok "exact single-maintainer match persists intent and performs no ruleset write"
+else
+  t_fail "exact single-maintainer match persists intent and performs no ruleset write"
+fi
+
+existing_profile_fixtures single-maintainer
+rc=0
+out="$(run_script -R acme/widget --profile single-maintainer --reconcile --dry-run 2>"$WORK/stderr.tmp")" || rc=$?
+err="$(cat "$WORK/stderr.tmp")"
+if [ "$rc" -eq 0 ] && printf '%s\n' "$err" | grep -Eqi 'dry-run.*candidate|no.op' \
+   && printf '%s\n' "$out" | jq -e '.bypass_actors == []' >/dev/null \
+   && no_profile_writes; then
+  t_ok "existing canonical single-maintainer dry-run validates detail with GET-only candidate output"
+else
+  t_fail "existing canonical single-maintainer dry-run validates detail with GET-only candidate output"
+fi
+
+# Producer metadata mutations below must be rejected before a reconciliation
+# can write either the persisted intent or a ruleset candidate.
+for mutation in \
+  '.source = "other/repo"' \
+  '.source_type = "Organization"' \
+  '.id = "42"' \
+  '.created_at = 42' \
+  '.created_at = null' \
+  '.updated_at = "not-a-timestamp"' \
+  '.created_at = "2026-99-99T00:00:00Z"' \
+  '.created_at = "2026-02-30T00:00:00Z"' \
+  '.updated_at = "2026-01-01T00:00:00+99:99"' \
+  '._links = "not-an-object"' \
+  '._links = {self:{href:42}}' \
+  '._links = {self:{href:"https://api.github.com/repos/other/repo/rulesets/42"}}' \
+  '.node_id = 42' \
+  '.current_user_can_bypass = null' \
+  '.current_user_can_bypass = "false"' \
+  '.rules[0].parameters.allowed_merge_methods = "merge"' \
+  '.rules[0].parameters.required_reviewers = "owner"' \
+  '.rules[1].parameters.do_not_enforce_on_create = "false"' \
+  '.rules[1].parameters.required_status_checks[0].context = 42'
+do
+  existing_profile_fixtures solo
+  jq "$mutation" "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp"
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+  detail_fails_closed "producer-shaped metadata/type mutation fails closed" solo --dry-run
+done
+
+existing_profile_fixtures solo active
+jq '.current_user_can_bypass = "exempt"
+  | ._links = {self:{href:"https://api.github.com/repos/acme/widget/rulesets/42"},
+               html:null}' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "documented exempt enum and nullable html link are accepted" \
+  run_script -R acme/widget --profile solo --reconcile --dry-run
+
+existing_profile_fixtures team active
+expect_rc_grep 1 'noncanonical|contradictory|refus' \
+  "team-to-single-maintainer contradictory transition is refused" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+
+existing_profile_fixtures solo active
+export GH_FAIL_EXACT='api --method PUT repos/acme/widget/rulesets/42 --input -'
+rc=0
+out="$(run_script -R acme/widget --profile single-maintainer --reconcile 2>&1)" || rc=$?
+if [ "$rc" -ne 0 ] && printf '%s\n' "$out" | grep -Eqi 'intent persisted.*ruleset|partial'; then
+  t_ok "ruleset PUT failure reports persisted intent as partial"
+else
+  t_fail "ruleset PUT failure reports persisted intent as partial"
+fi
+unset GH_FAIL_EXACT
+
+# A single-maintainer intent must not silently persist when an accepted
+# migration output is re-applied with a contradictory solo request.
+existing_profile_fixtures single-maintainer active
+export GH_VARIABLE=present
+printf '%s\n' '{"name":"SCAFFOLD_GOVERNANCE_PROFILE","value":"single-maintainer"}' \
+  > "$GH_FIXTURES/variable.json"
+expect_rc_grep 1 'contradictory|refus' \
+  "single-maintainer to solo contradictory intent is refused before writes" \
+  run_script -R acme/widget --profile solo --reconcile
+unset GH_VARIABLE
+
+# Unknown producer fields are customization, not harmless metadata.
+existing_profile_fixtures solo active
+jq '.rules[0].parameters.unrecognized_producer_flag = true' \
+  "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "unknown producer field refuses normalization" solo --dry-run
+
+# Unknown root and rule-object fields are adopter customization too. They
+# cannot be carried into a single-maintainer candidate merely because known
+# fields have otherwise valid producer shapes.
+for mutation in \
+  '.unrecognized_root_flag = true' \
+  '.rules[0].unrecognized_rule_flag = true'
+do
+  existing_profile_fixtures solo active
+  jq "$mutation" "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+    mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+  detail_fails_closed "unknown producer root or rule field refuses normalization" solo --dry-run
+done
+
+# Separately prepared canonical inputs exercise default-enforcement
+# reconciliation without claiming reuse of an emitted active candidate.
+existing_profile_fixtures solo active
+expect_rc 0 "reconcile separately prepared single-maintainer default candidate" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+existing_profile_fixtures single-maintainer active
+expect_rc 0 "reconcile separately prepared single-maintainer canonical input" \
+  run_script -R acme/widget --profile single-maintainer --reconcile
+
+# Reapply the actual emitted PUT body, with only server metadata restored as a
+# subsequent GET would provide; do not recreate the candidate from a fixture.
+existing_profile_fixtures solo active
+expect_rc 0 "emit accepted migration candidate" \
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
+jq '. + {id:42,node_id:"R_42",source_type:"Repository",source:"acme/widget",
+  created_at:"2026-01-01T00:00:00Z",updated_at:"2026-01-01T00:00:00Z",
+  current_user_can_bypass:"never",
+  _links:{self:{href:"https://api.github.com/repos/acme/widget/rulesets/42"},
+          html:{href:"https://github.com/acme/widget/rules/42"}}}' "$GH_FIXTURES/put.json" \
+  > "$GH_FIXTURES/ruleset-detail.json"
+reset_calls
+expect_rc 0 "reapply actual emitted migration candidate is a no-op" \
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
+if ! grep -Eq -- '--method PUT.*rulesets' "$GH_CALLS"; then
+  t_ok "actual emitted candidate reapplication performs no ruleset write"
+else
+  t_fail "actual emitted candidate reapplication performs no ruleset write"
+fi
+
+existing_profile_fixtures solo active
+jq '._links.html.href = "https://github.com/other/repo/rules/42"' \
+  "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/detail.tmp" &&
+  mv "$GH_FIXTURES/detail.tmp" "$GH_FIXTURES/ruleset-detail.json"
+detail_fails_closed "producer html link for another repository refuses normalization" solo --dry-run
+
+# Compare the complete emitted active candidate against the preimage-derived
+# projection, not selected policy fields.
+existing_profile_fixtures solo active
+canonical_detail solo active | with_producer_fields > "$GH_FIXTURES/ruleset-detail.json"
+expect_rc 0 "emit whole active candidate for equality assertion" \
+  run_script -R acme/widget --profile single-maintainer --enforcement active --reconcile
+jq -S '
+  del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
+      .current_user_can_bypass,._links)
+  | .enforcement = "active"
+  | .bypass_actors = []
+  | (.rules[] | select(.type == "pull_request").parameters
+     .required_approving_review_count) = 0
+' "$GH_FIXTURES/ruleset-detail.json" > "$GH_FIXTURES/expected-candidate.json"
+jq -S . "$GH_FIXTURES/put.json" > "$GH_FIXTURES/actual-candidate.json"
+if cmp -s "$GH_FIXTURES/expected-candidate.json" "$GH_FIXTURES/actual-candidate.json"; then
+  t_ok "whole active candidate equals preimage projection"
+else
+  t_fail "whole active candidate equals preimage projection"
+fi
+
 # Exact shape: each single mutation is adopter-owned and must fail closed.
 while IFS='|' read -r name base filter; do
   existing_profile_fixtures "$base"
@@ -520,6 +813,11 @@ team missing source is noncanonical|team|del(.rules[]|select(.type=="required_st
 team mixed source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = 42
 team null source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = null
 team malformed source is noncanonical|team|(.rules[]|select(.type=="required_status_checks").parameters.required_status_checks[0].integration_id) = "bad"
+single-maintainer nonzero approval count is noncanonical|single-maintainer|.rules[0].parameters.required_approving_review_count = 1
+single-maintainer stray bypass actor is noncanonical|single-maintainer|.bypass_actors = [{actor_id:6,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+single-maintainer mixed review controls are noncanonical|single-maintainer|(.rules[]|select(.type=="pull_request").parameters.dismiss_stale_reviews_on_push) = true
+single-maintainer mixed strictness is noncanonical|single-maintainer|(.rules[]|select(.type=="required_status_checks").parameters.strict_required_status_checks_policy) = true
+single-maintainer explicit false unattributed-approval flag is noncanonical|single-maintainer|(.rules[]|select(.type=="pull_request").parameters.require_extra_approval_for_unattributed_changes) = false
 NONCANONICAL
 
 # Zero matches intentionally remains the #95 fresh-create path tested above.

@@ -2,7 +2,7 @@
 # governance-status.sh — read-only default-branch governance sensor
 # (ADR-0004 decisions 1, 2, 4, 5). Compares effective branch rules, Actions
 # posture, CODEOWNERS tuning, and merge-queue applicability against an
-# explicitly declared solo or team intent (solo = the setup-ruleset.sh
+# explicitly declared solo, team, or single-maintainer intent (solo = the setup-ruleset.sh
 # minimum; stronger observed settings never make solo unhealthy). Aggregates
 # every active rule source including parent rulesets, qualifies
 # ruleset-derived controls with their bypass actors, and reports missing
@@ -16,7 +16,7 @@
 set -u
 
 usage() {
-  echo "Usage: governance-status.sh -R owner/repo [--profile solo|team]" >&2
+  echo "Usage: governance-status.sh -R owner/repo [--profile solo|team|single-maintainer]" >&2
   echo "                            [--checks ctx1,ctx2,...]" >&2
   exit 2
 }
@@ -27,7 +27,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -R|--repo) [ -n "${2:-}" ] || usage; REPO="$2"; shift 2 ;;
     --profile)
-      case "${2:-}" in solo|team) PROFILE="$2" ;; *) usage ;; esac
+      case "${2:-}" in solo|team|single-maintainer) PROFILE="$2" ;; *) usage ;; esac
       shift 2 ;;
     --checks) [ -n "${2:-}" ] || usage; CHECKS="$2"; shift 2 ;;
     *) usage ;;
@@ -70,7 +70,8 @@ jqr() { jq -r "$1" "$WORK/$2.json"; }
 if [ "$PROFILE_ACTIVE" = 0 ]; then
   fetch profile "repos/$REPO/actions/variables/SCAFFOLD_GOVERNANCE_PROFILE"
   if [ "$(st profile)" = ok ] &&
-     jq -e '.value | type == "string" and (. == "solo" or . == "team")' \
+     jq -e '.value | type == "string"
+       and (. == "solo" or . == "team" or . == "single-maintainer")' \
        "$WORK/profile.json" >/dev/null 2>&1 &&
      jq -r '.value' "$WORK/profile.json" > "$WORK/profile.value" 2>/dev/null &&
      IFS= read -r PROFILE < "$WORK/profile.value"; then
@@ -79,6 +80,8 @@ if [ "$PROFILE_ACTIVE" = 0 ]; then
 fi
 [ "$PROFILE_ACTIVE" != 1 ] || BASE=1
 [ "$PROFILE" != team ] || TEAM=1
+SM=0
+[ "$PROFILE" != single-maintainer ] || SM=1
 
 # emit <key> <state> <detail> <required-flag> — required OFF counts toward
 # exit 1; required UNKNOWN/UNCHECKABLE counts toward exit 3 (which outranks).
@@ -97,38 +100,93 @@ if [ "$(st repo)" = ok ]; then
   DEFB="$(jqr '.default_branch // empty' repo)"; OWNER="$(jqr '.owner.type // empty' repo)"
 fi
 if [ -n "$DEFB" ]; then
-  fetch rules "repos/$REPO/rules/branches/$DEFB"
+  fetch rules "repos/$REPO/rules/branches/$DEFB" page
   fetch wf "repos/$REPO/actions/permissions/workflow"
   fetch runs "repos/$REPO/commits/$DEFB/check-runs?filter=latest&per_page=100" page
   fetch clog "repos/$REPO/contents/SCAFFOLD-CHANGELOG.md?ref=$DEFB" raw
 else
   for name in rules wf runs clog; do echo fail > "$WORK/$name.rc"; done; fi
+# `--paginate` yields one JSON array per page for effective branch rules.
+# Normalize only arrays; malformed or permission-elided responses stay unknown.
+if [ "$(st rules)" = ok ] &&
+   jq -s -e 'if all(.[]; type == "array") then add else error("not arrays") end' \
+     "$WORK/rules.json" > "$WORK/rules.normalized.json" 2>/dev/null; then
+  mv "$WORK/rules.normalized.json" "$WORK/rules.json"
+else
+  echo fail > "$WORK/rules.rc"
+fi
 RULES=0
-[ "$(st rules)" != ok ] || RULES=1
+if [ "$(st rules)" = ok ] &&
+   jq -e 'type == "array" and all(.[]?;
+     (.type|type) == "string" and
+     (.ruleset_id|type) == "number" and
+     (.ruleset_source_type|type) == "string" and
+     (.ruleset_source|type) == "string" and
+     (          (if .type == "pull_request" then
+       (.parameters|type) == "object" and
+        (.parameters.required_approving_review_count|type) == "number" and
+          (.parameters.required_approving_review_count >= 0) and
+          ((.parameters.required_approving_review_count|floor) == .parameters.required_approving_review_count) and
+          ([.parameters.dismiss_stale_reviews_on_push,
+            .parameters.require_last_push_approval,
+            .parameters.require_code_owner_review,
+            .parameters.required_review_thread_resolution]
+           | all(.[]; type == "boolean")) and
+          (if (.parameters | has("required_reviewers")) then
+             (.parameters.required_reviewers|type) == "array" and
+             all(.parameters.required_reviewers[];
+               (type == "object")
+               and (.file_patterns|type) == "array"
+               and all(.file_patterns[]; type == "string")
+               and ((.minimum_approvals|type) == "number")
+               and (.minimum_approvals >= 0)
+               and ((.minimum_approvals|floor) == .minimum_approvals)
+               and ((.reviewer|type) == "object")
+               and ((.reviewer.id|type) == "number")
+               and (.reviewer.id >= 0)
+               and ((.reviewer.id|floor) == .reviewer.id)
+               and (.reviewer.type == "Team"))
+           else true end)
+      elif .type == "required_status_checks" then
+        (.parameters|type) == "object" and
+        (.parameters.strict_required_status_checks_policy|type) == "boolean" and
+        (.parameters.required_status_checks|type) == "array"
+      else ((.parameters|type) == "object" or .parameters == null) end)))' "$WORK/rules.json" >/dev/null 2>&1; then
+  RULES=1
+fi
 
 # Aggregate every effective rule of a type across all active sources: the
 # strongest approval threshold, any-source booleans, and the union of
 # contributing ruleset ids. One named ruleset is never the answer.
-PRN=0 APPR=0 DSM=false LPA=false COR=false RTR=false STRICT=false MQN=0
+PRN=0 APPR=0 DSM=false LPA=false COR=false RTR=false STRICT=false MQN=0 RRN=false
 PRSRC="" RSCSRC="" MQSRC=""
 if [ "$RULES" = 1 ]; then
+  if ! jq -e '
+    group_by(.ruleset_id) |
+    all(.[]; ([.[].ruleset_source_type]|unique|length) == 1 and
+      ([.[].ruleset_source]|unique|length) == 1)' "$WORK/rules.json" >/dev/null 2>&1; then
+    RULES=0
+  fi
+fi
+if [ "$RULES" = 1 ]; then
   # shellcheck disable=SC2016  # single-quoted jq program, as in setup-ruleset.sh
-  IFS="$TAB" read -r PRN APPR DSM LPA COR RTR STRICT MQN PRSRC RSCSRC MQSRC <<EOF
+  IFS="$TAB" read -r PRN APPR DSM LPA COR RTR STRICT MQN PRSRC RSCSRC MQSRC RRN <<EOF
 $(jqr '[.[]|select(.type=="pull_request")] as $p
   | [.[]|select(.type=="required_status_checks")] as $c
   | [.[]|select(.type=="merge_queue")] as $m
   | def srcs(x): ([x[].ruleset_id]|unique|map(tostring)|join(","))
       | if . == "" then "-" else . end;
   [($p|length),
-   ([$p[].parameters.required_approving_review_count]|max // 0),
-   ([$p[].parameters.dismiss_stale_reviews_on_push]|any),
-   ([$p[].parameters.require_last_push_approval]|any),
-   ([$p[].parameters.require_code_owner_review]|any),
-   ([$p[].parameters.required_review_thread_resolution]|any),
+   ([$p[]|(.parameters.required_approving_review_count // 1)]|max // 0),
+   ([$p[]|(.parameters.dismiss_stale_reviews_on_push // false)]|any),
+   ([$p[]|(.parameters.require_last_push_approval // false)]|any),
+   ([$p[]|(.parameters.require_code_owner_review // false)]|any),
+   ([$p[]|(.parameters.required_review_thread_resolution // false)]|any),
    ([$c[].parameters.strict_required_status_checks_policy]|any),
-   ($m|length), srcs($p), srcs($c), srcs($m)] | @tsv' rules)
+   ($m|length), srcs($p), srcs($c), srcs($m),
+   (any($p[]; any((.parameters.required_reviewers // [])[];
+      .minimum_approvals > 0)))] | @tsv' rules)
 EOF
-  [ -n "$PRN" ] || RULES=0
   for v in PRSRC RSCSRC MQSRC; do
     eval "[ \"\$$v\" != - ] || $v=\"\""
   done
@@ -150,10 +208,30 @@ while IFS="$TAB" read -r rid rtyp rsrc; do
     *) echo fail > "$WORK/rs$rid.rc" ;;
   esac
   [ "$(st "rs$rid")" = ok ] || continue
-  jqr '.bypass_actors // [] | sort_by(.actor_type, .actor_id)[]
+  if ! jq -e --argjson id "$rid" --arg typ "$rtyp" --arg src "$rsrc" '
+      (.id|type) == "number" and .id == $id and
+      (.source_type|type) == "string" and .source_type == $typ and
+      (.source|type) == "string" and .source == $src and
+      (.enforcement|type) == "string" and
+      .enforcement == "active" and
+      ((.name == null) or (.name|type) == "string")' \
+      "$WORK/rs$rid.json" >/dev/null 2>&1; then
+    echo fail > "$WORK/rs$rid.rc"
+    continue
+  fi
+  if ! jq -e '.bypass_actors | type == "array" and all(.[]?;
+      (.actor_type|type) == "string" and
+      (.bypass_mode|type) == "string" and
+      ((.actor_id == null) or (.actor_id|type) == "number") and
+      ((.actor_name == null) or (.actor_name|type) == "string"))' \
+      "$WORK/rs$rid.json" >/dev/null 2>&1; then
+    echo fail > "$WORK/rs$rid.rc"
+    continue
+  fi
+  jqr '.bypass_actors | sort_by(.actor_type, .actor_id)[]
     | "actor_type=\(.actor_type) actor_id=\(.actor_id // "none") bypass_mode=\(.bypass_mode)"' \
     "rs$rid" > "$WORK/actors.$rid"
-  jqr '.bypass_actors // [] | sort_by(.actor_type, .actor_id)
+  jqr '.bypass_actors | sort_by(.actor_type, .actor_id)
     | map("\(.actor_type):\(.actor_id // "none"):\(.bypass_mode)") | join(",")' \
     "rs$rid" > "$WORK/qual.$rid"
 done < "$WORK/srcs"
@@ -179,27 +257,69 @@ qual_for "$MQSRC"; MQQ="$QUAL"
 if [ -n "$DEFB" ]; then emit repository.default_branch ACTIVE "$DEFB" "$BASE"
 else emit repository.default_branch UNKNOWN "repository metadata unavailable" "$BASE"; fi
 if [ "$PROFILE_ACTIVE" = 1 ]; then emit governance.profile ACTIVE "$PROFILE" 1
-else emit governance.profile UNKNOWN "persisted profile unavailable or invalid; expected exact solo|team" 1; fi
+else emit governance.profile UNKNOWN "persisted profile unavailable or invalid; expected exact solo|team|single-maintainer" 1; fi
 if [ "$RULES" != 1 ]; then
   emit pull_request.required_approving_review_count UNKNOWN "effective rules unavailable" "$BASE"
+elif [ "$SM" = 1 ]; then
+  if [ "$PRN" = 0 ]; then
+    emit pull_request.required_approving_review_count OFF "count=0 (no approving-review requirement)" "$BASE"
+  elif [ "$APPR" -ge 1 ]; then
+    emit pull_request.required_approving_review_count OFF "count=$APPR (approving-review requirement not zero)" "$BASE"
+  elif [ "$RRN" = true ]; then
+    emit pull_request.required_approving_review_count OFF "required reviewers configured" "$BASE"
+  else
+    emit pull_request.required_approving_review_count ACTIVE "count=$APPR$PQ" "$BASE"
+  fi
 elif [ "$PRN" = 0 ] || [ "$APPR" -lt 1 ]; then
   emit pull_request.required_approving_review_count OFF "count=$APPR (no approving-review requirement)" "$BASE"
 else
   emit pull_request.required_approving_review_count ACTIVE "count=$APPR$PQ" "$BASE"
 fi
+REVIEW_GATES=0
+if [ "$SM" = 1 ]; then
+  if [ "$RULES" != 1 ]; then
+    emit pull_request.no_bypass_actors UNKNOWN "effective rules unavailable" 1
+  elif [ "$PRN" -eq 0 ]; then
+    emit pull_request.no_bypass_actors OFF "no pull_request rule in effect" 1
+  elif [ "$PQ" = " bypass=unknown" ]; then
+    emit pull_request.no_bypass_actors UNKNOWN "bypass evidence unavailable" 1
+  elif [ -z "$PQ" ]; then
+    emit pull_request.no_bypass_actors ACTIVE "no bypass actors$PQ" 1
+  else
+    emit pull_request.no_bypass_actors OFF "bypass actors present$PQ" 1
+  fi
+
+  if [ "$RULES" != 1 ]; then
+    emit required_checks.no_bypass_actors UNKNOWN "effective rules unavailable" 1
+  elif [ "$CQ" = " bypass=unknown" ]; then
+    emit required_checks.no_bypass_actors UNKNOWN "bypass evidence unavailable" 1
+  elif [ -z "$CQ" ]; then
+    emit required_checks.no_bypass_actors ACTIVE "no bypass actors$CQ" 1
+  else
+    emit required_checks.no_bypass_actors OFF "bypass actors present$CQ" 1
+  fi
+fi
+[ "$TEAM" = 1 ] && REVIEW_GATES=1
 
 # rule_row <key> <rule-count> <bool> <qual> <absent-detail> <required>
 rule_row() {
-  if [ "$RULES" != 1 ]; then emit "$1" UNKNOWN "effective rules unavailable" "$6"
+  if [ "$SM" = 1 ] && { [ "$1" = pull_request.require_last_push_approval ] ||
+                        [ "$1" = pull_request.require_code_owner_review ]; }; then
+    if [ "$RULES" != 1 ]; then emit "$1" UNKNOWN "effective rules unavailable" 1
+    elif [ "$2" = 0 ]; then emit "$1" OFF "no pull_request rule in effect" 0
+    elif [ "$3" = true ]; then emit "$1" OFF "true" 1
+    else emit "$1" OFF "false" 0
+    fi
+  elif [ "$RULES" != 1 ]; then emit "$1" UNKNOWN "effective rules unavailable" "$6"
   elif [ "$2" = 0 ]; then emit "$1" OFF "$5" "$6"
   elif [ "$3" = true ]; then emit "$1" ACTIVE "true$4" "$6"
   else emit "$1" OFF "false$4" "$6"
   fi
 }
-rule_row pull_request.dismiss_stale_reviews "$PRN" "$DSM" "$PQ" "no pull_request rule in effect" "$TEAM"
-rule_row pull_request.require_last_push_approval "$PRN" "$LPA" "$PQ" "no pull_request rule in effect" "$TEAM"
-rule_row pull_request.require_code_owner_review "$PRN" "$COR" "$PQ" "no pull_request rule in effect" "$TEAM"
-rule_row pull_request.required_review_thread_resolution "$PRN" "$RTR" "$PQ" "no pull_request rule in effect" "$TEAM"
+rule_row pull_request.dismiss_stale_reviews "$PRN" "$DSM" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
+rule_row pull_request.require_last_push_approval "$PRN" "$LPA" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
+rule_row pull_request.require_code_owner_review "$PRN" "$COR" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
+rule_row pull_request.required_review_thread_resolution "$PRN" "$RTR" "$PQ" "no pull_request rule in effect" "$REVIEW_GATES"
 RSCN=0
 [ -z "$RSCSRC" ] || RSCN=1
 rule_row required_checks.strict_policy "$RSCN" "$STRICT" "$CQ" "no required_status_checks rule in effect" "$TEAM"

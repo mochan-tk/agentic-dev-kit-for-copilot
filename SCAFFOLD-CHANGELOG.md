@@ -45,6 +45,37 @@ inherit what this one learned.
 
 ### Unreleased
 
+- `governance-status.sh` and `setup-ruleset.sh` add an explicit
+  `single-maintainer` governance profile, opt-in only via
+  `--profile single-maintainer` or a persisted `SCAFFOLD_GOVERNANCE_PROFILE`
+  variable equal to that exact string; `solo` and `team` behavior is
+  unchanged. The profile requires a mandatory PR gate with zero required
+  approving reviews and no bypass actors on either the PR or required-checks
+  axis, while still requiring all configured CI contexts — the sensor emits
+  new `pull_request.no_bypass_actors` and `required_checks.no_bypass_actors`
+  checks (`ACTIVE`/`OFF`/`UNKNOWN`, never silently healthy on unreadable
+  bypass evidence) alongside the existing zero-approval reading of
+  `pull_request.required_approving_review_count`. The actuator reconciles an
+  existing canonical `solo`-shaped ruleset in place by deriving the candidate
+  from the real GET preimage — changing only the profile-controlled bypass and
+  approval fields — so producer-only metadata (for
+  example a real `require_extra_approval_for_unattributed_changes: true`)
+  survives untouched rather than being reset by a lossy template rebuild;
+  malformed, customized, or already-owned targets are still refused (#124).
+  The migration does not add or remove code-owner, latest-push, or other
+  review restrictions; those producer fields remain part of the refusal and
+  preservation boundary. Dry-run output is write-free and reports that it
+  makes no mutation.
+  Adoption is repository-local: a maintainer must decide each PR and head;
+  this profile does not enable automatic merging and cannot guarantee
+  authenticated human and agent identities are distinguishable.
+
+- `single-maintainer` is an explicit actuator selection, not a persisted sensor
+  result or an automatic team migration: a team-shaped ruleset is refused rather
+  than silently downgraded, while a solo-shaped ruleset is a compatible
+  migration. The sensor consumes the persisted intent but remains GET-only, and
+  each pull request and head still requires a maintainer decision.
+
 - Replaced the top-level README with the Human-on-the-Loop overview draft and committed the matching overview image at `docs/images/agentic-development-kit-overview.png`, preserving the owner-supplied source artifacts and provenance in `.github/docs/context/readme-redesign/`.
 
 - The top-level Copilot app role is now called the `Project session`, and new

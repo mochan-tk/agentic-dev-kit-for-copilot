@@ -33,15 +33,16 @@ usage() {
 Usage: setup-ruleset.sh [options]
 
 Create a branch ruleset targeting the repository's default branch that
-requires:
-  - a pull request with at least 1 approving review
-  - required status checks (default: all four CI wall jobs —
+requires a pull request and required status checks (default: all four CI
+wall jobs —
     quality,task-ritual,scaffold-self-check,copilot-surface)
 
-Repository admins may bypass, for pull requests only: direct pushes stay
-blocked for everyone, but an admin can merge a PR through the explicit,
-audited "bypass" button. Without this, a solo adopter could never merge
-their own PRs (you cannot approve your own), including the onboarding PR.
+Profiles select the approval and bypass policy: `solo` retains the legacy
+admin pull-request bypass and one approving review; `team` adds review and
+issuer restrictions; `single-maintainer` requires zero approvals and no
+bypass actors. These are repository-local settings: a maintainer decides
+each PR/head, and the script does not provide automatic merge or guarantee
+that human and agent identities can be distinguished.
 
 If a ruleset with the same name already exists, the script updates its
 enforcement when the request differs and otherwise changes nothing.
@@ -55,12 +56,13 @@ Options:
                            the ruleset never blocks merges until a human
                            reviews it and enables it.
   --name <name>            Ruleset name. Default: scaffold-branch-protection.
-  --profile <solo|team>    Persist explicit governance intent and create a
+  --profile <solo|team|single-maintainer>
+                           Persist explicit governance intent and create a
                            fresh profile ruleset. Existing rulesets require
                            separate reconciliation.
   --reconcile              Require --profile and reconcile one canonical same-name ruleset.
   --dry-run                Print the request JSON body to stdout and exit
-                           without making any API call.
+                           without making any mutation.
   -h, --help               Show this help and exit.
 
 Examples:
@@ -101,8 +103,8 @@ while [[ $# -gt 0 ]]; do
       NAME="$2"; shift 2 ;;
     --profile)
       case "${2:-}" in
-        solo|team) PROFILE="$2" ;;
-        *) echo "error: --profile must be 'solo' or 'team'" >&2; exit 2 ;;
+        solo|team|single-maintainer) PROFILE="$2" ;;
+        *) echo "error: --profile must be 'solo', 'team' or 'single-maintainer'" >&2; exit 2 ;;
       esac
       shift 2 ;;
     --dry-run)
@@ -164,9 +166,24 @@ PAYLOAD="$(jq -n \
     ]
   }')"
 
+if [[ "$PROFILE" == "single-maintainer" ]]; then
+  # Fresh single-maintainer template: no bypass actors, zero required
+  # approvals. Overridden below by a preimage-derived candidate when
+  # reconciling an existing ruleset (preserves producer-only fields).
+  PAYLOAD="$(printf '%s' "$PAYLOAD" | jq '
+    .bypass_actors = []
+    | (.rules[] | select(.type == "pull_request").parameters.required_approving_review_count) = 0
+  ')"
+fi
+
 if [[ -n "$PROFILE" ]]; then
   if [[ "$PROFILE" == "solo" && "$DRY_RUN" == "true" && "$RECONCILE" != "true" ]]; then
     echo "dry-run: explicit solo candidate; no API call made." >&2
+    printf '%s\n' "$PAYLOAD"
+    exit 0
+  fi
+  if [[ "$PROFILE" == "single-maintainer" && "$DRY_RUN" == "true" && "$RECONCILE" != "true" ]]; then
+    echo "dry-run: explicit single-maintainer candidate; no API call made." >&2
     printf '%s\n' "$PAYLOAD"
     exit 0
   fi
@@ -205,31 +222,95 @@ if [[ -n "$PROFILE" ]]; then
       exit 1
     fi
     if ! printf '%s' "$EXISTING_DETAIL" | jq -er \
-      --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" '
-      ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
+      --arg name "$NAME" --arg id "$EXISTING_ID" --arg checks "$CHECKS" --arg repo "$REPO" '
+      def valid_datetime:
+        capture("^(?<year>[0-9]{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]+)?(Z|[+-](0[0-9]|1[0-9]|2[0-3]):[0-5][0-9])$") as $parts
+        | ($parts.year | tonumber) as $year
+        | ($parts.month | tonumber) as $month
+        | ($parts.day | tonumber) as $day
+        | ([31, (if (($year % 4 == 0 and $year % 100 != 0) or ($year % 400 == 0)) then 29 else 28 end), 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][$month - 1]) as $last_day
+        | $day <= $last_day;
+      select((type == "object")
+        and all(keys[]; IN("id","name","target","enforcement","source_type","source",
+          "node_id","created_at","updated_at","current_user_can_bypass",
+          "bypass_actors","conditions","rules","_links"))
+        and (.id|type) == "number"
+        and (.name|type) == "string"
+        and (.target|type) == "string"
+        and (.source_type|type) == "string"
+        and (.source|type) == "string"
+        and (.enforcement|type) == "string"
+        and ((has("node_id") | not) or (.node_id|type) == "string")
+        and ((has("created_at") | not) or ((.created_at|type) == "string" and (.created_at|valid_datetime)))
+        and ((has("updated_at") | not) or ((.updated_at|type) == "string" and (.updated_at|valid_datetime)))
+        and ((has("_links") | not) or
+          ((._links|type) == "object"
+           and (._links | keys | all(IN("self","html")))
+           and (._links.self|type) == "object"
+           and (._links.self.href|type) == "string"
+           and ._links.self.href == ("https://api.github.com/repos/" + $repo + "/rulesets/" + $id)
+           and ((._links | has("html") | not) or ._links.html == null
+                or ((._links.html|type) == "object"
+                    and (._links.html.href|type) == "string"
+                    and ._links.html.href == ("https://github.com/" + $repo + "/rules/" + $id)))))
+        and ((has("current_user_can_bypass") | not)
+             or ((.current_user_can_bypass|type) == "string"
+                 and (.current_user_can_bypass | IN("always","pull_requests_only","never","exempt"))))
+        and (.bypass_actors|type) == "array"
+        and (.conditions|type) == "object"
+        and (.rules|type) == "array"
+        and all(.rules[]; (type == "object")
+          and (keys | sort) == ["parameters","type"]))
+      | ($checks | split(",") | map(gsub("^\\s+|\\s+$"; ""))
        | map(select(length > 0)) | sort) as $want
       | [.rules[] | select(.type == "pull_request")] as $pr
       | [.rules[] | select(.type == "required_status_checks")] as $rs
       | ($rs[0].parameters.required_status_checks // []) as $got
-      | ($pr[0].parameters | del(.allowed_merge_methods,.required_reviewers)) as $prp
+      | ($pr[0].parameters | del(.allowed_merge_methods,.required_reviewers,
+            .require_extra_approval_for_unattributed_changes)) as $prp
       | ($rs[0].parameters | del(.do_not_enforce_on_create)) as $rsp
+      | (if .bypass_actors == [{actor_id:5,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+           then "admin"
+         elif .bypass_actors == [] then "none"
+         else "other" end) as $bypass_shape
       | select((.id | tostring) == $id and .name == $name and .target == "branch"
+          and .source_type == "Repository" and .source == $repo
           and (.enforcement == "active" or .enforcement == "disabled")
-          and .bypass_actors == [{actor_id:5,actor_type:"RepositoryRole",bypass_mode:"pull_request"}]
+          and $bypass_shape != "other"
           and .conditions == {ref_name:{include:["~DEFAULT_BRANCH"],exclude:[]}}
           and (.rules | length) == 2 and ($pr | length) == 1 and ($rs | length) == 1
-          and ($pr[0].parameters.allowed_merge_methods? // ["merge","squash","rebase"])
-              == ["merge","squash","rebase"]
-          and ($pr[0].parameters.required_reviewers? // []) == []
-          and ($rs[0].parameters.do_not_enforce_on_create? // false) == false
+          and ($pr[0].parameters.allowed_merge_methods | type) == "array"
+          and $pr[0].parameters.allowed_merge_methods == ["merge","squash","rebase"]
+          and (if ($pr[0].parameters | has("required_reviewers")) then
+                 ($pr[0].parameters.required_reviewers | type) == "array" and
+                 $pr[0].parameters.required_reviewers == [] and
+                 all($pr[0].parameters.required_reviewers[];
+                   (type == "object")
+                   and (keys | sort) == ["file_patterns","minimum_approvals","reviewer"]
+                   and (.file_patterns|type) == "array"
+                   and all(.file_patterns[]; type == "string")
+                   and (.minimum_approvals|type) == "number"
+                   and (.minimum_approvals >= 0)
+                   and (.minimum_approvals|floor) == .minimum_approvals
+                   and (.reviewer|type) == "object"
+                   and ((.reviewer|keys|sort) == ["id","type"])
+                   and (.reviewer.id|type) == "number"
+                   and (.reviewer.id >= 0)
+                   and (.reviewer.id|floor) == .reviewer.id
+                   and .reviewer.type == "Team")
+               else true end)
+          and ($pr[0].parameters | if has("require_extra_approval_for_unattributed_changes")
+               then .require_extra_approval_for_unattributed_changes else true end) == true
+          and ($rs[0].parameters.do_not_enforce_on_create | type) == "boolean"
+          and $rs[0].parameters.do_not_enforce_on_create == false
           and ($rsp | keys | sort) == ["required_status_checks","strict_required_status_checks_policy"]
           and ([$got[].context] | sort) == $want and ($got | length) == ($want | length))
-      | if $prp == {required_approving_review_count:1,
+      | if $bypass_shape == "admin" and $prp == {required_approving_review_count:1,
             dismiss_stale_reviews_on_push:false,require_code_owner_review:false,
             require_last_push_approval:false,required_review_thread_resolution:false}
           and $rs[0].parameters.strict_required_status_checks_policy == false
           and all($got[]; (keys | sort) == ["context"]) then "solo"
-        elif $prp == {required_approving_review_count:1,
+        elif $bypass_shape == "admin" and $prp == {required_approving_review_count:1,
             dismiss_stale_reviews_on_push:true,require_code_owner_review:true,
             require_last_push_approval:true,required_review_thread_resolution:true}
           and $rs[0].parameters.strict_required_status_checks_policy == true
@@ -237,8 +318,45 @@ if [[ -n "$PROFILE" ]]; then
             and (.integration_id | type) == "number" and .integration_id >= 0
             and (.integration_id | floor) == .integration_id)
           and ([$got[].integration_id] | unique | length) == 1 then "team"
+        elif $bypass_shape == "none" and $prp == {required_approving_review_count:0,
+            dismiss_stale_reviews_on_push:false,require_code_owner_review:false,
+            require_last_push_approval:false,required_review_thread_resolution:false}
+          and $rs[0].parameters.strict_required_status_checks_policy == false
+          and all($got[]; (keys | sort) == ["context"]) then "single-maintainer"
         else empty end' >/dev/null; then
       echo "error: existing ruleset is noncanonical or malformed; refusing customization." >&2
+      exit 1
+    fi
+    if [[ "$PROFILE" == "single-maintainer" ]]; then
+      if printf '%s' "$EXISTING_DETAIL" | jq -e '
+        any(.rules[]; .type == "pull_request" and
+          (.parameters.dismiss_stale_reviews_on_push == true
+           or .parameters.require_code_owner_review == true
+           or .parameters.require_last_push_approval == true
+           or .parameters.required_review_thread_resolution == true))
+        or any(.rules[]; .type == "required_status_checks" and
+          .parameters.strict_required_status_checks_policy == true)' >/dev/null; then
+        echo "error: contradictory team approval/CI requirements; refusing single-maintainer transition." >&2
+        exit 1
+      fi
+      # Reconciliation candidate is derived from the real preimage (not the
+      # lossy template) so producer-only fields (required_reviewers,
+      # allowed_merge_methods, require_extra_approval_for_unattributed_changes,
+      # do_not_enforce_on_create, per-context integration_id shape) survive
+      # untouched; only bypass_actors and the approval count are flipped.
+      PAYLOAD="$(printf '%s' "$EXISTING_DETAIL" | jq --arg enforcement "$ENFORCEMENT" '
+        del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
+            .current_user_can_bypass,._links)
+        | .enforcement = $enforcement
+        | .bypass_actors = []
+        | (.rules[] | select(.type == "pull_request").parameters.required_approving_review_count) = 0
+      ')"
+    elif [[ "$PROFILE" == "solo" ]] && printf '%s' "$EXISTING_DETAIL" | jq -e '
+      (.bypass_actors == [])
+      and (any(.rules[]; .type == "pull_request" and
+        (.parameters.required_approving_review_count == 0)))
+    ' >/dev/null; then
+      echo "error: contradictory single-maintainer intent; refusing solo transition." >&2
       exit 1
     fi
   fi
@@ -301,7 +419,7 @@ EOF
   fi
 
   if [[ "$DRY_RUN" == "true" ]]; then
-    echo "dry-run: explicit team candidate from GET-only evidence; no mutation made." >&2
+    echo "dry-run: explicit $PROFILE candidate from GET-only evidence; no mutation made." >&2
     printf '%s\n' "$PAYLOAD"
     exit 0
   fi
@@ -337,6 +455,18 @@ EOF
         gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" \
           -f enforcement="$ENFORCEMENT" >/dev/null
       fi
+    elif [[ "$PROFILE" == "single-maintainer" ]]; then
+      # PAYLOAD here is preimage-derived (see above), so compare the full
+      # metadata-stripped existing detail directly, not a field subset.
+      if ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
+        del(.id,.node_id,.source_type,.source,.created_at,.updated_at,
+            .current_user_can_bypass,._links) == $wanted' >/dev/null; then
+        if ! printf '%s' "$PAYLOAD" \
+          | gh api --method PUT "repos/$REPO/rulesets/$EXISTING_ID" --input - >/dev/null; then
+          echo "error: governance intent persisted, but ruleset PUT failed; partial state requires operator reconciliation." >&2
+          exit 1
+        fi
+      fi
     elif ! printf '%s' "$EXISTING_DETAIL" | jq -e --argjson wanted "$PAYLOAD" '
       {name,target,enforcement,bypass_actors,conditions,
        rules:(.rules | map(
@@ -363,7 +493,7 @@ fi
 
 if [[ "$DRY_RUN" == "true" ]]; then
   # stdout carries only the JSON body (pipeable to jq); notes go to stderr.
-  echo "dry-run: request body for POST /repos/{owner}/{repo}/rulesets; no API call made." >&2
+  echo "dry-run: request body for POST /repos/{owner}/{repo}/rulesets; no mutation made." >&2
   printf '%s\n' "$PAYLOAD"
   exit 0
 fi
