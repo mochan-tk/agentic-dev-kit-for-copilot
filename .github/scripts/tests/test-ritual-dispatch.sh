@@ -181,4 +181,32 @@ new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(exempt_plan_at 2026-01
 GH_FIXTURES="$CASE" expect_rc_grep 0 'exemption' \
   "exemption declared before the first commit passes" bash "$GUARD" 12
 
+# --- released dispatches on different branches no longer constrain the head ----
+dispatch_branch_at() {
+  printf '{"body":"Dispatching worker: PR #99 worker (session 6af9582d-42d1-425d-82c8-f9ec651225a8), branch %s","created_at":"%s","updated_at":"%s"}' "$1" "$2" "$2"
+}
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_branch_at task/12-old 2026-01-01T09:10:00Z), $(release_at 2026-01-01T09:20:00Z), $(dispatch_at 2026-01-01T09:30:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 0 'two-tier' \
+  "released old branch followed by the PR branch passes" bash "$GUARD" 12
+
+# Task #127 exposed this with two different app-generated worker branches.
+PR_MANAGED='{"user":{"login":"mochan-tk","type":"User"},"head":{"ref":"mochan-tk-legendary-eureka"},"body":"Closes #12\\n\\nPlan: https://github.com/o/r/issues/12#issuecomment-777"}'
+new_case "$PR_MANAGED" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_branch_at mochan-tk-supreme-bassoon 2026-01-01T09:10:00Z), $(release_at 2026-01-01T09:20:00Z), $(dispatch_branch_at mochan-tk-legendary-eureka 2026-01-01T09:30:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 0 'two-tier' \
+  "released app-generated branch followed by the new head passes (#127)" bash "$GUARD" 12
+
+# --- an active replacement on the wrong branch still fails ----------------------
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_at 2026-01-01T09:10:00Z), $(release_at 2026-01-01T09:20:00Z), $(dispatch_wrong_branch_at 2026-01-01T09:30:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 1 "dispatches branch 'task/34-other'" \
+  "released PR branch followed by a wrong active branch fails" bash "$GUARD" 12
+
+# --- an unreleased earlier dispatch still constrains the head -------------------
+new_case "$PR_JSON" "[$(claim_at 2026-01-01T09:00:00Z), $(plan_at 2026-01-01T09:05:00Z), $(dispatch_wrong_branch_at 2026-01-01T09:10:00Z), $(dispatch_at 2026-01-01T09:30:00Z)]" \
+  "$(commits_at 2026-01-01T10:00:00Z)"
+GH_FIXTURES="$CASE" expect_rc_grep 1 "dispatches branch 'task/34-other'" \
+  "unreleased wrong branch followed by the PR branch still fails" bash "$GUARD" 12
+
 t_summary
