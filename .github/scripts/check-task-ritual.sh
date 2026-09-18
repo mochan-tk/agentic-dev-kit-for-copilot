@@ -29,8 +29,9 @@
 #     comment starts with "Releasing worker" (first-line regexes, exactly
 #     like the claim);
 #   - a dispatch's first line names the worker session and its branch. The
-#     branch must be the PR's head ref (managed prefixes allowed), which is
-#     what stops one task's dispatch from satisfying another's trail. The
+#     branch must be the PR's head ref (managed prefixes allowed) unless a
+#     later dispatch supersedes it with a release in the inclusive window
+#     between them. Only unsuperseded dispatches constrain the PR head. The
 #     session ID is required but **not verified**: session trees are
 #     app-local and no API reachable from CI can enumerate them, so it is a
 #     durable record for humans and audits, not proof. This wall shows that
@@ -321,7 +322,7 @@ if [[ "$markers" == *DISPATCH* ]]; then
   # humans and audits, never treated as proof. What this wall can show is
   # that the supervisor claimed a specific session and a matching branch.
   head_ref=$(api "repos/{owner}/{repo}/pulls/${PR}" --jq '.head.ref')
-  while IFS=$'\t' read -r _kind _created _updated first_line; do
+  while IFS=$'\t' read -r _kind _created _updated first_line superseded; do
     [[ -n "$first_line" ]] || continue
     if ! printf '%s\n' "$first_line" | grep -qE 'session[[:space:]]+[0-9a-fA-F-]{8,}'; then
       echo "FAIL: issue #${issue} has a worker-dispatch comment that names no session:"
@@ -336,7 +337,7 @@ if [[ "$markers" == *DISPATCH* ]]; then
       echo "        ${first_line}"
       echo "      Record the worker's branch so the dispatch can be tied to this PR (session-orchestration skill)."
       ok=false
-    elif [[ -n "$head_ref" && "$dispatch_branch" != "$head_ref" && "$head_ref" != *"$dispatch_branch" ]]; then
+    elif [[ "$superseded" -eq 0 && -n "$head_ref" && "$dispatch_branch" != "$head_ref" && "$head_ref" != *"$dispatch_branch" ]]; then
       # Managed surfaces prefix the branch they generate (AGENTS.md §4), so a
       # head ref ending in the dispatched name is the same branch.
       echo "FAIL: issue #${issue} dispatches branch '${dispatch_branch}', but PR #${PR} is from '${head_ref}'."
@@ -344,7 +345,24 @@ if [[ "$markers" == *DISPATCH* ]]; then
       ok=false
     fi
   done <<EOF
-$(printf '%s\n' "$markers" | awk -F '\t' '$1 == "DISPATCH"')
+$(printf '%s\n' "$markers" | sort -s -t $'\t' -k2,2 | awk -F '\t' '
+  $1 == "DISPATCH" { dispatches[++n] = $0; times[n] = $2 }
+  $1 == "RELEASE" { releases[++nr] = $2 }
+  END {
+    for (i = 1; i <= n; i++) {
+      superseded = 0
+      for (j = i + 1; j <= n && !superseded; j++) {
+        for (r = 1; r <= nr; r++) {
+          if (releases[r] >= times[i] && releases[r] <= times[j]) {
+            superseded = 1
+            break
+          }
+        }
+      }
+      print dispatches[i] "\t" superseded
+    }
+  }
+')
 EOF
 
   # Chronology 3 — the dispatch follows the plan of record: the supervisor
