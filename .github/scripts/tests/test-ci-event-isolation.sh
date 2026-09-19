@@ -77,6 +77,10 @@ def contract(workflows):
                 "workflow grants must be read-only")
     require(set(ci["jobs"]) == CODE, "code contexts must have real sole producers")
     require(set(ledger["jobs"]) == {"task-ritual"}, "ledger must not emit code checks")
+    for workflow in (ci, ledger):
+        for job in workflow.get("jobs", {}).values():
+            require("concurrency" not in job,
+                    "job-level concurrency must not bypass workflow isolation")
     anchors = {
         "quality": "bash .github/scripts/check-action-pins.sh",
         "scaffold-self-check": "bash .github/scripts/tests/run-tests.sh",
@@ -176,6 +180,9 @@ class Isolation(unittest.TestCase):
         rejected("duplicate producer", lambda w: w.update({"duplicate.yml": w["ci.yml"]}))
         rejected("shared concurrency", lambda w: w["task-ritual.yml"].update(
             concurrency=w["ci.yml"]["concurrency"]))
+        rejected("shared job concurrency", lambda w:
+                 w["task-ritual.yml"]["jobs"]["task-ritual"].update(
+                     concurrency=w["ci.yml"]["concurrency"]))
         rejected("edited schedules code", lambda w:
                  w["ci.yml"]["on"]["pull_request"]["types"].append("edited"))
         rejected("skipped synthetic code", lambda w:
