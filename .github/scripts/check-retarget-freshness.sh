@@ -96,6 +96,18 @@ def decode(value):
         raise Fault(2, "schema: malformed JSON") from error
 
 
+def api_failure(detail):
+    status = re.search(r"\bHTTP(?:/\S+)?\s+([0-9]{3})\b", detail)
+    if status:
+        number = status.group(1)
+        if number == "401":
+            return "API authentication failure (HTTP 401)"
+        if number == "403":
+            return "API permission/access refusal (HTTP 403)"
+        return "API HTTP failure (" + number + ")"
+    return "API transport/CLI read failure"
+
+
 def get(endpoint):
     try:
         result = subprocess.run(
@@ -105,11 +117,12 @@ def get(endpoint):
     except (OSError, subprocess.TimeoutExpired, UnicodeError) as error:
         raise Fault(2, "API: read unavailable or timed out for " + endpoint) from error
     need(result.returncode == 0,
-         "API: GET failed (HTTP/auth/permission); cannot verify " + endpoint)
+         api_failure(result.stderr + "\n" + result.stdout) + "; cannot verify " + endpoint)
     header, separator, body = result.stdout.replace("\r\n", "\n").partition("\n\n")
     lines = header.splitlines()
-    need(separator and lines and re.fullmatch(r"HTTP/\S+ 200(?: .*)?", lines[0]),
-         "API: invalid HTTP response for " + endpoint)
+    need(separator and lines, "API: missing HTTP response framing for " + endpoint)
+    need(re.fullmatch(r"HTTP/\S+ 200(?: .*)?", lines[0]),
+         api_failure(lines[0]) + "; invalid response for " + endpoint)
     headers = {}
     for line in lines[1:]:
         key, colon, value = line.partition(":")

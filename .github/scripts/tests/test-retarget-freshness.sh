@@ -618,6 +618,16 @@ class Freshness(unittest.TestCase):
                 data["status_lines"] = {endpoint: status}
                 self.check(data, 2, "API")
 
+    def test_api_fault_diagnostics_distinguish_auth_permission_and_http(self):
+        for failure, reason in (("HTTP 401", "authentication"),
+                                ("HTTP 403", "permission/access"),
+                                ("HTTP 503", "HTTP failure (503)"),
+                                ("connection refused", "transport/CLI")):
+            with self.subTest(failure=failure):
+                data = self.fresh()
+                data["errors"][TIMELINE] = failure
+                self.check(data, 2, reason)
+
     def test_malformed_nested_identity_never_tracebacks_or_passes(self):
         for mode in ("base-name", "base-repo", "job-attempt", "app", "status"):
             with self.subTest(mode=mode):
