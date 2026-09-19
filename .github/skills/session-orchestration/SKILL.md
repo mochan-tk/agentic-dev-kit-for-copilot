@@ -75,15 +75,17 @@ a conductor crosses them anyway, that is a retro, not a footnote.
 
 **Who posts what:** claim, plan, worker-dispatch, and outcome comments on
 the Task issue belong to the **supervisor**; the PR is opened and iterated
-by the **worker**. Before a worker starts, the supervisor **creates the
-worker session, confirms it exists, and only then** posts a worker-dispatch
-comment naming it — session name, session ID, and branch, plus the target PR
-and scope. No verified worker, no implementation: a dispatch comment for a
+by the **worker**. Before implementation, the supervisor **creates the
+worker session, confirms it exists with its actual identity and branch, then
+records `Dispatching worker`, then releases the worker to implement**. It names
+the session name, session ID, branch, target PR, and scope; use the
+[render/preflight procedure](references/ritual-records.md). Generation never
+proves worker existence. No verified worker, no implementation: a comment for a
 session that was never created records a split that did not happen, which is
 the one thing this trail exists to show (ADR-0003). A supervisor that cannot
 raise a worker either declares the small-task exemption in its plan comment
 and implements directly, or escalates — it does not write the comment
-anyway. Before irreversible worker teardown or replacement, the supervisor's
+anyway. <a id="worker-disposition"></a>Before irreversible worker teardown or replacement, the supervisor's
 release-and-successor or closeout record names the worker head SHA, whether
 uncommitted work exists, its preservation location (or an explicit discard
 decision and reason), and the single authority owning that disposition.
@@ -150,6 +152,13 @@ This ritual is executed by the **supervisor** session for its Task issue
 (steps 1–5); the implementation itself runs in a worker session dispatched
 afterwards (see Worker protocol below). Under the declared small-task
 exemption, the supervisor performs both parts single-session.
+
+**Prevention before publication:** for claim/resume, plan, and dispatch, use
+[`task-ritual.sh`](references/ritual-records.md): render -> inspect -> read-only
+preflight -> separate append-only publication. Stop on failure; escalate
+malformed prior records, never silently supersede them. PASS expires as the
+ledger changes: refresh immediately before posting; it proves neither future
+CI nor authenticated identity and does not replace the existing risk gate.
 
 **Start ritual** (do this before touching any file; apply the
 [startup scenarios](#startup-scenarios) without inventing another gate):
@@ -440,13 +449,8 @@ the next phase gets absorbed into whatever session is still open.
 Sessions die without warning. The ordinary start ritual *is* the resume
 path: this is procedural recovery, **not runtime pause/resume machinery**.
 
-- **Disposition before loss**: before irreversible worker teardown or
-  replacement, the supervisor's release-and-successor or closeout record
-  names the worker head SHA, whether uncommitted work exists, its preservation
-  location or explicit discard decision and reason, and the single authority
-  owning that disposition. Preservation does not approve work as mergeable.
-  Name reused artifacts and their fresh authorization in the record and
-  re-verify them; never present earlier approval as new (#6, linked above).
+- **Disposition before loss**: follow the canonical
+  [worker disposition duties](#worker-disposition) before teardown or replacement.
 - **Successor session**: run the start ritual (AGENTS.md §9) exactly as for a
   fresh task, using the [inherited-decline](#scenario-inherited) and
   [supervisor](#scenario-supervisor)/[worker](#scenario-worker) rows, then
