@@ -103,7 +103,7 @@ if [[ "$mode" == render ]]; then
       elif $kind == "dispatch" then
         keys == ["branch","session","session_id","task"] and
         (.session | identity) and (.branch | identity) and
-        (.session_id | type == "string" and test("^[0-9a-fA-F-]{8,}$"))
+        (.session_id | identity and test("^[0-9a-fA-F-]{8,}$"))
       else
         keys == ["branch","session","task"] and (.session | identity) and (.branch | identity)
       end)'
