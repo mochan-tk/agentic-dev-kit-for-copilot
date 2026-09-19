@@ -34,6 +34,127 @@ onboarding PR should confirm it)*
 4. Land as one PR titled `scaffold: upgrade to vX.Y.Z`; append a
    `.github/docs/agreements/retro-log.md` row (class `scaffold-upgrade`).
 
+### Epic #119 migration: preserved adopter files
+
+Use this checklist when upgrading an existing instance across the landed
+#121 / [PR #122](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/pull/122)
+startup/role clarification and #133 /
+[PR #139](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/pull/139)
+reviewability wording. The latter is merged as `b4f30dcc`; its
+[completed outcome](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/133#issuecomment-5738634787)
+records the final text. These are available changes, unlike the pending F06
+work below. This checklist changes no constitution or installer behavior.
+
+#### What the upgrade does and does not apply
+
+The installer's [`upgrade_class`](.github/scripts/scaffold-init.sh) and
+[upgrade fixtures](.github/scripts/tests/test-scaffold-init.sh) distinguish
+existing-file collisions from absent files:
+
+| File class | `--upgrade` behavior | Adopter review |
+|---|---|---|
+| Engine: `.github/scripts/**`, skills, agents, prompts, issue templates, PR template, this changelog | Refreshes existing copies, including the governance-control manifest in `.github/scripts/`. | Read the new procedures and compare them with preserved local instructions/workflows. |
+| Tuned: `.github/copilot-instructions.md`, `.github/workflows/**`, `.github/CODEOWNERS`, `.github/instructions/**`, `AGENTS.md` | Keeps existing files; does not port these section-level changes. | Apply only the relevant reviewed wording, preserving project customizations. |
+| Instance docs: `.github/docs/**` | Keeps existing context, agreements, and other project truth. | Do not replace them with template documents. |
+| Absent files in any of the above classes | Installs them, even when other files in that class are kept. | Inspect newly introduced instructions, docs, and workflows as well as refreshed engine files. |
+| Seed-only `README.md` | Keeps it when present; seeds it only when absent. | Retain the project's own overview. |
+
+Engine refresh is not onboarding and does not make an adopter tuned. Preserve
+project-specific commands, implementation-model choices, ownership rules, and
+local tuning; do not replace an entire kept file to obtain a changed paragraph.
+
+#### Section-level checklist for landed changes
+
+The source-section links below pin the upstream instructions at `b4f30dcc`,
+which includes both landed changes, rather than pointing at an adopter's
+possibly older preserved copy.
+
+| Preserved file / section | Manual migration |
+|---|---|
+| `.github/copilot-instructions.md` / [First contact][migration-first-contact] (#121 / PR #122) | Keep the platform-specific startup command and the three outcomes: exit 0 = tuned; 1 = not onboarded; anything else, including a missing interpreter/script or invalid invocation, = failed check, not permission to proceed. On 1, acknowledge untuned and read an explicit owner decline linked from the current work order/kickoff; verify repository/work scope and continuing applicability. Carry the link/scope into child, replacement, and resumed sessions. Only a covered decline permits already-authorized work without repeating onboarding; otherwise offer `/onboard-project` and wait for explicit yes/no. Never infer opt-out from source markers, `sha=unknown`, forks, chat memory, or unrelated/revoked/contradictory decisions. A new explicit onboarding request still enters onboarding. Link the refreshed [canonical startup scenarios](.github/skills/session-orchestration/SKILL.md#startup-scenarios), rather than copying its table. |
+| `.github/copilot-instructions.md` / [Working a Task issue][migration-working-task] (#121 / PR #122) | Replace role-ambiguous ritual wording with supervisor-owned claim/resume, Plan/update, dispatch/release, escalation, and outcome comments. Workers execute the approved plan, maintain PR evidence and its Plan link, run every Verification command, and report to the supervisor; they do not post duplicate Task comments. Keep `risk:high` approval, record-before-report, scope/authority escalation, declared ownership, and the rule against weakening checks. Only a Task supervisor may use the declared small-task exemption; conductors cannot. Refer to the refreshed [child protocol](.github/skills/session-orchestration/SKILL.md#child-session-protocol) and [worker protocol](.github/skills/session-orchestration/SKILL.md#worker-protocol-adr-0003). |
+| `.github/copilot-instructions.md` / [Pull request conventions][migration-pr-conventions] (#133 / PR #139) | Port the landed wording: "Keep PRs reviewable: one Task issue per PR. Roughly 400 changed lines is a planning guideline, not an acceptance criterion or automatic stop/replan trigger." Link [plan-management / Rolling-wave decomposition](.github/skills/plan-management/SKILL.md#rolling-wave-decomposition) for semantic independence, authority, review difficulty, and tests/generated ratio. Remove stale count-only split/replan directives, not tests or scope limits. The planner agent is engine-refreshed; this preserved instructions paragraph still needs manual alignment. |
+
+#### Older-adopter constitution compatibility review
+
+These are **existing constitution duties**, not new Epic #119 amendments.
+Compare older local `AGENTS.md` wording with the source sections below and
+resolve any project-specific differences through the adopter's normal review
+process; this migration does not authorize a wholesale constitution replacement.
+
+| Existing `AGENTS.md` section | Compatibility check |
+|---|---|
+| [2: Record-before-report][migration-agents-2] | Preserve the Task Plan before implementation and the durable outcome before reporting; worker PR evidence/reporting follows the role-specific protocol above. |
+| [4: Unit of work][migration-agents-4] | Preserve one Task supervisor and one active worker per PR/worktree/branch, dispatch before implementation, and the explicitly declared supervisor-only small-task exemption. |
+| [5: Single-writer rule][migration-agents-5] | Keep declared File ownership, requester ownership of the Task body, append-only executor comments, and escalation rather than silent scope expansion. |
+| [9: Start ritual][migration-agents-9] | Keep the ordered reading of constitution, repository instructions, full Task, referenced agreements, and applicable skills before restating the goal, acceptance criteria, and ownership. |
+
+Treat `.github/instructions/**`, `.github/CODEOWNERS`, and `.github/docs/**`
+as preserved project truth, not a blanket-copy list. Retain path-specific
+rules, actual owners, reviewed agreements, and collected context. Review any
+absent-file additions separately; installation does not make template content
+an approved project agreement.
+
+#### F06 pending: code and metadata CI separation
+
+**Forward reference, not an available workflow migration.** Epic #119
+authorizes separating metadata-only ledger checks from code verification so
+PR-body edits do not cancel or rerun code CI. The F06 Task will fill in the
+concrete migration steps here when it lands. Until then, retain the current
+workflow behavior; do not move jobs based on this placeholder.
+
+The future migration must jointly reconcile preserved workflow triggers and
+concurrency, unchanged required-check names and issuing-app/freshness semantics,
+the refreshed `.github/scripts/governance-controls.tsv` manifest, and any absent
+new workflow files installed by the upgrade. Installing a new workflow alone
+does not remove an old trigger from a kept workflow; refreshing a manifest alone
+does not migrate its target jobs. Missing verification must not become success.
+This forward reference prescribes no live ruleset, required-context, or variable
+mutation; any such change needs separate owner authorization.
+
+#### Safe preview, review, and validation
+
+1. Work on an upgrade branch in the **adopted repository**, with a clean index.
+   Select a tag/full SHA, obtain and review the installer from that same ref,
+   and substitute real paths/ref in this preview example:
+   `SCAFFOLD_REF='<tag-or-full-sha>' bash /path/to/reviewed/scaffold-init.sh --upgrade --dry-run /path/to/adopter`.
+   Inspect every `upgrade`, `keep`, and `install` entry. Dry-run writes and
+   stages nothing. Do not run an installer against the source-template
+   working repository to validate this documentation.
+2. Only after accepting the preview, run that pinned installer against the
+   adopter without `--dry-run`. Review `git diff --cached` for automatically
+   staged installed/refreshed files. Port the applicable checklist rows by hand;
+   review `git diff`, stage only intended paths, then review
+   `git diff --cached` and `git diff --cached --check` again.
+3. Run `bash .github/scripts/tuning-status.sh --quiet` and inspect its exit:
+   0 = tuned, 1 = not onboarded (apply First contact above), any other outcome =
+   check error to diagnose, not tuned or untuned. On Windows use
+   `pwsh .github/scripts/run.ps1 tuning-status.sh --quiet`. CI's warning-only
+   `--ci` exit 0 is not proof of tuning; neither is a successful upgrade.
+4. Run `bash .github/scripts/governance-drift.sh --root .` in the adopter
+   and inspect each `ACTIVE`, `MISSING`, or `WAIVED` control against the
+   preserved files. Default exit 0 means a report was produced, not no drift;
+   `--strict` exits 1 for unwaived missing controls, and exit 2 is an input/schema
+   error. Resolve gaps through reviewed changes or existing authorized waiver
+   procedures, not by silently replacing project truth.
+5. Run the project's validated commands and existing CI gates; check the upgrade
+   PR with `gh pr checks <PR>`. Retain the ledger, quality, scaffold, and Copilot
+   surface checks configured by the adopter. Locally run
+   `bash .github/scripts/check-md-links.sh`,
+   `bash .github/scripts/check-changelog-refs.sh`, and `git diff --check`;
+   all should exit 0. The scaffold's guard regression runner normally skips
+   adopted instances; a skip does not replace project tests or green CI.
+   Carry the actual results, scoped onboarding decision if applicable, and any
+   unresolved drift into the upgrade PR for human review.
+
+[migration-first-contact]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/.github/copilot-instructions.md#first-contact
+[migration-working-task]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/.github/copilot-instructions.md#working-a-task-issue
+[migration-pr-conventions]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/.github/copilot-instructions.md#pull-request-conventions
+[migration-agents-2]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/AGENTS.md#2-record-before-report
+[migration-agents-4]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/AGENTS.md#4-unit-of-work
+[migration-agents-5]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/AGENTS.md#5-single-writer-rule
+[migration-agents-9]: https://github.com/mochan-tk/agentic-dev-kit-for-copilot/blob/b4f30dcc85339b9f73150ea95d9998d379658980/AGENTS.md#9-start-ritual
+
 ## Upstreaming (instance → template)
 
 When a retro fix is project-agnostic, open a matching PR on the template
