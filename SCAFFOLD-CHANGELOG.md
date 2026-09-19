@@ -113,6 +113,7 @@ pins, checkout permissions, and project-specific checks.
 | `.github/workflows/ci.yml` / `on.pull_request` and `concurrency` | Admit only `opened`, `synchronize`, `reopened`; retain push to `main` (or the adopter's default branch). Preserve the `ci-${{ github.ref }}` domain and PR-only cancellation. Remove `edited` from this code workflow, not by adding job-level skip conditions that emit success-shaped code contexts. Port the adjacent freshness-boundary comment. |
 | `.github/workflows/ci.yml` / `jobs.task-ritual` | Remove the legacy job when the separate ledger workflow is installed. Keep genuine `quality`, `scaffold-self-check`, `copilot-surface` and optional `windows-launcher` verification, including local application gates. |
 | `.github/workflows/task-ritual.yml` / events, concurrency, job | Admit PR `opened`, `synchronize`, `reopened`, `edited` and default-branch push; use the distinct `task-ritual-${{ github.ref }}` domain. Keep the sole `task-ritual` job PR-conditional, pinned checkout, `persist-credentials: false`, contents/issues/pull-requests read permissions, and unchanged `check-task-ritual.sh` invocation. Its skipped push check exists for default-branch issuer discovery, not as code verification. |
+| `.github/workflows/task-ritual.yml` / third step and job grants (#143) | After the unchanged guard, port the unconditional, fail-propagating `bash .github/scripts/check-retarget-freshness.sh` step. Pass `GH_TOKEN`, `GH_REPO`, `PR_NUMBER`, and `PR_HEAD_SHA` from `github.event.pull_request.head.sha`, not `GITHUB_SHA`. Add exactly checks/actions read to the existing three read grants; never write scopes. Ritual exemptions do not exempt this sensor. |
 | `.github/scripts/governance-controls.tsv` / `ci-task-ritual` | Engine refresh moves the anchored invocation target and remediation to `task-ritual.yml`. Inspect the new target together with the preserved workflows; refreshing the manifest cannot move a job or remove duplicate producers. |
 
 **Freshness boundary:** code verification covers the head SHA as merged into
@@ -125,12 +126,69 @@ Body-only evidence on an unchanged head and base does not cover retargets.
 Missing, cancelled, failed, or unavailable code verification remains
 unsatisfied; a passing metadata check is never evidence of successful code.
 
+**Retarget sensor (#143):** scripts and tests are engine-refreshed, but existing
+workflow copies are kept. A reviewed port of the third step, its environment,
+and both read grants is required; refreshing scripts alone does not activate it.
+The server-produced `base_ref_changed` timeline records a write-access retarget,
+not authenticated agents, sessions, comment authors, or historical permissions.
+Its UTC `created_at` and positive ID establish the latest boundary, including
+away-and-back retargets; array/ID order does not. It needs no `changes.base`, and
+nullable commit fields do not identify a tested merge. An edited webhook is a
+different source: validated `changes.base` can veto a result until a timeline
+retarget reaches the payload's PR `updated_at`, never prove positive freshness.
+
+A complete retarget-free timeline emits `NO_RETARGET` and exits 0 independently
+of code results: code verification remains separately required. After retarget,
+the sensor selects the unique latest original `created_at` among attributable
+current-head `ci.yml` pull-request runs, without filtering for success. Original
+creation must be strictly later than the retarget; a newer failure cannot fall
+back to an older success. An old original cannot become fresh through a rerun,
+even with later start/completion times. A full rerun of a fresh original can
+qualify, but an incomplete partial attempt cannot borrow earlier job successes.
+
+Each of `quality`, `scaffold-self-check`, and `copilot-surface` must have exactly
+one successful completed job in that current attempt, bound to its direct
+same-repository check ID, head, suite, name, status, timestamps and GitHub Actions
+issuer (slug `github-actions`, GitHub.com App ID 15368). Unsupported hosts or
+issuers require separately reviewed adaptation, never an unbound App fallback.
+Ledger, push, optional Windows, unrelated PR/head/workflow and synthetic-merge
+checks cannot substitute. Checks are attached to the PR head, not `GITHUB_SHA`;
+neither the PR's current merge SHA nor mutable run associations attest immutable
+historical merge parents or arbitrary workflow contents. The selected run's base
+repository/ref must match, with a nonempty associated base SHA; equality to the
+current base SHA is deliberately not required, preserving `strict: false` base
+advancement semantics. Empty or ambiguous associations fail uncheckable.
+
+Original creation <= run start <= check start <= completion is required, with
+both check times strictly after the latest retarget. Timestamp ties do not prove
+freshness. Timeline/run/attempt-job pagination must reach its terminal page with
+consistent counts and unique IDs; malformed, truncated or failed reads and the
+Actions 1000-result cap fail closed. Direct check reads avoid the reference-list
+1000-suite cap. Before success the bounded snapshot rereads PR/head/base-ref and
+retarget history, plus runs/attempt/jobs/checks on the retarget path; changes fail
+as unstable. There is no polling, cache, scheduling, transactional/TOCTOU guarantee
+or eventual-consistency guarantee.
+
+Exit 1 means stale, non-success or incomplete evidence; exit 2 means an API,
+permission, schema or identity ambiguity. Diagnostics name PR/head, retarget
+ID/time, context/run/attempt where known and the reason, distinguishing timestamp
+and pagination faults. Obtain new code verification through a new head push or
+close/reopen, not an old-code rerun. The independent ledger may still fail before
+new code finishes; once code succeeds, an operator can reevaluate the ledger
+(for example, manually rerun the ledger). That observes evidence only, never
+refreshes code. No automatic recovery or guaranteed concurrent completion exists.
+
 Run `bash .github/scripts/governance-drift.sh --root . --strict` and review
 every row. This source has exactly five ACTIVE controls; a missing, misplaced,
 or only-commented ledger invocation is MISSING. A report with all signatures
 ACTIVE still does not detect the old duplicate producer: inspect both
 workflows and actual run/check identities. Resolve adopter drift through the
 reviewed port or explicitly authorized waiver process, not automatic mutation.
+The five-control manifest is unchanged: its ACTIVE ritual signature alone also
+cannot prove sensor adoption. Inspect the third step and execute
+`bash .github/scripts/tests/run-tests.sh retarget-freshness ci-event-isolation`
+in the source (or explicitly opt into the adopter's guard tests) to verify the
+actual-YAML step/environment/grant contract, not just a manifest signature.
 
 Verify the exact required names `quality`, `task-ritual`,
 `scaffold-self-check`, `copilot-surface` and optional `windows-launcher`, with
