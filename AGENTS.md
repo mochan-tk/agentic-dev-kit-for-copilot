@@ -101,8 +101,8 @@ them, escalate per §6.
 
 | Concern | Location |
 |---|---|
-| Raw collected material (phase 1) | `.github/docs/context/` |
-| Reviewed requirements, ADRs, glossary, non-goals (phase 2) | `.github/docs/agreements/` |
+| Raw collected material (phase 1) | `.github/docs/context/` (installed tree); root `docs/context/` (this source template's existing history; not installed or guaranteed in adopters; not a new required destination). |
+| Reviewed requirements, ADRs, glossary, non-goals (phase 2) | `.github/docs/agreements/` (installed tree; ADR-0000 template and ADR-0004 in `.github/docs/agreements/adr/`); root `docs/agreements/adr/` (ADR-0001..0003, this source template's existing history; not installed or guaranteed in adopters; not a new required destination). |
 | Repository practicalities (layout, commands, PR mechanics) | `.github/copilot-instructions.md` |
 | Path-scoped rules | `.github/instructions/*.instructions.md` |
 | Procedures (planning, routing, orchestration, verification, retro, context) | `.github/skills/*/SKILL.md` |
