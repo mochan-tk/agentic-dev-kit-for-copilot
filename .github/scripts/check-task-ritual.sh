@@ -85,6 +85,8 @@
 # checkout ({owner}/{repo} placeholders); set GH_REPO to override.
 
 set -euo pipefail
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/task-ritual-lib.sh"
 
 PR="${1:-${PR_NUMBER:-}}"
 if [[ -z "$PR" ]]; then
@@ -227,9 +229,7 @@ fi
 # The first task link names the primary Task under review. A qualifier may sit
 # between the keyword and the number ("Refs Epic #2") — the phrasing is
 # accurate and rejecting it buys no safety.
-link=$(printf '%s\n' "$body" \
-  | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?|refs?)[[:space:]]+([A-Za-z]+[[:space:]]+)?#[0-9]+' \
-  | head -n1 || true)
+link=$(printf '%s\n' "$body" | ritual_task_link)
 if [[ -z "$link" ]]; then
   echo "FAIL: PR #${PR} body has no task link (e.g. 'Closes #N', or 'Refs #N' for post-merge acceptance)."
   echo "      Every PR must declare the Task it lands (plan-management, tracking graph)."
@@ -240,14 +240,7 @@ issue="${link##*#}"
 # One pass over the issue's comments, emitting a TSV marker per ritual
 # artifact: TYPE, created_at, updated_at. The API returns ascending
 # created_at, but earliest-of is computed with an explicit sort anyway.
-markers=$(api "repos/{owner}/{repo}/issues/${issue}/comments" --paginate --jq '
-  .[] |
-  (if (.body | test("^(Starting|Resuming) in session")) then [ "CLAIM", .created_at, .updated_at ] | @tsv else empty end),
-  (if ((.body | test("(^|\\n)## Plan\\b")) or (.body | startswith("Plan:"))) then [ "PLAN", .created_at, .updated_at ] | @tsv else empty end),
-  (if (.body | test("^Dispatching worker")) then [ "DISPATCH", .created_at, .updated_at, (.body | split("\n")[0]) ] | @tsv else empty end),
-  (if (.body | test("^Releasing worker")) then [ "RELEASE", .created_at, .updated_at ] | @tsv else empty end),
-  (if (((.body | test("(^|\\n)## Plan\\b")) or (.body | startswith("Plan:"))) and (.body | ascii_downcase | contains("no worker will be spawned"))) then [ "EXEMPT", .created_at, .updated_at ] | @tsv else empty end)
-')
+markers=$(api "repos/{owner}/{repo}/issues/${issue}/comments" --paginate --jq "$RITUAL_JQ ritual_markers")
 
 ok=true
 case "$markers" in
@@ -324,20 +317,20 @@ if [[ "$markers" == *DISPATCH* ]]; then
   head_ref=$(api "repos/{owner}/{repo}/pulls/${PR}" --jq '.head.ref')
   while IFS=$'\t' read -r _kind _created _updated first_line superseded; do
     [[ -n "$first_line" ]] || continue
-    if ! printf '%s\n' "$first_line" | grep -qE 'session[[:space:]]+[0-9a-fA-F-]{8,}'; then
+    if ! ritual_has_session "$first_line"; then
       echo "FAIL: issue #${issue} has a worker-dispatch comment that names no session:"
       echo "        ${first_line}"
       echo "      Create the worker session first, then record it — 'Dispatching worker: PR #<n> worker (session <id>), branch <branch>' (session-orchestration skill)."
       ok=false
       continue
     fi
-    dispatch_branch=$(printf '%s\n' "$first_line" | sed -n 's/.*branch[[:space:]]\{1,\}\([^ ,)]\{1,\}\).*/\1/p')
+    dispatch_branch=$(ritual_branch "$first_line")
     if [[ -z "$dispatch_branch" ]]; then
       echo "FAIL: issue #${issue} has a worker-dispatch comment that names no branch:"
       echo "        ${first_line}"
       echo "      Record the worker's branch so the dispatch can be tied to this PR (session-orchestration skill)."
       ok=false
-    elif [[ "$superseded" -eq 0 && -n "$head_ref" && "$dispatch_branch" != "$head_ref" && "$head_ref" != *"$dispatch_branch" ]]; then
+    elif [[ "$superseded" -eq 0 && -n "$head_ref" ]] && ! ritual_branch_matches "$dispatch_branch" "$head_ref"; then
       # Managed surfaces prefix the branch they generate (AGENTS.md §4), so a
       # head ref ending in the dispatched name is the same branch.
       echo "FAIL: issue #${issue} dispatches branch '${dispatch_branch}', but PR #${PR} is from '${head_ref}'."
@@ -345,24 +338,7 @@ if [[ "$markers" == *DISPATCH* ]]; then
       ok=false
     fi
   done <<EOF
-$(printf '%s\n' "$markers" | sort -s -t $'\t' -k2,2 | awk -F '\t' '
-  $1 == "DISPATCH" { dispatches[++n] = $0; times[n] = $2 }
-  $1 == "RELEASE" { releases[++nr] = $2 }
-  END {
-    for (i = 1; i <= n; i++) {
-      superseded = 0
-      for (j = i + 1; j <= n && !superseded; j++) {
-        for (r = 1; r <= nr; r++) {
-          if (releases[r] >= times[i] && releases[r] <= times[j]) {
-            superseded = 1
-            break
-          }
-        }
-      }
-      print dispatches[i] "\t" superseded
-    }
-  }
-')
+$(printf '%s\n' "$markers" | ritual_dispatch_rows)
 EOF
 
   # Chronology 3 — the dispatch follows the plan of record: the supervisor
@@ -448,9 +424,7 @@ fi
 # Provenance — the PR's plan link must resolve to the plan of record on the
 # linked Task in this repository. The link is load-bearing for reviewers and
 # future sessions; a dead link once passed CI and needed a human to catch.
-plan_link=$(printf '%s\n' "$body" \
-  | grep -oiE 'plan:[[:space:]]*https://github\.com/[^/[:space:]]+/[^/[:space:]]+/issues/[0-9]+#issuecomment-[0-9]+' \
-  | head -n1 || true)
+plan_link=$(printf '%s\n' "$body" | ritual_plan_link)
 if [[ -z "$plan_link" ]]; then
   echo "FAIL: PR #${PR} body has no plan link ('Plan: https://github.com/<owner>/<repo>/issues/N#issuecomment-ID')."
   echo "      Link the plan comment posted on the Task (session-orchestration step 5; the PR template's Plan line)."
@@ -475,9 +449,9 @@ else
   elif [[ "$link_issue" != "$issue" ]]; then
     echo "FAIL: PR #${PR}'s plan link points at issue #${link_issue}, but the PR's task link is #${issue}."
     ok=false
-  elif resolved=$(api "repos/{owner}/{repo}/issues/comments/${comment_id}" --jq '
+  elif resolved=$(api "repos/{owner}/{repo}/issues/comments/${comment_id}" --jq "$RITUAL_JQ"'
       [ (.issue_url | sub(".*/"; "")),
-        (if ((.body | test("(^|\\n)## Plan\\b")) or (.body | startswith("Plan:"))) then "plan" else "other" end)
+        (if (.body | ritual_plan) then "plan" else "other" end)
       ] | @tsv' 2>/dev/null); then
     IFS=$'\t' read -r comment_issue comment_kind <<< "$resolved"
     if [[ "$comment_issue" != "$issue" ]]; then

@@ -108,7 +108,7 @@ for kind in claim resume plan dispatch; do
     t_ok "$kind exact canonical body"
   else t_fail "$kind exact canonical body"; fi
 done
-[[ ! -s "$RITUAL_CALLS" ]] && t_ok "render has zero network calls" || t_fail "render has zero network calls"
+if [[ ! -s "$RITUAL_CALLS" ]]; then t_ok "render has zero network calls"; else t_fail "render has zero network calls"; fi
 capture "$BASH_BIN" "$CLI" render claim --input - <<< "$CLAIM_INPUT"
 assert_result 0 '^Starting in session' "stdin input"
 for input in '{}' '{"task":0}' '{"task":"12","content":"x"}' '{"task":12,"content":""}' \
@@ -129,6 +129,8 @@ for field in session branch session_id; do
 done
 render claim '{"task":12,"session":"s","branch":"bad..ref"}'
 assert_result 2 'branch|input' "invalid Git branch"
+render plan '{"task":12,"content":"bad\u0000content"}'
+assert_result 2 'input|content|control' "plan content rejects NUL"
 capture "$BASH_BIN" "$CLI" render claim --input "$WORK/input" --approve
 assert_result 2 'option|usage' "no approval option"
 capture "$BASH_BIN" "$CLI" render claim --input
@@ -136,7 +138,7 @@ assert_result 2 'value|usage|input' "missing option value"
 capture "$BASH_BIN" "$CLI" --help
 assert_result 0 'preflight' "help includes interface"
 for text in 'session_id' 'Exit' 'Stop' 'approval' 'CI' 'publish'; do
-  grep -q "$text" "$WORK/out" && t_ok "help documents $text" || t_fail "help documents $text"
+  if grep -q "$text" "$WORK/out"; then t_ok "help documents $text"; else t_fail "help documents $text"; fi
 done
 
 comment() {
@@ -182,7 +184,7 @@ ledger "[$C,$P]"
 preflight dispatch "$DISPATCH" --branch copilot/task/12-x
 assert_result 0 'observed|draft' "dispatch after plan and managed branch"
 for text in 'CI' 'approval' 'session'; do
-  grep -q "$text" "$WORK/out" && t_ok "preflight scopes $text" || t_fail "preflight scopes $text"
+  if grep -q "$text" "$WORK/out"; then t_ok "preflight scopes $text"; else t_fail "preflight scopes $text"; fi
 done
 preflight dispatch "$DISPATCH" --branch task/34-wrong
 assert_result 1 'branch' "known wrong branch"
@@ -196,12 +198,32 @@ preflight dispatch 'Dispatching worker: worker, branch task/12-x'
 assert_result 1 'session|identity' "dispatch draft needs session identity"
 preflight plan 'Plan:'
 assert_result 1 'content|plan|draft' "plan draft needs content"
+printf 'Starting in session s\0, branch task/12-x\n' > "$WORK/body"
+capture "$BASH_BIN" "$CLI" preflight claim --repo o/r --task 12 --body-file "$WORK/body"
+assert_result 1 'control|draft' "raw NUL draft cannot be silently normalized"
 ledger "[$C,$P,$D]"
 preflight dispatch "$DISPATCH"
 assert_result 1 'release|replacement' "unreleased replacement"
 ledger "[$C,$P,$D,$R]"
 preflight dispatch "$DISPATCH" --branch task/12-x
 assert_result 0 'observed|draft' "released replacement"
+old=$(printf '%s' "$D" | jq '.body |= sub("task/12-x";"managed-old")')
+ledger "[$C,$P,$old,$R]"
+preflight dispatch "$DISPATCH" --branch task/12-x
+assert_result 0 'observed|draft' "released old branch is superseded by candidate"
+ledger "[$C,$P,$old]"
+preflight resume "$RESUME" --branch task/12-x
+assert_result 1 'branch' "unsuperseded historical wrong branch fails"
+ledger "[$C,$P,$D]"
+jq '.[2].body="Dispatching worker: missing identity, branch task/12-x"' "$GH_FIXTURES/comments.json" > "$WORK/change"
+cp "$WORK/change" "$GH_FIXTURES/comments.json"
+preflight resume "$RESUME"
+assert_result 1 'session' "earlier malformed dispatch identity fails"
+ledger "[$C,$P,$D]"
+jq '.[2].created_at="2026-01-01T09:02:00Z" | .[2].updated_at=.[2].created_at' "$GH_FIXTURES/comments.json" > "$WORK/change"
+cp "$WORK/change" "$GH_FIXTURES/comments.json"
+preflight resume "$RESUME"
+assert_result 1 'order|chronology' "earlier dispatch before plan fails"
 for index in 0 1 2 3; do
   ledger "[$C,$P,$D,$R]"
   jq --argjson i "$index" '.[$i].updated_at="2026-01-01T09:30:00Z"' "$GH_FIXTURES/comments.json" > "$WORK/change"
@@ -217,6 +239,11 @@ assert_result 1 'order|chronology' "earlier chronology cannot be repaired"
 ledger "[$C,$P,$D]"
 preflight resume "$RESUME" --pr 99
 assert_result 0 'observed|draft' "optional PR checks existing valid trail"
+ledger "[$C,$P,$D]"
+jq '.[0].commit.committer.date=null | .[0].commit.author.date="2026-01-01T10:00:00Z"' "$GH_FIXTURES/commits.json" > "$WORK/change"
+cp "$WORK/change" "$GH_FIXTURES/commits.json"
+preflight resume "$RESUME" --pr 99
+assert_result 0 'observed|draft' "optional PR author-date fallback"
 preflight resume "$RESUME" --pr 99 --branch wrong
 assert_result 1 'branch|head' "optional PR conflicts with explicit branch"
 ledger "[$C]"
@@ -277,6 +304,14 @@ ledger "[$C,$P]"
 printf '%s\n' '[{"body":"Starting in session x"}]' > "$GH_FIXTURES/comments.json"
 preflight dispatch "$DISPATCH"
 assert_result 1 'ledger|comment|timestamp' "malformed ledger record"
+ledger "[$C,$P]"
+jq '.[0].created_at="2026-00-00T09:00:00Z" | .[0].updated_at=.[0].created_at' "$GH_FIXTURES/comments.json" > "$WORK/change"
+cp "$WORK/change" "$GH_FIXTURES/comments.json"
+preflight dispatch "$DISPATCH"
+assert_result 1 'timestamp|ledger' "impossible ledger date"
+ledger "[$C,$P]"
+preflight plan $'Plan: Updated approach.\n\nTask: #12'
+assert_result 0 'observed|draft' "legacy Plan prefix remains accepted"
 
 # The rendered artifacts themselves, not a test-only parser, feed the CI wall.
 ledger '[]'
@@ -302,12 +337,21 @@ jq --argjson row "$row" '.[0]=$row' "$GH_FIXTURES/comments.json" > "$WORK/change
 ledger "$(cat "$WORK/change")"
 capture "$BASH_BIN" "$GUARD" 99
 assert_result 0 'ritual in order' "generated resume passes production CI parser"
+ledger "[$C]"
+render plan '{"task":12,"content":"Small change; no worker will be spawned."}'
+preflight plan "$(cat "$WORK/out")"
+assert_result 0 'observed|draft' "explicit human-supplied exemption remains allowed"
 if grep -q 'MUTATION' "$RITUAL_CALLS"; then t_fail "zero mutating API calls"; else t_ok "zero mutating API calls"; fi
-grep -q -- '--method GET' "$RITUAL_CALLS" && t_ok "preflight explicitly uses GET" || t_fail "preflight explicitly uses GET"
+if grep -q -- '--method GET' "$RITUAL_CALLS"; then t_ok "preflight explicitly uses GET"; else t_fail "preflight explicitly uses GET"; fi
 
 # An isolated PATH makes dependency failures observable without uninstalling tools.
 mkdir "$WORK/no-tools"
 ln -s "$(command -v dirname)" "$WORK/no-tools/dirname"
 capture env PATH="$WORK/no-tools" "$BASH_BIN" "$CLI" render plan --input "$WORK/input"
 assert_result 2 'not found|requires|missing' "missing dependency fails explicitly"
+for tool in jq git cat grep sed awk sort head date tr; do
+  ln -s "$(command -v "$tool")" "$WORK/no-tools/$tool"
+done
+capture env PATH="$WORK/no-tools" "$BASH_BIN" "$CLI" preflight claim --repo o/r --task 12 --body-file "$WORK/body"
+assert_result 2 'not found: gh' "missing gh fails explicitly"
 t_summary
