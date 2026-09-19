@@ -43,8 +43,8 @@ to the application.
      - `.github/docs/context/`    — raw collected material (read for background).
      - `.github/docs/agreements/` — reviewed decisions (read before designing anything).
 -->
-- `.github/docs/context/` — raw collected material.
-- `.github/docs/agreements/` — reviewed requirements, ADRs, glossary, non-goals.
+- `.github/docs/context/` — raw collected material in the installed tree; root `docs/context/` is this source template's existing history, not installed or guaranteed in adopters and not a new required destination.
+- `.github/docs/agreements/` — reviewed requirements, ADRs, glossary, non-goals in the installed tree; `.github/docs/agreements/adr/` holds ADR-0000 (template) and ADR-0004; root `docs/agreements/adr/` holds ADR-0001..0003 as this source template's existing history, not installed or guaranteed in adopters and not a new required destination.
 - `.github/skills/` — procedures. `.github/instructions/` — path-scoped rules.
 - `.github/agents/` — role definitions (orchestrator, planner, reviewer).
 
