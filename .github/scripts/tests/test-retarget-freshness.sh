@@ -125,12 +125,12 @@ body = data["routes"][endpoint]
 responses = data["responses"].get(endpoint)
 if responses is not None:
     body = responses[min(index, len(responses) - 1)]
-print("HTTP/2.0 200 OK")
+print(data.get("status_lines", {}).get(endpoint, "HTTP/2.0 200 OK"))
 print("Content-Type: application/json")
 for key, value in data["headers"].get(endpoint, {}).items():
     print(key + ": " + value)
 print()
-print(json.dumps(body))
+print(data.get("raw_bodies", {}).get(endpoint, json.dumps(body)))
 '''
 
 
@@ -478,8 +478,10 @@ class Freshness(unittest.TestCase):
     def pages(self, data, endpoint, key=None):
         value = data["routes"][endpoint]
         items = value if key is None else value[key]
-        cut = 0 if key is None else 1
+        cut = 1
         first, second = items[:cut], items[cut:]
+        if key is None and len(items) == 1:
+            first, second = [{"event": "committed"}], items
         data["routes"][endpoint] = first if key is None else dict(value, **{key: first})
         next_endpoint = endpoint + "&page=2"
         data["routes"][next_endpoint] = second if key is None else dict(value, **{key: second})
@@ -492,6 +494,10 @@ class Freshness(unittest.TestCase):
         data = self.fresh()
         data["routes"][TIMELINE].insert(0, {"event": "committed"})
         self.pages(data, TIMELINE)
+        data["routes"][RUN_LIST]["workflow_runs"].append(
+            dict(self.run_record(data), id=RUN + 1, workflow_id=77,
+                 path=".github/workflows/task-ritual.yml"))
+        data["routes"][RUN_LIST]["total_count"] = 2
         self.pages(data, RUN_LIST, "workflow_runs")
         self.pages(data, f"{PREFIX}/actions/runs/{RUN}/attempts/1/jobs?per_page=100", "jobs")
         self.check(data)
@@ -512,8 +518,11 @@ class Freshness(unittest.TestCase):
                     data["routes"][RUN_LIST]["workflow_runs"] *= 2
                     data["routes"][RUN_LIST]["total_count"] = 2
                 elif mode == "count-drift":
+                    data["routes"][RUN_LIST]["workflow_runs"].append(
+                        dict(self.run_record(data), id=RUN + 1))
+                    data["routes"][RUN_LIST]["total_count"] = 2
                     second = self.pages(data, RUN_LIST, "workflow_runs")
-                    data["routes"][second]["total_count"] = 2
+                    data["routes"][second]["total_count"] = 3
                 else:
                     self.pages(data, TIMELINE)
                     link = data["headers"][TIMELINE]["Link"]
@@ -595,6 +604,57 @@ class Freshness(unittest.TestCase):
                     data["event"]["changes"] = {"base": "bad"}
                 self.check(data, 2, "identity")
         self.check(self.fresh(), 2, "issuer", env_changes={"GH_HOST": "example.invalid"})
+
+    def test_invalid_json_and_http_framing(self):
+        endpoint = PREFIX + "/pulls/144"
+        for body in ("{", '{"number":144,"number":144}', "NaN", "{} {}"):
+            with self.subTest(body=body):
+                data = self.fresh()
+                data["raw_bodies"] = {endpoint: body}
+                self.check(data, 2, "schema")
+        for status in ("HTTP/2.0 403 Forbidden", "not HTTP"):
+            with self.subTest(status=status):
+                data = self.fresh()
+                data["status_lines"] = {endpoint: status}
+                self.check(data, 2, "API")
+
+    def test_malformed_nested_identity_never_tracebacks_or_passes(self):
+        for mode in ("base-name", "base-repo", "job-attempt", "app", "status"):
+            with self.subTest(mode=mode):
+                data = self.fresh()
+                if mode == "base-name":
+                    data["routes"][PREFIX + "/pulls/144"]["base"]["repo"]["full_name"] = 12
+                elif mode == "base-repo":
+                    data["routes"][PREFIX + "/pulls/144"]["base"]["repo"] = None
+                elif mode == "job-attempt":
+                    self.jobs(data)[0]["run_attempt"] = True
+                elif mode == "app":
+                    data["routes"][f"{PREFIX}/check-runs/{CHECKS[0]}"]["app"] = []
+                else:
+                    for value in (self.jobs(data)[0],
+                                  data["routes"][f"{PREFIX}/check-runs/{CHECKS[0]}"]):
+                        value["status"] = "unknown"
+                result, _ = execute(data)
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertIn("UNCHECKABLE", result.stdout)
+                self.assertNotIn("Traceback", result.stdout)
+
+    def test_unreadable_no_retarget_history_is_not_applicable_never(self):
+        data = self.fresh()
+        data["routes"][TIMELINE] = [{"event": "committed"}]
+        second = self.pages(data, TIMELINE)
+        data["errors"][second] = "HTTP 403"
+        result, _ = self.check(data, 2, "API")
+        self.assertNotIn("NO_RETARGET", result.stdout)
+
+    def test_run_queued_and_in_progress_remain_incomplete(self):
+        for status in ("queued", "in_progress"):
+            with self.subTest(status=status):
+                data = self.fresh()
+                self.run_record(data)["status"] = status
+                if status == "queued":
+                    self.run_record(data)["run_started_at"] = None
+                self.check(data, 1, "incomplete")
 
 
 unittest.main(verbosity=2)

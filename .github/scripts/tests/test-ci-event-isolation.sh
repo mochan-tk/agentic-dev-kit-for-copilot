@@ -20,6 +20,7 @@ ROOT = Path(sys.argv.pop())
 CODE = {"quality", "scaffold-self-check", "copilot-surface", "windows-launcher"}
 PR = "github.event_name == 'pull_request'"
 GUARD = "bash .github/scripts/check-task-ritual.sh"
+SENSOR = "bash .github/scripts/check-retarget-freshness.sh"
 
 
 def load():
@@ -107,10 +108,11 @@ def contract(workflows):
     require("needs" not in job and "continue-on-error" not in job,
             "ledger must independently fail closed")
     require(job["permissions"] == {
-        "contents": "read", "issues": "read", "pull-requests": "read"
-    }, "ledger grants must be exactly contents/issues/pull-requests read")
+        "contents": "read", "issues": "read", "pull-requests": "read",
+        "checks": "read", "actions": "read",
+    }, "ledger grants must be exactly contents/issues/pull-requests/checks/actions read")
     steps = job["steps"]
-    require(len(steps) == 2, "ledger must only check out and run the unchanged guard")
+    require(len(steps) == 3, "ledger must check out, run unchanged guard, then sensor")
     require(re.fullmatch(r"actions/checkout@[0-9a-f]{40}", steps[0]["uses"])
             and steps[0].get("with") == {"persist-credentials": "false"},
             "ledger checkout must be pinned with no persisted credentials")
@@ -118,6 +120,12 @@ def contract(workflows):
         "GH_TOKEN": "${{ github.token }}",
         "PR_NUMBER": "${{ github.event.pull_request.number }}",
     }, "ledger must read current PR through unchanged guard")
+    require(steps[2].get("run") == SENSOR and steps[2].get("env") == {
+        "GH_TOKEN": "${{ github.token }}",
+        "GH_REPO": "${{ github.repository }}",
+        "PR_NUMBER": "${{ github.event.pull_request.number }}",
+        "PR_HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+    }, "sensor must bind current repository/PR/head, never the merge SHA")
     require(all("if" not in step and "continue-on-error" not in step for step in steps),
             "ledger guard cannot be skipped or softened")
     for action in ["opened", "synchronize", "reopened", "edited"]:
@@ -203,6 +211,26 @@ class Isolation(unittest.TestCase):
                      {"pull-requests": "write"}))
         rejected("no default branch ledger", lambda w:
                  w["task-ritual.yml"]["on"].pop("push"))
+        rejected("removed sensor", lambda w:
+                 w["task-ritual.yml"]["jobs"]["task-ritual"]["steps"].pop())
+        rejected("conditional sensor", lambda w:
+                 w["task-ritual.yml"]["jobs"]["task-ritual"]["steps"][2].update(
+                     {"if": "false"}))
+        rejected("softened sensor", lambda w:
+                 w["task-ritual.yml"]["jobs"]["task-ritual"]["steps"][2].update(
+                     {"continue-on-error": "true"}))
+        rejected("swallowed sensor failure", lambda w:
+                 w["task-ritual.yml"]["jobs"]["task-ritual"]["steps"][2].update(
+                     run=SENSOR + " || true"))
+        rejected("merge SHA instead of head", lambda w:
+                 w["task-ritual.yml"]["jobs"]["task-ritual"]["steps"][2]["env"].update(
+                     PR_HEAD_SHA="${{ github.sha }}"))
+        for grant in ("checks", "actions"):
+            rejected("missing " + grant + " read", lambda w, grant=grant:
+                     w["task-ritual.yml"]["jobs"]["task-ritual"]["permissions"].pop(grant))
+            rejected(grant + " write", lambda w, grant=grant:
+                     w["task-ritual.yml"]["jobs"]["task-ritual"]["permissions"].update(
+                         {grant: "write"}))
 
 
 unittest.main(verbosity=2)
