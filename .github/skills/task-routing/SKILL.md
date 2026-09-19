@@ -17,6 +17,16 @@ task's supervisor lives in an app session while its worker is the cloud
 coding agent). When a supervisor implements directly under the declared
 small-task exemption, the label routes that single session.
 
+**Small-task candidate, not blanket permission.** For ordinary changes,
+consider the existing supervisor-direct exemption (AGENTS.md §4) as the
+standard candidate only when ALL eligibility conditions hold: low risk,
+clear acceptance criteria, a bounded change set, no ownership conflict,
+and verification available. Exclude authentication/authorization, secrets,
+data deletion, deployment, rulesets, CI guards, and operating contracts.
+Only a Task supervisor may declare "no worker will be spawned" in its
+plan comment; conductors never implement. This routes the existing exemption,
+not a new permission or a change to AGENTS.md §4.
+
 **A Task supervisor runs on the default agent** with
 `.github/skills/session-orchestration/SKILL.md` as its manual — the ritual is
 fully described there, so no separate role definition exists. Do not pick
