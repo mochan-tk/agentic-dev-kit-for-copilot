@@ -261,14 +261,13 @@ with `Refs #<n>`, never `Closes` (AGENTS.md §4). Order: merge → post-merge
 steps → outcome comment → close the issue manually. Auto-close would end
 the record before the work it certifies exists.
 
-The message to the parent is a pointer, not a payload: outcome word + issue
-and PR links. If the parent session is gone, the record still stands — that
-is the point. Reports climb one hop at a time: the **worker** reports to its
-**supervisor** (PR link, CI status, verification output, deviations); the
-supervisor independently verifies against ground truth (`gh pr view/checks`,
-diff vs. ownership), posts the outcome comment, and only then reports to the
-**Epic orchestrator**. A worker never posts the ritual comments and never
-reports past its supervisor.
+When messaging is exposed, report one hop after recording: outcome + issue/PR
+links, not a replacement payload. If the parent is gone, the record still stands.
+The **worker** records PR evidence and reports PR link, CI status, verification
+output and deviations only to its **supervisor**, never via Task ritual comments.
+The supervisor independently verifies ground truth (`gh pr view/checks`, diff vs.
+ownership), posts the Task outcome, then reports to the **Epic orchestrator**.
+Restricted planner/reviewer handoffs use the GitHub deliverable specified below.
 
 ## Worker protocol (ADR-0003)
 
@@ -286,7 +285,7 @@ start cheap.
 
 **Worker kickoff template** — a worker sees only its kickoff and the
 ledger, so the kickoff must be complete (kickoff completeness is
-load-bearing, ADR-0003):
+load-bearing, ADR-0003; app creators also check explicit tool arguments below):
 
 ```markdown
 You are the WORKER session for Task issue #<n> in <owner>/<repo>.
@@ -416,14 +415,16 @@ display strings in a narrow column, where short and uniform beats descriptive
 and truncated.
 
 App tools that instantiate the protocol:
+Restricted planner/reviewer kickoffs name their GitHub handoff: an Epic rationale comment / non-approving PR audit comment, respectively; never demand messaging absent from exposed tools.
+If reviewer GitHub publication is unavailable, return the audit marked **unrecorded** for requester publication before action, as the reviewer procedure requires.
 
 | Tool | Protocol step |
 |---|---|
-| `create_session` (kickoff prompt, mode, model) | Dispatch a supervisor or worker with a complete kickoff; choose mode (`autopilot` for workers) and model per the routing block |
+| `create_session` (kickoff prompt, mode, model) | Before EVERY call, check explicit `kickoff.model` and `kickoff.mode` tool arguments against the applicable owner decision and Routing block; correct missing arguments before dispatch, never rely on omitted defaults or prompt prose. Workers use `autopilot`; others use the mode authorized for their purpose. Epic-specific model preferences are not repository-wide policy. Supply a complete kickoff; this guidance adds no approval gate or runtime enforcement. |
 | `open_issue_session` | Dispatch straight from a Task issue — the issue is the brief |
 | `respond_to_session_plan` | The `risk:high` plan-approval gate, exercised by the parent |
-| `notify_on_idle` | Wake the parent when a child stops. A wake is not a completion — it fires identically for finished, dead, and never-started — so what happened is read on the issue, not inferred from the notification |
-| `send_session_message` | Steering, escalation (§6), and the report hop (pointer, not payload) |
+| `notify_on_idle` | Wake the parent when a child stops, whether finished, dead, or never-started. Read the named Epic/Task/PR record; idle without a durable result remains unverified, never completion. |
+| `send_session_message` | When exposed: steering, escalation (AGENTS.md section 6), and a one-hop report pointer after recording, never a substitute for GitHub. Restricted-role kickoffs use the durable handoff above instead. |
 | `archive_session` | Dispose of a finished worker; its context is released, the record stays on GitHub |
 
 **Teardown order is leaf-first.** `archive_session` works only on sessions
