@@ -28,8 +28,10 @@ a requirement that was not agreed.
   verification command or observable artifact. Cite `REQ-###` where one
   exists; most tasks have none.
 - **Bounded.** Explicit "Out of scope" and "File ownership" sections. Sized so
-  a competent agent finishes in one session (roughly: one PR under ~400
-  changed lines). Bigger than that → split.
+  a competent agent finishes in one session. Roughly 400 changed lines is a
+  planning guideline, not an acceptance criterion or automatic stop/replan trigger.
+  Use [plan-management](../skills/plan-management/SKILL.md#rolling-wave-decomposition)
+  for splitting decisions.
 - **Partitioned.** File-ownership paths of tasks intended to run in parallel
   must not overlap. Where overlap is unavoidable, serialize with
   `--add-blocked-by` instead of hoping merge conflicts won't happen.

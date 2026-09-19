@@ -109,9 +109,9 @@ Conductors keep their fixed role and cannot take that exemption (AGENTS.md §4).
 - Title: imperative mood, mirrors the Task issue title.
 - Body: fill `.github/PULL_REQUEST_TEMPLATE.md` completely, including
   `Closes #<n>` and the evidence table.
-- Keep PRs reviewable: one Task issue per PR; if the diff exceeds roughly 400
-  changed lines outside generated code, propose splitting via `needs:replan`
-  instead of pushing on.
+- Keep PRs reviewable: one Task issue per PR. Roughly 400 changed lines is a
+  planning guideline, not an acceptance criterion or automatic stop/replan trigger.
+  Use [plan-management](skills/plan-management/SKILL.md#rolling-wave-decomposition) for splitting decisions.
 
 ## Things that will get your PR rejected
 
