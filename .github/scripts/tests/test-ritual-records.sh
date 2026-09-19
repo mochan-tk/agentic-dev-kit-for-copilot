@@ -127,6 +127,11 @@ for field in session branch session_id; do
   render dispatch "$input"
   assert_result 2 'input|schema|field|session|branch' "reject missing $field"
 done
+for token in '"abcdef12\n"' '"abcdef12\r"' '"abcdef12\t"' '"abcdef12\u0000"'; do
+  input=$(printf '%s' "$DISPATCH_INPUT" | jq --argjson token "$token" '.session_id=$token')
+  render dispatch "$input"
+  assert_result 2 'input|identity|session|field' "reject valid session token with trailing control: $token"
+done
 render claim '{"task":12,"session":"s","branch":"bad..ref"}'
 assert_result 2 'branch|input' "invalid Git branch"
 render plan '{"task":12,"content":"bad\u0000content"}'
