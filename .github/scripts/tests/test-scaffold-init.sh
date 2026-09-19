@@ -494,6 +494,7 @@ cp -R "$FIXTURE" "$FIXTURE2"
 echo "echo guard v2" > "$FIXTURE2/.github/scripts/some-guard.sh"
 cp "$REPO_ROOT/.github/scripts/governance-controls.tsv" "$FIXTURE2/.github/scripts/"
 cp "$REPO_ROOT/.github/scripts/governance-drift.sh" "$FIXTURE2/.github/scripts/"
+cp "$REPO_ROOT/.github/workflows/task-ritual.yml" "$FIXTURE2/.github/workflows/"
 mkdir -p "$FIXTURE2/.github/prompts" "$FIXTURE2/.github/instructions"
 echo "# new prompt" > "$FIXTURE2/.github/prompts/new.prompt.md"
 echo "# new rules" > "$FIXTURE2/.github/instructions/new.instructions.md"
@@ -596,6 +597,27 @@ else
 fi
 expect_rc 1 "the installed detector can explicitly enforce strict drift" \
   bash "$TARGET/.github/scripts/governance-drift.sh" --root "$TARGET" --strict
+
+# The old combined CI survives: installing the ledger does not remove its
+# legacy producer. ACTIVE signatures alone cannot prove event isolation.
+if cmp -s "$FIXTURE2/.github/workflows/task-ritual.yml" \
+    "$TARGET/.github/workflows/task-ritual.yml" \
+   && git -C "$TARGET" diff --cached --name-only \
+      | grep -qx '.github/workflows/task-ritual.yml' \
+   && grep -q 'run: bash .github/scripts/check-task-ritual.sh' \
+      "$TARGET/.github/workflows/ci.yml"; then
+  t_ok "upgrade stages absent ledger workflow but preserves legacy producer for manual migration"
+else
+  t_fail "upgrade stages absent ledger workflow but preserves legacy producer for manual migration"
+fi
+printf '%s\n' '# LOCAL LEDGER TUNING' >> "$TARGET/.github/workflows/task-ritual.yml"
+ledger_hash="$(git -C "$TARGET" hash-object .github/workflows/task-ritual.yml)"
+expect_rc 0 "repeat upgrade keeps an adopted ledger workflow" run_upgrade "$TARGET" --upgrade
+if [ "$ledger_hash" = "$(git -C "$TARGET" hash-object .github/workflows/task-ritual.yml)" ]; then
+  t_ok "existing ledger workflow tuning survives byte-identical"
+else
+  t_fail "existing ledger workflow tuning survives byte-identical"
+fi
 
 # --- upgrade --dry-run: class labels, bit-inert ------------------------------
 tune_target

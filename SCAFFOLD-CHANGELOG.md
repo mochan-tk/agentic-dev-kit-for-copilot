@@ -42,8 +42,8 @@ startup/role clarification and #133 /
 [PR #139](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/pull/139)
 reviewability wording. The latter is merged as `b4f30dcc`; its
 [completed outcome](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/133#issuecomment-5738634787)
-records the final text. These are available changes, unlike the pending F06
-work below. This checklist changes no constitution or installer behavior.
+records the final text. The F06 workflow migration from #138 is detailed
+below. This checklist changes no constitution or installer behavior.
 
 #### What the upgrade does and does not apply
 
@@ -95,22 +95,59 @@ rules, actual owners, reviewed agreements, and collected context. Review any
 absent-file additions separately; installation does not make template content
 an approved project agreement.
 
-#### F06 pending: code and metadata CI separation
+#### F06: code and metadata CI separation (#138)
 
-**Forward reference, not an available workflow migration.** Epic #119
-authorizes separating metadata-only ledger checks from code verification so
-PR-body edits do not cancel or rerun code CI. The F06 Task will fill in the
-concrete migration steps here when it lands. Until then, retain the current
-workflow behavior; do not move jobs based on this placeholder.
+Upgrade from a source ref containing both workflows. An absent
+`.github/workflows/task-ritual.yml` installs automatically, while an adopted
+`.github/workflows/ci.yml` (and an already present ledger workflow) is kept.
+**Installation alone is not migration:** it can leave the legacy ledger job
+and the new workflow producing the same `task-ritual` check.
 
-The future migration must jointly reconcile preserved workflow triggers and
-concurrency, unchanged required-check names and issuing-app/freshness semantics,
-the refreshed `.github/scripts/governance-controls.tsv` manifest, and any absent
-new workflow files installed by the upgrade. Installing a new workflow alone
-does not remove an old trigger from a kept workflow; refreshing a manifest alone
-does not migrate its target jobs. Missing verification must not become success.
-This forward reference prescribes no live ruleset, required-context, or variable
-mutation; any such change needs separate owner authorization.
+Port these sections together in one reviewed adopter PR, before landing or
+relying on the upgraded workflows. Do not replace the entire adopted CI:
+retain application build/test steps, local tuning, runner choices, action
+pins, checkout permissions, and project-specific checks.
+
+| File / section | Atomic migration |
+|---|---|
+| `.github/workflows/ci.yml` / `on.pull_request` and `concurrency` | Admit only `opened`, `synchronize`, `reopened`; retain push to `main` (or the adopter's default branch). Preserve the `ci-${{ github.ref }}` domain and PR-only cancellation. Remove `edited` from this code workflow, not by adding job-level skip conditions that emit success-shaped code contexts. Port the adjacent freshness-boundary comment. |
+| `.github/workflows/ci.yml` / `jobs.task-ritual` | Remove the legacy job when the separate ledger workflow is installed. Keep genuine `quality`, `scaffold-self-check`, `copilot-surface` and optional `windows-launcher` verification, including local application gates. |
+| `.github/workflows/task-ritual.yml` / events, concurrency, job | Admit PR `opened`, `synchronize`, `reopened`, `edited` and default-branch push; use the distinct `task-ritual-${{ github.ref }}` domain. Keep the sole `task-ritual` job PR-conditional, pinned checkout, `persist-credentials: false`, contents/issues/pull-requests read permissions, and unchanged `check-task-ritual.sh` invocation. Its skipped push check exists for default-branch issuer discovery, not as code verification. |
+| `.github/scripts/governance-controls.tsv` / `ci-task-ritual` | Engine refresh moves the anchored invocation target and remediation to `task-ritual.yml`. Inspect the new target together with the preserved workflows; refreshing the manifest cannot move a job or remove duplicate producers. |
+
+**Freshness boundary:** code verification covers the head SHA as merged into
+the base at run time, the same staleness class as base advancement under
+`strict: false`. Every `edited` event, including a base retarget, runs the
+ledger only: it cannot schedule, cancel, refresh, or substitute code checks.
+After retargeting, a new head push or close/reopen is required to refresh code
+verification against the new base; nothing automatically reopens the PR.
+Body-only evidence on an unchanged head and base does not cover retargets.
+Missing, cancelled, failed, or unavailable code verification remains
+unsatisfied; a passing metadata check is never evidence of successful code.
+
+Run `bash .github/scripts/governance-drift.sh --root . --strict` and review
+every row. This source has exactly five ACTIVE controls; a missing, misplaced,
+or only-commented ledger invocation is MISSING. A report with all signatures
+ACTIVE still does not detect the old duplicate producer: inspect both
+workflows and actual run/check identities. Resolve adopter drift through the
+reviewed port or explicitly authorized waiver process, not automatic mutation.
+
+Verify the exact required names `quality`, `task-ritual`,
+`scaffold-self-check`, `copilot-surface` and optional `windows-launcher`, with
+one intended producer per event and the same issuing GitHub App. Read checks
+and runs on the upgrade PR, including body edits during code verification,
+and after merge read default-branch check runs to confirm issuer discovery
+still sees the PR-conditional skipped `task-ritual` context. Compare live
+required contexts and issuer restrictions using GET-only ruleset reads.
+A workflow-name change must not turn into an unnoticed required-context
+rename: a missing required check stays pending, not successful. Stop if the
+adopter needs a context/issuer migration and scope that live change separately.
+
+Source-PR tests and hosted PR runs prove the proposed source behavior, not
+that an adopter has ported it or that live governance has changed. This
+migration authorizes no ruleset, variable, branch-protection, approval,
+write-token, privileged-event, or automatic-merge change. Preserve the
+existing PR evidence table and supervisor Outcome duties.
 
 #### Safe preview, review, and validation
 

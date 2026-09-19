@@ -5,10 +5,12 @@ name: CI
 
 on:
   pull_request:
-    # 'edited' is not a default activity type: without it, a PR body edited
-    # after a green run never re-triggers CI, so the task-ritual wall's
-    # verdict on the body-parsed task link and plan link could go stale.
-    types: [opened, synchronize, reopened, edited]
+    # Verification covers the head SHA merged into the base at run time:
+    # the same staleness class as base advancement under strict: false.
+    # All edited events, including a base retarget, run the ledger only
+    # (task-ritual.yml); they never refresh or replace code verification.
+    # After retargeting, refresh with a new head push or close/reopen.
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
 
@@ -68,33 +70,6 @@ jobs:
 
       - name: Scaffold tuning status
         run: bash .github/scripts/tuning-status.sh --ci
-
-  # The ledger wall: the PR's linked Task must carry a start claim and a plan
-  # comment before it can merge (session-orchestration start ritual, steps
-  # 4-5) — work that starts without a claim leaves the ledger unable to
-  # explain who did what.
-  task-ritual:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      # A job-level block replaces the workflow-level grant rather than
-      # adding to it, so `contents: read` has to be repeated here — without
-      # it `actions/checkout` fails with "Repository not found" on private
-      # repositories. Public repositories clone without a token, which is
-      # why this scaffold's own CI cannot catch the omission.
-      contents: read
-      issues: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Linked Task carries start claim + plan comment
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: bash .github/scripts/check-task-ritual.sh
 
   # Lints the scaffold itself: shell scripts, workflow files, and the
   # consistency of issue-form templates and Markdown path references.

@@ -34,6 +34,7 @@ OLD="$WORK/822fdda"
 mkdir -p "$OLD/.github/workflows"
 grep -v 'pwsh \.github/scripts/run\.ps1 tuning-status\.sh --quiet' \
   "$ROOT/.github/workflows/ci.yml" > "$OLD/.github/workflows/ci.yml"
+cp "$ROOT/.github/workflows/task-ritual.yml" "$OLD/.github/workflows/"
 out="$(run_sensor "$OLD" "$MANIFEST" 2>&1)"
 rc=$?
 if [ "$rc" -eq 0 ] \
@@ -65,6 +66,26 @@ expect_rc_grep 0 '^MISSING ci-action-pins ' \
 rm "$FALSE/.github/workflows/ci.yml"
 expect_rc_grep 0 '^MISSING ci-action-pins ' \
   "a missing declared target is MISSING" run_sensor "$FALSE" "$ONE"
+
+RITUAL="$WORK/ritual"
+mkdir -p "$RITUAL/.github/workflows"
+cp "$ROOT/.github/workflows/ci.yml" "$RITUAL/.github/workflows/"
+for shape in missing misplaced commented; do
+  case "$shape" in
+    missing) ;;
+    misplaced)
+      printf '%s\n' '        run: bash .github/scripts/check-task-ritual.sh' \
+        >> "$RITUAL/.github/workflows/ci.yml"
+      ;;
+    commented)
+      printf '%s\n' '        # run: bash .github/scripts/check-task-ritual.sh' \
+        > "$RITUAL/.github/workflows/task-ritual.yml"
+      ;;
+  esac
+  expect_rc_grep 1 '^MISSING ci-task-ritual .*remediation=.github/workflows/task-ritual.yml ' \
+    "$shape ritual invocation fails strict drift at the new target" \
+    run_sensor "$RITUAL" "$MANIFEST" --strict
+done
 
 BAD="$WORK/bad.tsv"
 printf 'empty\t.github/workflows/ci.yml\t\t#1\tfix\n' > "$BAD"
