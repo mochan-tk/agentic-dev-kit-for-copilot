@@ -60,6 +60,11 @@ this.
 3. Every Task must clear the planner quality bar
    (self-contained, checkable, bounded, partitioned, routed —
    see `.github/agents/planner.agent.md`). Only then add `ai:ready`.
+   Roughly 400 changed lines is a planning guideline, not an acceptance
+   criterion: consider splitting by semantic independence, authority,
+   review difficulty, and the tests/generated ratio, not mechanical slicing.
+   Include related tests and configuration in File ownership from the
+   initial Task; workers never widen declared ownership.
    Criteria that can only be met after the merge (a tag, a release, a
    deploy check) must say so in the work order — they commit the PR to
    `Refs #<n>` and a manual close (AGENTS.md §4). When the roadmap exists,
@@ -68,7 +73,8 @@ this.
 4. Partition for parallelism: tasks meant to run concurrently must have
    disjoint **File ownership** path sets. If two tasks need the same paths,
    add a `blocked-by` edge between them — serialization by dependency beats
-   merge-conflict roulette.
+   merge-conflict roulette. Dependencies represent real ordering constraints
+   only, not invented stage gates.
 5. Once the round's Task issues exist, correct the Epic body's state line:
    replace the onboarding draft marker (*"Draft from onboarding — … nothing
    is decomposed until you approve."*) with one line naming the phase just
@@ -212,7 +218,16 @@ exactly one of three doors:
 
 Exception gate: a task labeled `risk:high` pauses after its plan comment
 until an approval comment lands (`session-orchestration`, Risk gate). All
-other tasks pass through.
+other tasks pass through (lazy consensus). Planner/requester guidance:
+approval names permitted scope, execution authority, and risk once. Within
+that scope, test -> red -> implement -> green proceeds without further
+approvals. Re-approval is required only for material changes to production
+impact, authority, ownership, or acceptance criteria, not stage transitions.
+Keep the explicit exception: owner-typed GO immediately before an
+irreversible live write. Human merge authority remains unchanged.
+Reversible implementation-internal choices that preserve acceptance criteria
+do not return to the human; this does not waive the material-change triggers
+above or let workers widen declared ownership.
 
 ## Replanning procedure
 

@@ -83,9 +83,16 @@ session that was never created records a split that did not happen, which is
 the one thing this trail exists to show (ADR-0003). A supervisor that cannot
 raise a worker either declares the small-task exemption in its plan comment
 and implements directly, or escalates — it does not write the comment
-anyway. A replacement
-worker is preceded by a comment releasing the old worker and naming its
-successor.
+anyway. Before irreversible worker teardown or replacement, the supervisor's
+release-and-successor or closeout record names the worker head SHA, whether
+uncommitted work exists, its preservation location (or an explicit discard
+decision and reason), and the single authority owning that disposition.
+A replacement record releases the old worker and names its successor.
+Preservation is not approval as mergeable: name any reused artifacts and
+their fresh authorization in the record, and re-verify them before use.
+Never present an earlier approval as a new one
+([#6](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/issues/6)).
+These are procedural duties, not runtime pause/resume or authentication.
 **Machine-checked format:** the worker-dispatch comment's *first line* must
 match the regex `^Dispatching worker`, and the release comment's *first
 line* must match `^Releasing worker` — no leading blank line, greeting, or
@@ -191,11 +198,16 @@ cloud agent) produce a convenient copy: link the plan comment from the PR
 description and treat the issue timeline as authoritative.
 
 **Risk gate** (`risk:high` tasks only): stop after posting the plan comment
-and wait for an explicit approval comment from the requester/orchestrator
-before the first commit. The default is pass-through — a posted plan on an
-unlabeled task is actionable immediately (lazy consensus); the gate exists
-only for tasks whose blast radius warrants a pre-flight human eye
-(`plan-management`, Intervening).
+and wait for an explicit requester/orchestrator approval comment before the
+first commit.
+The approval names permitted scope, execution authority, and risk once.
+Within that scope, test -> red -> implement -> green needs no further
+approvals. Re-approval is required only for material changes to production
+impact, authority, ownership, or acceptance criteria, never a stage transition.
+Tasks without `risk:high` remain actionable on posting the plan (lazy
+consensus; `plan-management`, Intervening). The explicit exception remains
+an owner-typed GO immediately before an irreversible live write; it is not
+a stage gate for other work. Human merge authority is unchanged.
 
 **Work loop** (the implementing session — the worker, or the supervisor
 under a declared exemption): stay inside the ownership paths; commit early
@@ -410,8 +422,9 @@ its caller created, so archiving a supervisor before its workers strands
 the workers — no agent can remove them afterwards, only a human. Workers
 stay alive through review (rework returns to the same worker), so teardown
 runs after the merge, not at closeout: the requester messages the
-supervisor to tear down → the supervisor archives its worker(s) and
-acknowledges → only then does the requester archive the supervisor.
+supervisor to tear down → the supervisor records the disposition above and
+archives its worker(s) → acknowledges → only then does the requester archive
+the supervisor.
 
 **Conducting sessions are not torn down with them.** Teardown covers the
 executing layers only: workers and Task supervisors, which carry the
@@ -424,11 +437,16 @@ the next phase gets absorbed into whatever session is still open.
 
 ## Resume protocol (crash-only)
 
-Sessions die without warning — network, quota, machine sleep, closed laptop.
-The scaffold has **no dedicated resume machinery** on purpose: the ordinary
-start ritual *is* the resume path (crash-only design — recovery and startup
-are the same code path).
+Sessions die without warning. The ordinary start ritual *is* the resume
+path: this is procedural recovery, **not runtime pause/resume machinery**.
 
+- **Disposition before loss**: before irreversible worker teardown or
+  replacement, the supervisor's release-and-successor or closeout record
+  names the worker head SHA, whether uncommitted work exists, its preservation
+  location or explicit discard decision and reason, and the single authority
+  owning that disposition. Preservation does not approve work as mergeable.
+  Name reused artifacts and their fresh authorization in the record and
+  re-verify them; never present earlier approval as new (#6, linked above).
 - **Successor session**: run the start ritual (AGENTS.md §9) exactly as for a
   fresh task, using the [inherited-decline](#scenario-inherited) and
   [supervisor](#scenario-supervisor)/[worker](#scenario-worker) rows, then
