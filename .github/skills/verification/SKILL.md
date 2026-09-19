@@ -35,6 +35,8 @@ is the cap and the exit, not an invitation to grind until green.
      audit, and unsupported surfaces are never assumed. GitHub currently
      documents it for Copilot CLI and the Copilot app:
      https://docs.github.com/en/copilot/concepts/agents/copilot-cli/rubber-duck
+     Follow [Code Review Standards](../../instructions/code-review.instructions.md),
+     "Session availability", for actual tool availability and the once-only fallback.
    - **Generic code review:** Copilot code review looks for bugs, security
      vulnerabilities, and logic defects in a diff or PR. Its findings are
      advisory and do not satisfy human approval.
