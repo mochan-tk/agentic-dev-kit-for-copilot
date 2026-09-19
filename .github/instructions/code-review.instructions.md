@@ -23,7 +23,18 @@ and [Copilot code review](https://docs.github.com/en/copilot/concepts/agents/cod
 Do not infer Rubber Duck support on surfaces GitHub has not documented or the
 adopter has not verified.
 
-Rubber Duck runs inside the work loop, before a PR audit, and is therefore not
+**Session availability.** Documented surface support does not establish
+availability in a session's exposed tools. Use Rubber Duck when supported
+and available. If absent from those tools, state that fact once per session
+in an existing appropriate durable work record (supervisor Plan or worker PR
+evidence), not a new ritual comment. Omit repeated boilerplate from later
+reports, evidence, and Outcome records; link the original record when relevant.
+Never claim a run that did not happen or generalize session absence into a
+platform-wide claim. Continue the applicable review duties below; a missing
+optional mechanism adds no approval stage, replacement mechanism, or fabricated
+pass.
+
+When available, Rubber Duck runs inside the work loop, before a PR audit, and is not
 a numbered PR gate below. Review a PR in this order. A mechanism runs the
 checks assigned to it; a human may inspect any row. The custom reviewer is
 required only for `risk:high` and governance-surface Tasks (`task-routing`,
@@ -55,7 +66,7 @@ reviewer is selected.
 6. **Code defects (Copilot code review + human).** Hunt for substantive bugs,
    vulnerabilities, logic errors, and performance failures beyond check 3's
    test-integrity obligation. Rubber Duck should already have challenged
-   these in-loop on supported surfaces. AI findings are advisory; they never
+   these in-loop when supported and available. AI findings are advisory; they never
    satisfy required approval.
 7. **Craft (Copilot code review + human).** Treat naming, structure,
    duplication, and comment quality as lower priority than substantive
