@@ -14,13 +14,38 @@ in layer 1 is investing in delegation itself.
 
 ## Test-first work orders
 
-Acceptance criteria land as **executable tests before implementation**. The
+For executable behavior, acceptance criteria land as **tests before implementation**. The
 planner's motto: *slice late, measure early* — rolling-wave keeps task detail
 late, but the measuring stick arrives first. A criterion without a command is
 an opinion; the wall judges, not the worker's account of the work. Retries
 against the wall are budgeted: the same failure three times hands the work up
 one tier of the escalation ladder (`session-orchestration` skill) — the ladder
 is the cap and the exit, not an invitation to grind until green.
+
+**Bind evidence to the request, including rework.** The implementer records
+the latest request/Plan/correction link and the pre-change base/head before
+editing. Before claiming completion, inspect the actual relevant diff and
+map its changes and assertions to that request. Retain existing green checks
+as baseline evidence, not proof of a newly requested implementation. An
+unchanged submission, unrelated new SHA, bare test count or text match, or
+`task_complete` signal cannot replace the requested delta and its evidence.
+
+For each executable behavior change, add the applicable focused regression
+first; capture its genuine failing assertion before the production fix,
+commit the test before the fix, and capture fixed success at the identified
+revision. Record the command, scalar exit status, relevant assertion output
+and actual comparison results separately. For claimed state measurements,
+compare named states/paths directly and record the results; word counts or
+absent comparisons are not state comparisons. Preserve separately credited
+real reds, hashes and test-before-fix order; missing history stays missing,
+not reconstructed by rerunning fixed code. Upper tiers inspect this request
+binding and these records under the existing layers, rather than rebuilding.
+
+For documentation-only work, show the requested document delta, plus applicable
+documentation checks or a before/after procedural walkthrough. Do not invent
+source/test edits, red runs or test/fix commits; mixed work still applies the
+executable-behavior requirements to its executable changes. This procedure
+guides capture and review, not runtime enforcement or proven future compliance.
 
 ## The layers
 
@@ -70,7 +95,7 @@ child with one instruction: record first.
 ## Pre-PR checklist (implementer)
 
 1. Run every command in the Task issue's **Verification** section; capture
-   real output.
+   real output and apply the request-bound evidence procedure above.
 2. `git status --short` clean; diff confined to the issue's File-ownership
    paths.
 3. New logic has tests at the appropriate level (firmware logic: `native`
