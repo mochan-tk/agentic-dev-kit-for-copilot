@@ -320,10 +320,9 @@ merge — a phase started against a half-tuned repository verifies nothing.
    (session naming: §Copilot app session tree).
 2. **Epic sessions are siblings, not descendants.** An Epic session that
    sees the next phase becoming actionable reports that to the Project
-   session rather than starting a peer itself: sessions spawning their
-   successors nest one level deeper per phase, and after a few phases the
-   tree is unreadable. Epics are siblings in the issue graph; their sessions
-   mirror that.
+   session rather than starting a peer itself: on the default nested path,
+   successors nest one level deeper per phase, and the tree becomes unreadable.
+   Epics are siblings in the issue graph; their sessions mirror that.
 3. **Watch across Epics, not within one.** Phase-spanning trouble is the
    Project session's business: an Epic whose blockers never clear, a
    dependency that turns out to be backwards, repeated escalations of the
@@ -395,17 +394,18 @@ merge — a phase started against a half-tuned repository verifies nothing.
 ## Copilot app session tree
 
 The GitHub Copilot app instantiates this protocol with a visible session
-tree. Two structural facts shape it:
+tree. Keep documented app capability, exposed tool schema, observed
+execution and kit policy apart; never infer one from another.
 
-- **Conductor pattern.** Agents cannot create root sessions; only a human
-  can. The human therefore keeps one long-lived root session — the
-  *conductor* — from which all orchestration descends (conductor → Epic
-  orchestrator → Task supervisor → worker). The conductor steers; it does
-  not implement.
-- **Creator nesting.** A session created by an agent nests under its
-  creator in the sidebar. The tree shape is grouping, not memory: roles are
-  portable (§1), and a dead session at any tier is replaced by a successor
-  resuming from the ledger.
+- **Conductor pattern (kit policy).** The human keeps one long-lived root
+  session — the *conductor* — from which all orchestration descends
+  (conductor → Epic orchestrator → Task supervisor → worker); it steers and
+  does not implement. The app documents agent-created top-level sessions
+  (changelog v1.1.15): capability, not authorization to bypass this hierarchy.
+- **Creator nesting.** The `create_session` contract nests a new session under
+  its creator by default, the path this kit chooses; `detached` drops that
+  link, creator coordination and idle notification. The tree is grouping, not
+  memory (§1): a dead session at any tier gets a successor from the ledger.
 
 **Name sessions after what they work on**, so a sidebar of open sessions can
 be read without opening any of them: `Project`, `Epic #1`, `Task #6
@@ -420,21 +420,21 @@ If reviewer GitHub publication is unavailable, return the audit marked **unrecor
 
 | Tool | Protocol step |
 |---|---|
-| `create_session` (kickoff prompt, mode, model) | Before EVERY call, check explicit `kickoff.model` and `kickoff.mode` tool arguments against the applicable owner decision and Routing block; correct missing arguments before dispatch, never rely on omitted defaults or prompt prose. Workers use `autopilot`; others use the mode authorized for their purpose. Epic-specific model preferences are not repository-wide policy. Supply a complete kickoff; this guidance adds no approval gate or runtime enforcement. |
+| `create_session` (kickoff prompt, mode, model) | Before EVERY call, check explicit `kickoff.model` and `kickoff.mode` tool arguments against the applicable owner decision and Routing block; correct missing arguments before dispatch, never rely on omitted defaults or prompt prose. Workers use `autopilot`; others use the mode authorized for their purpose. Epic-specific model preferences are not repository-wide policy. Supply a complete kickoff; this guidance adds no approval gate or runtime enforcement. The `create_session` schema may expose `detached` (schema, not execution evidence); this kit uses the default nested, coordinated path. Observed detached execution: none, and none is authorized here. |
 | `open_issue_session` | Dispatch straight from a Task issue — the issue is the brief |
 | `respond_to_session_plan` | The `risk:high` plan-approval gate, exercised by the parent |
-| `notify_on_idle` | Wake the parent when a child stops, whether finished, dead, or never-started. Read the named Epic/Task/PR record; idle without a durable result remains unverified, never completion. |
+| `notify_on_idle` | Wake the parent when a child stops, whether finished, dead, or never-started. Read the named Epic/Task/PR record; idle without a durable result remains unverified, never completion. Ignored for a detached session, which has no creator to notify. |
 | `send_session_message` | When exposed: steering, escalation (AGENTS.md section 6), and a one-hop report pointer after recording, never a substitute for GitHub. Restricted-role kickoffs use the durable handoff above instead. |
-| `archive_session` | Dispose of a finished worker; its context is released, the record stays on GitHub |
+| `archive_session` | Dispose of a finished worker; its context is released, the record stays on GitHub. Its contract limits it to sessions the caller created; no archive right over a detached session is assumed. |
 
-**Teardown order is leaf-first.** `archive_session` works only on sessions
-its caller created, so archiving a supervisor before its workers strands
-the workers — no agent can remove them afterwards, only a human. Workers
-stay alive through review (rework returns to the same worker), so teardown
-runs after the merge, not at closeout: the requester messages the
-supervisor to tear down → the supervisor records the disposition above and
-archives its worker(s) → acknowledges → only then does the requester archive
-the supervisor.
+**Teardown order is leaf-first**, the nested-path procedure and not a verified
+detached-session lifecycle. `archive_session` works only on sessions its caller
+created, so archiving a supervisor before its workers strands the workers — no
+agent can remove them afterwards, only a human. Workers stay alive through
+review (rework returns to the same worker), so teardown runs after the merge,
+not at closeout: the requester messages the supervisor to tear down → the
+supervisor records the disposition above and archives its worker(s) →
+acknowledges → only then does the requester archive the supervisor.
 
 **Conducting sessions are not torn down with them.** Teardown covers the
 executing layers only: workers and Task supervisors, which carry the
