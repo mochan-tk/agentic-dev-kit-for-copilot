@@ -236,6 +236,8 @@ same canonical installer used on macOS and Linux.
 
 The installer stages files but does not commit them, refuses unexpected
 collisions and symlinked paths, and records the resolved scaffold revision.
+Only bootstrap documentation is installed; kit context, ADR history and
+populated agreement/retro ledgers stay in the kit repository.
 
 Land the adoption commit on the remote default branch before onboarding.
 
@@ -289,7 +291,7 @@ remain explicit adopter actions.
 
 See:
 
-- [ADR-0004: governance sensors and actuators](.github/docs/agreements/adr/ADR-0004-hotl-governance-sensors.md)
+- [Kit ADR-0004: governance sensors and actuators](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr)
 - [`governance-status.sh`](.github/scripts/governance-status.sh)
 - [`ownership-overlap.sh`](.github/scripts/ownership-overlap.sh)
 - [`governance-drift.sh`](.github/scripts/governance-drift.sh)

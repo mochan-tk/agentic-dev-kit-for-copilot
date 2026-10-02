@@ -46,7 +46,9 @@ EOF
 echo "FIXTURE LICENSE TEXT" > "$FIXTURE/LICENSE"
 echo '{"servers":{}}' > "$FIXTURE/.vscode/mcp.json"
 echo "echo guard" > "$FIXTURE/.github/scripts/some-guard.sh"
-echo "# fixture doc" > "$FIXTURE/.github/docs/thing.md"
+echo "# fixture doc" > "$FIXTURE/.github/docs/adopter-feedback.md"
+printf '.github/docs/adopter-feedback.md\t.github/docs/adopter-feedback.md\n' \
+  > "$FIXTURE/.github/scripts/scaffold-docs.manifest"
 # Tuned-class representatives (kept on --upgrade collisions): the Sync
 # Triangle file and a workflow.
 mkdir -p "$FIXTURE/.github/workflows"
@@ -79,7 +81,7 @@ new_target
 expect_rc_grep 0 "Scaffold installed from" "clean install succeeds with handoff banner" run_init "$TARGET"
 staged=$(git -C "$TARGET" diff --cached --name-only | sort | tr '\n' ' ')
 case "$staged" in
-  *".github/docs/thing.md"*".github/scripts/some-guard.sh"*"AGENTS.md"*"README.md"*"SCAFFOLD-CHANGELOG.md"*)
+  *".github/docs/adopter-feedback.md"*".github/scripts/some-guard.sh"*"AGENTS.md"*"README.md"*"SCAFFOLD-CHANGELOG.md"*)
     t_ok "clean install stages the scaffold set (incl. seeded README)" ;;
   *)
     t_fail "clean install stages the scaffold set (staged: $staged)" ;;
@@ -515,7 +517,7 @@ tune_target() {
   echo "TUNED INSTRUCTIONS" > "$TARGET/.github/copilot-instructions.md"
   echo "TUNED CI" > "$TARGET/.github/workflows/ci.yml"
   echo "AMENDED AGENTS" > "$TARGET/AGENTS.md"
-  echo "PROJECT DOC" > "$TARGET/.github/docs/thing.md"
+  echo "PROJECT DOC" > "$TARGET/.github/docs/adopter-feedback.md"
 }
 
 # --- upgrade + --force is a usage error -------------------------------------
@@ -545,7 +547,7 @@ if [ "$(cat "$TARGET/.github/copilot-instructions.md")" = "TUNED INSTRUCTIONS" ]
 else
   t_fail "tuned surfaces survive the upgrade byte-identical"
 fi
-if [ "$(cat "$TARGET/.github/docs/thing.md")" = "PROJECT DOC" ]; then
+if [ "$(cat "$TARGET/.github/docs/adopter-feedback.md")" = "PROJECT DOC" ]; then
   t_ok "instance docs survive the upgrade byte-identical"
 else
   t_fail "instance docs survive the upgrade byte-identical"
@@ -558,7 +560,7 @@ else
 fi
 if grep -q "refreshed   .github/scripts/some-guard.sh" "$OUT_UPG" \
    && grep -q "kept        AGENTS.md (tuned surface" "$OUT_UPG" \
-   && grep -q "kept        .github/docs/thing.md (instance docs" "$OUT_UPG"; then
+   && grep -q "kept        .github/docs/adopter-feedback.md (instance docs" "$OUT_UPG"; then
   t_ok "upgrade banner reports refreshed and kept files by class"
 else
   t_fail "upgrade banner reports refreshed and kept files by class"
@@ -625,7 +627,7 @@ OUT_UDRY="$WORK/upgrade-dry-out.txt"
 run_upgrade "$TARGET" --upgrade --dry-run > "$OUT_UDRY" 2>&1
 if grep -q "upgrade    .github/scripts/some-guard.sh (scaffold-owned" "$OUT_UDRY" \
    && grep -q "keep       AGENTS.md (tuned surface" "$OUT_UDRY" \
-   && grep -q "keep       .github/docs/thing.md (instance docs" "$OUT_UDRY" \
+   && grep -q "keep       .github/docs/adopter-feedback.md (instance docs" "$OUT_UDRY" \
    && grep -q "install    .github/prompts/new.prompt.md" "$OUT_UDRY"; then
   t_ok "--upgrade --dry-run labels the plan by ownership class"
 else

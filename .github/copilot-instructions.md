@@ -43,8 +43,8 @@ to the application.
      - `.github/docs/context/`    — raw collected material (read for background).
      - `.github/docs/agreements/` — reviewed decisions (read before designing anything).
 -->
-- `.github/docs/context/` — raw collected material in the installed tree; root `docs/context/` is this source template's existing history, not installed or guaranteed in adopters and not a new required destination.
-- `.github/docs/agreements/` — reviewed requirements, ADRs, glossary, non-goals in the installed tree; `.github/docs/agreements/adr/` holds ADR-0000 (template) and ADR-0004; root `docs/agreements/adr/` holds ADR-0001..0003 as this source template's existing history, not installed or guaranteed in adopters and not a new required destination.
+- `.github/docs/context/` — adopter intake starts with a bootstrap README; kit collections here and in root `docs/context/` stay source-side, not installed or required adopter destinations.
+- `.github/docs/agreements/` — adopter truth starts with its README, ADR-0000 template and empty ledgers; adopter-feedback is also bootstrapped. Kit ADRs ([ADR-0004 directory](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr)), retro rows and root `docs/` history stay source-side; adopter ADR numbering starts at ADR-0001.
 - `.github/skills/` — procedures. `.github/instructions/` — path-scoped rules.
 - `.github/agents/` — role definitions (orchestrator, planner, reviewer).
 

@@ -1,0 +1,10 @@
+# Adopter documentation only: destination<TAB>source, repository-relative.
+# Keep mutable kit ledgers separate from their empty bootstrap payloads.
+.github/docs/adopter-feedback.md	.github/docs/adopter-feedback.md
+.github/docs/agreements/README.md	.github/docs/agreements/README.md
+.github/docs/agreements/adr/ADR-0000-template.md	.github/docs/agreements/adr/ADR-0000-template.md
+.github/docs/context/README.md	.github/docs/context/README.md
+.github/docs/agreements/requirements.md	.github/templates/adopter-docs/agreements/requirements.md
+.github/docs/agreements/glossary.md	.github/templates/adopter-docs/agreements/glossary.md
+.github/docs/agreements/non-goals.md	.github/templates/adopter-docs/agreements/non-goals.md
+.github/docs/agreements/retro-log.md	.github/templates/adopter-docs/agreements/retro-log.md

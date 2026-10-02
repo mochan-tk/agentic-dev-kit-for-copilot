@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # governance-status.sh — read-only default-branch governance sensor
-# (ADR-0004 decisions 1, 2, 4, 5). Compares effective branch rules, Actions
+# (kit ADR-0004 decisions 1, 2, 4, 5:
+# https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr).
+# Compares effective branch rules, Actions
 # posture, CODEOWNERS tuning, and merge-queue applicability against an
 # explicitly declared solo, team, or single-maintainer intent (solo = the setup-ruleset.sh
 # minimum; stronger observed settings never make solo unhealthy). Aggregates

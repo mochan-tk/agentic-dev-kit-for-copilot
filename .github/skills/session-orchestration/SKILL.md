@@ -132,7 +132,7 @@ mechanism or measured model-compliance test. Status is the report/quiet exit
 contract; CI's warning-only exit 0 does not establish tuned. A decline is not
 authentication, a new implementation release, or a waiver of claim/plan,
 `risk:high` approval, ownership, verification, or human merge authority
-(ADR-0004). Conflicting authority is escalated through the supervisor.
+([kit ADR-0004](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr)). Conflicting authority is escalated through the supervisor.
 
 | Scenario | Expected next action |
 |---|---|

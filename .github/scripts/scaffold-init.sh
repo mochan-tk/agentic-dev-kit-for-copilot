@@ -7,7 +7,9 @@
 # directory — it runs this script through Git Bash; logic lives here only.
 #
 # What it installs — and nothing else; the application owns every other path:
-#   always            .github/**  AGENTS.md  SCAFFOLD-CHANGELOG.md
+#   always            .github/** except kit docs/history and payload storage;
+#                     adopter docs from scaffold-docs.manifest;
+#                     AGENTS.md  SCAFFOLD-CHANGELOG.md
 #   seed-if-absent    README.md  .gitignore  .gitattributes
 #   never             LICENSE, .vscode/ (license choice and editor setup
 #                     belong to the adopting repository)
@@ -45,7 +47,7 @@
 # Usage: scaffold-init.sh [--force|--upgrade] [--dry-run] [--help] [target-dir]
 #   target-dir  create the directory (git init if needed) and install there;
 #               without it, install into the current directory's repo root.
-# Exit codes: 0 ok · 1 collision/symlink/target error · 2 usage · 3 fetch error.
+# Exit codes: 0 ok · 1 collision/symlink/target error · 2 usage · 3 source error.
 
 set -euo pipefail
 
@@ -58,7 +60,9 @@ usage() {
 Usage: scaffold-init.sh [--force|--upgrade] [--dry-run] [--help] [target-dir]
 
 Install the agentic-dev scaffold into a git repository (current directory
-by default; pass target-dir to create/init one). Installs .github/**,
+by default; pass target-dir to create/init one). Installs .github/** except
+kit documentation history and adopter-docs payload storage; documentation
+destinations come only from scripts/scaffold-docs.manifest. Installs
 AGENTS.md and SCAFFOLD-CHANGELOG.md always; seeds README.md, .gitignore
 and .gitattributes only when the target has none; never installs LICENSE
 or .vscode/.
@@ -266,6 +270,47 @@ if [ ! -d "$SRC/.github" ]; then
   exit 3
 fi
 
+# Validate all documentation inputs before planning, copying or staging,
+# including dry runs. Never fall back to enumerating the kit's live docs.
+DOC_DESTS=()
+DOC_SOURCES=()
+doc_error() { echo "error: documentation manifest/payload: $*" >&2; exit 3; }
+doc_path_valid() {
+  case "$1" in
+    ''|/*|*/|*//*|.|./*|*/./*|*/.|..|../*|*/../*|*/..|*[[:space:]]*) return 1 ;;
+  esac
+}
+MANIFEST="$SRC/.github/scripts/scaffold-docs.manifest"
+[ -f "$MANIFEST" ] && [ -r "$MANIFEST" ] || doc_error "missing or unreadable manifest"
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in ''|\#*) continue ;; esac
+  case "$line" in *$'\t'*) ;; *) doc_error "entry must have exactly two TAB-separated paths" ;; esac
+  dest="${line%%$'\t'*}"
+  source="${line#*$'\t'}"
+  if ! doc_path_valid "$dest" || ! doc_path_valid "$source"; then
+    doc_error "invalid path in entry: $line"
+  fi
+  case "$dest" in .github/docs/?*) ;; *) doc_error "destination outside .github/docs/: $dest" ;; esac
+  for previous in ${DOC_DESTS[@]+"${DOC_DESTS[@]}"}; do
+    [ "$previous" != "$dest" ] || doc_error "duplicate destination: $dest"
+    case "$dest/" in "$previous/"*) doc_error "overlapping destinations: $previous and $dest" ;; esac
+    case "$previous/" in "$dest/"*) doc_error "overlapping destinations: $previous and $dest" ;; esac
+  done
+  case "$source" in
+    .github/docs/*) [ "$source" = "$dest" ] || doc_error "live docs source must equal destination: $source" ;;
+  esac
+  p="$source"
+  while :; do
+    [ ! -L "$SRC/$p" ] || doc_error "symlinked payload source: $source"
+    case "$p" in */*) p="${p%/*}" ;; *) break ;; esac
+  done
+  [ -f "$SRC/$source" ] && [ -r "$SRC/$source" ] && [ -s "$SRC/$source" ] \
+    || doc_error "missing, unreadable, non-file or empty payload: $source"
+  DOC_DESTS+=("$dest")
+  DOC_SOURCES+=("$source")
+done < "$MANIFEST"
+[ "${#DOC_DESTS[@]}" -gt 0 ] || doc_error "manifest has no entries"
+
 # --- file plan --------------------------------------------------------------
 # present <relpath> — something occupies the path (a broken symlink counts:
 # writing to it would follow the link).
@@ -306,7 +351,8 @@ ALWAYS=()
 status "computing the file plan ..."
 while IFS= read -r -d '' f; do
   ALWAYS+=("${f#"$SRC"/}")
-done < <(find "$SRC/.github" -type f -print0 | sort -z)
+done < <(find "$SRC/.github" \( -path "$SRC/.github/docs" -o -path "$SRC/.github/templates/adopter-docs" \) -prune -o -type f -print0 | sort -z)
+ALWAYS+=("${DOC_DESTS[@]}")
 for f in AGENTS.md SCAFFOLD-CHANGELOG.md; do
   [ -f "$SRC/$f" ] && ALWAYS+=("$f")
 done
@@ -422,8 +468,9 @@ for f in ${ALWAYS[@]+"${ALWAYS[@]}"} ${SEED[@]+"${SEED[@]}"}; do
   INSTALLED+=("$f")
 done
 
-# Copy the whole set in two processes: one mkdir -p for every target
-# directory, one tar pipe for the files. The previous per-file
+# Copy engine/seed files in one tar pipe and mapped docs in another.
+# Directory creation and payload assembly are batched; there are no
+# per-file process spawns. The previous per-file
 # dirname/mkdir/cp loop spawned ~3 processes per file — minutes of
 # silence on MSYS (Git Bash), where process creation is slow and
 # corporate AV scans every spawn (#165). tar -p preserves the modes and
@@ -432,8 +479,18 @@ done
 if [ "${#INSTALLED[@]}" -gt 0 ]; then
   status "installing ${#INSTALLED[@]} file(s) ..."
   DIRS=()
+  ENGINE_FILES=()
+  DOC_FILES=()
+  PAYLOAD_DIRS=()
   for f in "${INSTALLED[@]}"; do
     case "$f" in */*) DIRS+=("${f%/*}") ;; esac
+    case "$f" in
+      .github/docs/*)
+        DOC_FILES+=("$f")
+        PAYLOAD_DIRS+=("$WORK/docs-payload/${f%/*}")
+        ;;
+      *) ENGINE_FILES+=("$f") ;;
+    esac
   done
   if [ "${#DIRS[@]}" -gt 0 ]; then
     mkdir -p "${DIRS[@]}"
@@ -441,7 +498,26 @@ if [ "${#INSTALLED[@]}" -gt 0 ]; then
   # LC_ALL=C: keep tar's behavior and stderr locale-independent (bsdtar
   # warns "Failed to set default locale" in locale-less environments);
   # every scaffold path is ASCII, so the C locale loses nothing.
-  LC_ALL=C tar -C "$SRC" -cf - "${INSTALLED[@]}" | LC_ALL=C tar -xpf -
+  if [ "${#DOC_FILES[@]}" -gt 0 ]; then
+    mkdir -p "${PAYLOAD_DIRS[@]}"
+    for (( i = 0; i < ${#DOC_DESTS[@]}; i++ )); do
+      dest="${DOC_DESTS[$i]}"
+      if [ "$UPGRADE" -eq 1 ] && present "$dest"; then continue; fi
+      # Builtins preserve bytes (including NULs and a missing final newline)
+      # without a cp process per mapped payload.
+      {
+        chunk=""
+        while IFS= read -r -d '' chunk; do printf '%s\0' "$chunk"; done
+        printf '%s' "$chunk"
+      } < "$SRC/${DOC_SOURCES[$i]}" > "$WORK/docs-payload/$dest"
+    done
+  fi
+  if [ "${#ENGINE_FILES[@]}" -gt 0 ]; then
+    LC_ALL=C tar -C "$SRC" -cf - "${ENGINE_FILES[@]}" | LC_ALL=C tar -xpf -
+  fi
+  if [ "${#DOC_FILES[@]}" -gt 0 ]; then
+    LC_ALL=C tar -C "$WORK/docs-payload" -cf - "${DOC_FILES[@]}" | LC_ALL=C tar -xpf -
+  fi
 fi
 
 # insert_adopted_line <line> — place one **Adopted:** line directly under

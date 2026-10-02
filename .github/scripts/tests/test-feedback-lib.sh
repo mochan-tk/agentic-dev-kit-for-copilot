@@ -321,12 +321,15 @@ fi
 
 # --- installer wiring: non-interactive failure produces no offer output ------
 FIXTURE="$WORK/template"
-mkdir -p "$FIXTURE/.github/scripts"
+mkdir -p "$FIXTURE/.github/scripts" "$FIXTURE/.github/docs"
 echo "# fixture agents" > "$FIXTURE/AGENTS.md"
 echo "# fixture changelog" > "$FIXTURE/SCAFFOLD-CHANGELOG.md"
 echo "# fixture readme" > "$FIXTURE/README.md"
 echo "fixture-ignore" > "$FIXTURE/.gitignore"
 echo "echo guard" > "$FIXTURE/.github/scripts/some-guard.sh"
+echo "# fixture feedback" > "$FIXTURE/.github/docs/adopter-feedback.md"
+printf '.github/docs/adopter-feedback.md\t.github/docs/adopter-feedback.md\n' \
+  > "$FIXTURE/.github/scripts/scaffold-docs.manifest"
 TARGET="$WORK/ro-target"
 init_sandbox_repo "$TARGET"
 chmod u-w "$TARGET"
