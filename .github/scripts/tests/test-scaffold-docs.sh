@@ -22,6 +22,8 @@ check() {
   shift
   if "$@"; then t_ok "$name"; else t_fail "$name"; fi
 }
+not_grep() { ! grep "$@"; }
+dir_empty() { [ -z "$(find "$1" -type f -print)" ]; }
 snapshot() {
   (cd "$TARGET" && find . -path ./.git -prune -o -type f -exec cksum {} + | LC_ALL=C sort)
   git -C "$TARGET" ls-files --stage
@@ -109,7 +111,7 @@ snapshot > "$WORK/after"
 check "dry-run preserves direct tree, bytes and index snapshot" cmp -s "$WORK/before" "$WORK/after"
 awk '$1 == "install" && $2 ~ /^\.github\/docs\// { print $2 }' "$WORK/dry" | LC_ALL=C sort > "$WORK/dry-docs"
 check "dry-run docs plan equals exactly the allowlist" cmp -s "$WORK/expected" "$WORK/dry-docs"
-check "dry-run excludes payload storage" bash -c '! grep -q "\.github/templates/adopter-docs" "$1"' _ "$WORK/dry"
+check "dry-run excludes payload storage" not_grep -q '\.github/templates/adopter-docs' "$WORK/dry"
 
 invalid() {
   local name="$1" mode
@@ -131,6 +133,10 @@ invalid() {
 }
 rm "$SOURCE/.github/scripts/scaffold-docs.manifest"
 invalid "missing manifest"
+cp "$WORK/valid-manifest" "$SOURCE/.github/scripts/scaffold-docs.manifest"
+chmod a-r "$SOURCE/.github/scripts/scaffold-docs.manifest"
+invalid "unreadable manifest"
+chmod u+r "$SOURCE/.github/scripts/scaffold-docs.manifest"
 printf '# comments only\n\n' > "$SOURCE/.github/scripts/scaffold-docs.manifest"
 invalid "comment-only manifest"
 for line in \
@@ -139,6 +145,10 @@ for line in \
   $'.github/docs/bad.md\tREADME.md\textra' \
   $'/absolute.md\tREADME.md' \
   $'.github/docs/../escape.md\tREADME.md' \
+  $'.github/docs/new/\tREADME.md' \
+  $'.github/docs/.\tREADME.md' \
+  $'.github/docs/./bad.md\tREADME.md' \
+  $'.github/docs//bad.md\tREADME.md' \
   $'./.github/docs/bad.md\tREADME.md' \
   $'.github/docs/bad.md\tREADME.md ' \
   $'README.md\tREADME.md' \
@@ -149,6 +159,12 @@ for line in \
 done
 cat "$WORK/valid-manifest" "$WORK/valid-manifest" > "$SOURCE/.github/scripts/scaffold-docs.manifest"
 invalid "duplicate destination"
+printf '.github/docs/new.md\tREADME.md\n.github/docs/new.md/child.md\tREADME.md\n' \
+  > "$SOURCE/.github/scripts/scaffold-docs.manifest"
+invalid "parent-child destinations"
+printf '.github/docs/new.md/child.md\tREADME.md\n.github/docs/new.md\tREADME.md\n' \
+  > "$SOURCE/.github/scripts/scaffold-docs.manifest"
+invalid "child-parent destinations"
 : > "$SOURCE/empty.md"
 printf '.github/docs/bad.md\tempty.md\n' > "$SOURCE/.github/scripts/scaffold-docs.manifest"
 invalid "empty payload"
@@ -158,6 +174,14 @@ invalid "symlinked payload"
 mkdir "$SOURCE/directory"
 printf '.github/docs/bad.md\tdirectory\n' > "$SOURCE/.github/scripts/scaffold-docs.manifest"
 invalid "non-file payload"
+echo "readable bytes" > "$SOURCE/unreadable.md"
+chmod a-r "$SOURCE/unreadable.md"
+printf '.github/docs/bad.md\tunreadable.md\n' > "$SOURCE/.github/scripts/scaffold-docs.manifest"
+invalid "unreadable payload"
+chmod u+r "$SOURCE/unreadable.md"
+ln -s .github/templates/adopter-docs "$SOURCE/linked-dir"
+printf '.github/docs/bad.md\tlinked-dir/agreements/requirements.md\n' > "$SOURCE/.github/scripts/scaffold-docs.manifest"
+invalid "symlinked payload ancestor"
 cp "$WORK/valid-manifest" "$SOURCE/.github/scripts/scaffold-docs.manifest"
 
 new_target
@@ -190,7 +214,22 @@ expect_rc_grep 0 'overwrote   .github/docs/agreements/requirements.md' "force re
 check "force writes the approved payload bytes" cmp -s "$TARGET/.github/docs/agreements/requirements.md" "$SOURCE/.github/templates/adopter-docs/agreements/requirements.md"
 check "force preserves excluded history bytes" grep -qx 'KEEP HISTORY' "$TARGET/.github/docs/context/future/INDEX.md"
 run_init --force --dry-run > "$WORK/force-dry" 2>&1
-check "force does not plan unknown kit records" bash -c '! grep -Eq "context/future|ADR-0005|unknown.md" "$1"' _ "$WORK/force-dry"
+check "force does not plan unknown kit records" not_grep -Eq 'context/future|ADR-0005|unknown.md' "$WORK/force-dry"
+
+# Pin byte preservation for the builtins-only mapped copy under both shells.
+printf 'first\r\n\0\0last-without-newline\0' > "$SOURCE/bytes.md"
+printf '.github/docs/bytes.md\tbytes.md\n' > "$SOURCE/.github/scripts/scaffold-docs.manifest"
+new_target
+expect_rc 0 "binary-boundary payload fresh install succeeds" run_init
+check "fresh payload preserves CRLF, consecutive/trailing NULs" cmp -s "$SOURCE/bytes.md" "$TARGET/.github/docs/bytes.md"
+printf 'no-final-newline' > "$SOURCE/bytes.md"
+expect_rc 0 "binary-boundary payload force install succeeds" run_init --force
+check "force payload preserves missing final newline" cmp -s "$SOURCE/bytes.md" "$TARGET/.github/docs/bytes.md"
+rm "$TARGET/.github/docs/bytes.md"
+printf 'no-final-newline\0\0CRLF\r\nend' > "$SOURCE/bytes.md"
+expect_rc 0 "binary-boundary missing payload upgrade succeeds" run_init --upgrade
+check "upgrade adds byte-identical binary-boundary payload" cmp -s "$SOURCE/bytes.md" "$TARGET/.github/docs/bytes.md"
+cp "$WORK/valid-manifest" "$SOURCE/.github/scripts/scaffold-docs.manifest"
 
 for path in .github/docs .github/docs/agreements .github/docs/agreements/requirements.md; do
   new_target
@@ -200,6 +239,6 @@ for path in .github/docs .github/docs/agreements .github/docs/agreements/require
   expect_rc_grep 1 'refusing to write through symbolic links' "force refuses destination symlink: $path" run_init --force
   snapshot > "$WORK/after"
   check "symlink refusal leaves target/index inert: $path" cmp -s "$WORK/before" "$WORK/after"
-  check "symlink refusal writes nothing outside target: $path" bash -c '[ -z "$(find "$1" -type f -print)" ]' _ "$WORK/outside$N"
+  check "symlink refusal writes nothing outside target: $path" dir_empty "$WORK/outside$N"
 done
 t_summary
