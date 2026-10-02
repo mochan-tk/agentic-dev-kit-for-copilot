@@ -24,8 +24,9 @@ onboarding PR should confirm it)*
    (`.github/scripts|skills|agents|prompts|ISSUE_TEMPLATE/**`, the PR
    template, this changelog) is refreshed in place; tuned surfaces
    (`copilot-instructions.md`, `workflows/`, `CODEOWNERS`,
-   `instructions/`, `AGENTS.md`) and `.github/docs/**` are kept and
-   listed. Preview with `--upgrade --dry-run`.
+   `instructions/`, `AGENTS.md`) and existing `.github/docs/**` are kept.
+   Only allowlisted bootstrap docs are added when absent; kit history is
+   outside the install plan. Preview with `--upgrade --dry-run`.
 2. Review the staged diff (`git diff --cached`) and this changelog's
    entries since your adopted version; port anything the kept files
    need by hand — upgrades change procedures and templates, not your
@@ -55,8 +56,8 @@ existing-file collisions from absent files:
 |---|---|---|
 | Engine: `.github/scripts/**`, skills, agents, prompts, issue templates, PR template, this changelog | Refreshes existing copies, including the governance-control manifest in `.github/scripts/`. | Read the new procedures and compare them with preserved local instructions/workflows. |
 | Tuned: `.github/copilot-instructions.md`, `.github/workflows/**`, `.github/CODEOWNERS`, `.github/instructions/**`, `AGENTS.md` | Keeps existing files; does not port these section-level changes. | Apply only the relevant reviewed wording, preserving project customizations. |
-| Instance docs: `.github/docs/**` | Keeps existing context, agreements, and other project truth. | Do not replace them with template documents. |
-| Absent files in any of the above classes | Installs them, even when other files in that class are kept. | Inspect newly introduced instructions, docs, and workflows as well as refreshed engine files. |
+| Instance docs: `.github/docs/**` | Keeps existing context, agreements, and other project truth; adds only absent allowlisted bootstrap docs. | Do not replace them with template documents; excluded kit history is neither installed nor deleted. |
+| Absent engine/tuned files and allowlisted bootstrap docs | Installs them, even when other files in that class are kept. | Inspect newly introduced instructions, bootstrap docs, and workflows as well as refreshed engine files. |
 | Seed-only `README.md` | Keeps it when present; seeds it only when absent. | Retain the project's own overview. |
 
 Engine refresh is not onboarding and does not make an adopter tuned. Preserve
@@ -260,6 +261,51 @@ inherit what this one learned.
 ## Versions
 
 ### Unreleased
+
+- Documentation installation now uses `scaffold-docs.manifest`, an explicit
+  eight-destination allowlist, with dedicated empty agreement/retro payloads.
+  Kit context collections, numbered kit ADRs and populated kit ledgers are
+  not installed or staged; unknown future docs are excluded too. Upgrade
+  preserves existing adopter truth, adds missing bootstrap docs, and never
+  reintroduces excluded kit records after manual removal. Force applies only
+  to allowed destinations. Invalid distribution data fails before writes
+  or staging (mochan-tk/agentic-dev-kit-for-copilot#174, derived from
+  mochan-tk/agentic-dev-kit-for-copilot#173).
+
+#### Migration: previously installed kit documentation
+
+Upgrades **never remove old kit records**. Before manual cleanup, compare
+each record below with the kit version at your recorded adoption SHA, using
+the [kit repository](https://github.com/mochan-tk/agentic-dev-kit-for-copilot).
+Keep anything your project modified or relies on; resolve differences through
+your normal reviewed PR, not a blanket deletion or file replacement.
+
+1. Inspect the six kit context collections under `.github/docs/context/`:
+   `development-speed/`, `hotl-review/`, `platform-capabilities/`,
+   `readme-redesign/`, `session-naming/`, `single-maintainer-rollout/`.
+   Inspect `ADR-0004-hotl-governance-sensors.md` in the agreements `adr/`
+   directory. Use `git rm` only on individually compared, unmodified kit
+   records your project does not rely on; retain all adopter material.
+2. Compare kit rows in `retro-log.md` and kit examples in `requirements.md`,
+   `glossary.md`, and `non-goals.md`. Reconcile only those inherited entries
+   by hand, keeping adopter requirements, vocabulary, non-goals and history.
+   Empty bootstrap payloads are starting templates, not replacements for
+   adopted ledgers.
+3. Reconcile the kept `AGENTS.md` and `copilot-instructions.md` map lines,
+   both tier READMEs in `.github/docs/context/` and `.github/docs/agreements/`,
+   and seed-only root `README.md`. Preserve tuning and project content.
+   State that only bootstrap docs are distributed, while kit history stays
+   at its existing root `docs/` and kit `.github/docs/` paths; root `docs/`
+   is not a required adopter destination and adopter ADRs start at ADR-0001.
+   Replace any inherited ADR-0004 link with the
+   [kit ADR directory](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr),
+   not a missing adopter file. Upgrades keep these files, so their wording
+   is not automatically ported.
+4. Review the staged diff, run tuning-status and the shipped CI guards,
+   and land the reconciled changes as one reviewed adopter PR. A later
+   `--upgrade` will not reinstall the removed kit records.
+
+#### Other unreleased changes
 
 - `governance-status.sh` and `setup-ruleset.sh` add an explicit
   `single-maintainer` governance profile, opt-in only via

@@ -22,7 +22,9 @@ is wrong, follow `.github/instructions/docs.instructions.md` ("Changing an
 agreement"): substantive changes get a dedicated agreements PR; declared
 wording riders may ride the implementation PR.
 
-> Template-repository note: the scaffold's **own** ADRs (`ADR-0001` and up)
-> live in the template repository at root `docs/agreements/adr/` and are
-> never installed. This tree in your project holds *your* agreements only;
-> your numbering starts fresh at `ADR-0001`.
+> Template-repository note: kit history stays at its source paths: root
+> `docs/agreements/adr/`, kit ADR-0004 in the [kit ADR directory](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr),
+> and populated kit `retro-log.md`. None is installed as adopter truth.
+> This tier receives only its README, ADR-0000 template and empty bootstrap
+> ledgers; this tree in your project holds *your* agreements, and your ADR
+> numbering starts fresh at `ADR-0001`. Root `docs/` is not a required destination.

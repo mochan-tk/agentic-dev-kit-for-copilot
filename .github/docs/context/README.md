@@ -19,6 +19,8 @@ Ground rules (summary — the skill is authoritative):
   conclusions here — that is distillation
   (`.github/skills/context-distillation/SKILL.md`).
 
-> Template-repository note: the scaffold's own context collections live in
-> the template repository at root `docs/context/` and are never installed —
-> this area is exclusively for *your* project's material.
+> Template-repository note: kit context history stays at its source paths
+> under both root `docs/context/` and kit `.github/docs/context/` collections.
+> The installer ships only the bootstrap README for this tier, never those
+> collections. In an adopter, this area holds *your* project's material;
+> root `docs/` is not a required intake destination.

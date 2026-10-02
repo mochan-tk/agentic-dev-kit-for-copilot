@@ -25,6 +25,7 @@ check() {
 not_grep() { ! grep "$@"; }
 dir_empty() { [ -z "$(find "$1" -type f -print)" ]; }
 snapshot() {
+  (cd "$TARGET" && find . -path ./.git -prune -o \( -type d -o -type l \) -print | LC_ALL=C sort)
   (cd "$TARGET" && find . -path ./.git -prune -o -type f -exec cksum {} + | LC_ALL=C sort)
   git -C "$TARGET" ls-files --stage
   if [ -f "$TARGET/.git/index" ]; then cksum < "$TARGET/.git/index"; fi

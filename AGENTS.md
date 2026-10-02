@@ -101,8 +101,8 @@ them, escalate per §6.
 
 | Concern | Location |
 |---|---|
-| Raw collected material (phase 1) | `.github/docs/context/` (installed tree); root `docs/context/` (this source template's existing history; not installed or guaranteed in adopters; not a new required destination). |
-| Reviewed requirements, ADRs, glossary, non-goals (phase 2) | `.github/docs/agreements/` (installed tree; ADR-0000 template and ADR-0004 in `.github/docs/agreements/adr/`); root `docs/agreements/adr/` (ADR-0001..0003, this source template's existing history; not installed or guaranteed in adopters; not a new required destination). |
+| Raw collected material (phase 1) | `.github/docs/context/` starts with its bootstrap README; kit collections there and in root `docs/context/` stay source-side, not installed or required adopter destinations. |
+| Reviewed requirements, ADRs, glossary, non-goals (phase 2) | `.github/docs/agreements/` starts with its README, ADR-0000 template and empty ledgers; adopter-feedback is also bootstrapped. Kit ADRs ([ADR-0004 directory](https://github.com/mochan-tk/agentic-dev-kit-for-copilot/tree/main/.github/docs/agreements/adr)), retro rows and root `docs/` history stay source-side; adopter numbering starts at ADR-0001. |
 | Repository practicalities (layout, commands, PR mechanics) | `.github/copilot-instructions.md` |
 | Path-scoped rules | `.github/instructions/*.instructions.md` |
 | Procedures (planning, routing, orchestration, verification, retro, context) | `.github/skills/*/SKILL.md` |
